@@ -1,0 +1,11 @@
+node_modules/
+.DS_Store
+*.xcuserdata
+.env
+*.p8
+venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.build/
+*.xcworkspace/xcuserdata
