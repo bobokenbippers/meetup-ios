@@ -215,9 +215,7 @@ struct CreateMeetupView: View {
     }
 
     private func addressSubtitle(for item: MKMapItem) -> String? {
-        let addr = item.address
-        let parts = [addr?.street, addr?.city, addr?.state].compactMap { $0 }.filter { !$0.isEmpty }
-        return parts.isEmpty ? nil : parts.joined(separator: ", ")
+        item.address?.shortAddress
     }
 
     private func selectPlace(_ item: MKMapItem) {
