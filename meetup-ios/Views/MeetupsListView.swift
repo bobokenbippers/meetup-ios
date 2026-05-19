@@ -111,6 +111,7 @@ struct MeetupsListView: View {
                     }
                 }
             }
+            .animation(.easeOut(duration: 0.3), value: hasLoaded)
             .navigationTitle("Meetups")
             .toolbar {
                 Button("", systemImage: "plus") { showCreate = true }

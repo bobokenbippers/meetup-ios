@@ -13,6 +13,7 @@ struct MeetupDashboardView: View {
     @State private var error: String?
     @State private var showCancelConfirm = false
     @State private var showBill = false
+    @State private var showConfetti = false
 
     private var myUserId: UUID? { auth.session?.user.id }
     private var myStatus: String? { participants.first(where: { $0.userId == myUserId })?.status }
@@ -80,6 +81,7 @@ struct MeetupDashboardView: View {
                             }
                             .frame(maxWidth: .infinity)
                             .padding(.horizontal)
+                            .transition(.scale(scale: 0.9, anchor: .top).combined(with: .opacity))
                         }
 
                         VStack(alignment: .leading, spacing: 0) {
@@ -119,6 +121,7 @@ struct MeetupDashboardView: View {
                         .padding(.top, 4)
                         .padding(.bottom, 32)
                     }
+                    .animation(.spring(response: 0.45, dampingFraction: 0.75), value: myStatus)
                 }
             }
             .navigationTitle(meetup.destinationName)
@@ -160,6 +163,9 @@ struct MeetupDashboardView: View {
             } message: {
                 Text(error ?? "")
             }
+            .overlay {
+                if showConfetti { ConfettiView() }
+            }
         }
     }
 
@@ -197,6 +203,11 @@ struct MeetupDashboardView: View {
         do {
             if accept {
                 try await MeetupService.shared.accept(meetupId: meetup.id)
+                showConfetti = true
+                Task {
+                    try? await Task.sleep(for: .seconds(2.5))
+                    showConfetti = false
+                }
             } else {
                 try await MeetupService.shared.decline(meetupId: meetup.id)
             }
@@ -284,6 +295,7 @@ struct ParticipantTile: View {
                         .font(.headline)
                         .foregroundStyle(statusColor)
                 }
+                .animation(.spring(response: 0.4, dampingFraction: 0.6), value: participant.status)
 
             VStack(alignment: .leading, spacing: 2) {
                 HStack(spacing: 4) {
@@ -311,5 +323,59 @@ struct ParticipantTile: View {
         }
         .padding(.horizontal)
         .padding(.vertical, 10)
+    }
+}
+
+private struct ConfettiView: View {
+    private struct Particle: Identifiable {
+        let id = UUID()
+        let x: CGFloat
+        let color: Color
+        let width: CGFloat
+        let height: CGFloat
+        let delay: Double
+        let duration: Double
+        let drift: CGFloat
+        let startAngle: Double
+        let endAngle: Double
+    }
+
+    @State private var particles: [Particle] = {
+        let palette: [Color] = [.pink, .purple, .blue, .orange, .yellow, .green, .red, .cyan, .mint, .indigo]
+        return (0..<60).map { _ in
+            Particle(
+                x: .random(in: 0.05...0.95),
+                color: palette.randomElement()!,
+                width: .random(in: 6...12),
+                height: .random(in: 4...8),
+                delay: .random(in: 0...0.55),
+                duration: .random(in: 1.3...2.1),
+                drift: .random(in: -80...80),
+                startAngle: .random(in: -20...20),
+                endAngle: .random(in: 220...560)
+            )
+        }
+    }()
+
+    @State private var drop = false
+
+    var body: some View {
+        GeometryReader { geo in
+            ForEach(particles) { p in
+                RoundedRectangle(cornerRadius: 2)
+                    .fill(p.color)
+                    .frame(width: p.width, height: p.height)
+                    .rotationEffect(.degrees(drop ? p.endAngle : p.startAngle))
+                    .position(
+                        x: geo.size.width * p.x + (drop ? p.drift : 0),
+                        y: drop ? geo.size.height + 30 : -10
+                    )
+                    .opacity(drop ? 0 : 1)
+                    .animation(.easeIn(duration: p.duration).delay(p.delay), value: drop)
+            }
+        }
+        .allowsHitTesting(false)
+        .ignoresSafeArea()
+        .onAppear { drop = true }
     }
 }
