@@ -55,6 +55,13 @@ struct MeetupsListView: View {
                     )
                 } else {
                     List {
+                        Section {
+                            Text("Track your squad's live location and ETA to the meetup spot.")
+                                .font(.subheadline)
+                                .foregroundStyle(.secondary)
+                                .listRowBackground(Color.clear)
+                                .listRowSeparator(.hidden)
+                        }
                         if !invited.isEmpty {
                             Section("Invited") {
                                 ForEach(invited, id: \.meetup.id) { p in
