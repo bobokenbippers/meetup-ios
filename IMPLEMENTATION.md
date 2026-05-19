@@ -1827,6 +1827,115 @@ Defer until v1 is shipping smoothly.
 
 ---
 
+## Bill Splitting Tables
+
+Run all SQL below in the Supabase SQL editor before using any bill-splitting features on the client.
+
+```sql
+-- ============================================================
+-- Bill Splitting Tables (run in Supabase SQL editor)
+-- ============================================================
+
+-- Bills: one per meetup
+CREATE TABLE bills (
+  id           uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  meetup_id    uuid NOT NULL REFERENCES meetups(id) ON DELETE CASCADE,
+  created_by   uuid NOT NULL REFERENCES profiles(id),
+  subtotal     numeric(10,2) NOT NULL,
+  tax          numeric(10,2) NOT NULL DEFAULT 0,
+  tip          numeric(10,2) NOT NULL DEFAULT 0,
+  total        numeric(10,2) NOT NULL,
+  created_at   timestamptz NOT NULL DEFAULT now(),
+  UNIQUE (meetup_id)
+);
+
+-- Line items parsed from receipt
+CREATE TABLE bill_items (
+  id       uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  bill_id  uuid NOT NULL REFERENCES bills(id) ON DELETE CASCADE,
+  name     text NOT NULL,
+  price    numeric(10,2) NOT NULL,
+  position int NOT NULL
+);
+
+-- Which user claimed which item
+CREATE TABLE bill_item_claims (
+  id           uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  bill_item_id uuid NOT NULL REFERENCES bill_items(id) ON DELETE CASCADE,
+  user_id      uuid NOT NULL REFERENCES profiles(id),
+  created_at   timestamptz NOT NULL DEFAULT now(),
+  UNIQUE (bill_item_id, user_id)
+);
+
+-- RLS
+ALTER TABLE bills ENABLE ROW LEVEL SECURITY;
+ALTER TABLE bill_items ENABLE ROW LEVEL SECURITY;
+ALTER TABLE bill_item_claims ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "meetup participants can read bills"
+  ON bills FOR SELECT
+  USING (EXISTS (
+    SELECT 1 FROM meetup_participants
+    WHERE meetup_participants.meetup_id = bills.meetup_id
+      AND meetup_participants.user_id = auth.uid()
+  ));
+
+CREATE POLICY "meetup participants can insert bills"
+  ON bills FOR INSERT
+  WITH CHECK (EXISTS (
+    SELECT 1 FROM meetup_participants
+    WHERE meetup_participants.meetup_id = bills.meetup_id
+      AND meetup_participants.user_id = auth.uid()
+  ));
+
+CREATE POLICY "meetup participants can read bill_items"
+  ON bill_items FOR SELECT
+  USING (EXISTS (
+    SELECT 1 FROM bills
+    JOIN meetup_participants ON meetup_participants.meetup_id = bills.meetup_id
+    WHERE bills.id = bill_items.bill_id
+      AND meetup_participants.user_id = auth.uid()
+  ));
+
+CREATE POLICY "meetup participants can insert bill_items"
+  ON bill_items FOR INSERT
+  WITH CHECK (EXISTS (
+    SELECT 1 FROM bills
+    JOIN meetup_participants ON meetup_participants.meetup_id = bills.meetup_id
+    WHERE bills.id = bill_items.bill_id
+      AND meetup_participants.user_id = auth.uid()
+  ));
+
+CREATE POLICY "meetup participants can update bill_items"
+  ON bill_items FOR UPDATE
+  USING (EXISTS (
+    SELECT 1 FROM bills
+    JOIN meetup_participants ON meetup_participants.meetup_id = bills.meetup_id
+    WHERE bills.id = bill_items.bill_id
+      AND meetup_participants.user_id = auth.uid()
+  ));
+
+CREATE POLICY "meetup participants can read claims"
+  ON bill_item_claims FOR SELECT
+  USING (EXISTS (
+    SELECT 1 FROM bill_items
+    JOIN bills ON bills.id = bill_items.bill_id
+    JOIN meetup_participants ON meetup_participants.meetup_id = bills.meetup_id
+    WHERE bill_items.id = bill_item_claims.bill_item_id
+      AND meetup_participants.user_id = auth.uid()
+  ));
+
+CREATE POLICY "users can insert own claims"
+  ON bill_item_claims FOR INSERT
+  WITH CHECK (user_id = auth.uid());
+
+CREATE POLICY "users can delete own claims"
+  ON bill_item_claims FOR DELETE
+  USING (user_id = auth.uid());
+```
+
+---
+
 ## Appendix A — Backend Authentication Helper
 
 Used in all protected endpoints:
