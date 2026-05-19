@@ -931,6 +931,7 @@ create table public.meetups (
   parking_buffer_min    int not null default 0,
   status                text not null default 'active' check (status in ('active', 'ended', 'cancelled')),
   share_token           text not null unique default encode(gen_random_bytes(16), 'hex'),
+  category              text,
   created_at            timestamptz not null default now()
 );
 
