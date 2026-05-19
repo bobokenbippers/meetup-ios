@@ -54,6 +54,15 @@ struct MeetupDashboardView: View {
                                 .font(.subheadline)
                                 .foregroundStyle(.secondary)
                             }
+                            if let category = meetup.category, !category.isEmpty {
+                                Text(category)
+                                    .font(.caption.weight(.medium))
+                                    .padding(.horizontal, 8)
+                                    .padding(.vertical, 3)
+                                    .background(.secondary.opacity(0.15))
+                                    .clipShape(Capsule())
+                                    .foregroundStyle(.secondary)
+                            }
                         }
                         .padding(.horizontal)
                         .padding(.top, 16)

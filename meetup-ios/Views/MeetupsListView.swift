@@ -173,8 +173,19 @@ struct MeetupRow: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text(participation.meetup.destinationName)
-                .font(.headline)
+            HStack(spacing: 6) {
+                Text(participation.meetup.destinationName)
+                    .font(.headline)
+                if let category = participation.meetup.category, !category.isEmpty {
+                    Text(category)
+                        .font(.caption2.weight(.medium))
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(.secondary.opacity(0.15))
+                        .clipShape(Capsule())
+                        .foregroundStyle(.secondary)
+                }
+            }
             if let target = participation.meetup.targetArrivalAt {
                 Text(target.formatted(date: .abbreviated, time: .shortened))
                     .font(.subheadline)
