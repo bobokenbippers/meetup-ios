@@ -10,7 +10,21 @@ struct CreateMeetupView: View {
     @State private var selectedPlace: MKMapItem?
 
     @State private var setTargetTime = false
-    @State private var targetTime = Date().addingTimeInterval(3600)
+    @State private var targetTime = CreateMeetupView.defaultPickerTime
+    @State private var pickerHour: Int = {
+        let h = Calendar.current.component(.hour, from: CreateMeetupView.defaultPickerTime)
+        return h % 12 == 0 ? 12 : h % 12
+    }()
+    @State private var pickerMinute = Calendar.current.component(.minute, from: CreateMeetupView.defaultPickerTime)
+    @State private var pickerAmPm = Calendar.current.component(.hour, from: CreateMeetupView.defaultPickerTime) < 12 ? 0 : 1
+
+    private static let defaultPickerTime: Date = {
+        let cal = Calendar.current
+        var comps = cal.dateComponents([.year, .month, .day, .hour, .minute], from: Date().addingTimeInterval(3600))
+        comps.minute = ((comps.minute ?? 0) / 15 + 1) * 15
+        comps.second = 0
+        return cal.date(from: comps) ?? Date().addingTimeInterval(3600)
+    }()
 
     @State private var inviteePhone = ""
     @State private var foundUser: FoundUser?
@@ -64,19 +78,34 @@ struct CreateMeetupView: View {
                     Toggle("Set a target arrival time", isOn: $setTargetTime)
                     if setTargetTime {
                         DatePicker("Date", selection: $targetTime, in: Date()..., displayedComponents: [.date])
-                        HStack {
-                            Text("Time")
-                            Spacer()
-                            Picker("Time", selection: $targetTime) {
-                                ForEach(0..<(24 * 4), id: \.self) { index in
-                                    let hour = index / 4
-                                    let minute = (index % 4) * 15
-                                    let label = String(format: "%02d:%02d", hour, minute)
-                                    Text(label).tag(generateTime(hour: hour, minute: minute))
+                        HStack(spacing: 0) {
+                            Picker("Hour", selection: $pickerHour) {
+                                ForEach(1...12, id: \.self) { h in
+                                    Text("\(h)").tag(h)
                                 }
                             }
                             .pickerStyle(.wheel)
+                            .frame(width: 60)
+                            .clipped()
+                            Picker("Minute", selection: $pickerMinute) {
+                                ForEach([0, 15, 30, 45], id: \.self) { m in
+                                    Text(String(format: "%02d", m)).tag(m)
+                                }
+                            }
+                            .pickerStyle(.wheel)
+                            .frame(width: 60)
+                            .clipped()
+                            Picker("AM/PM", selection: $pickerAmPm) {
+                                Text("AM").tag(0)
+                                Text("PM").tag(1)
+                            }
+                            .pickerStyle(.wheel)
+                            .frame(width: 70)
+                            .clipped()
                         }
+                        .onChange(of: pickerHour) { _, _ in syncTimePickers() }
+                        .onChange(of: pickerMinute) { _, _ in syncTimePickers() }
+                        .onChange(of: pickerAmPm) { _, _ in syncTimePickers() }
                     }
                 }
 
@@ -257,12 +286,14 @@ struct CreateMeetupView: View {
         }
     }
 
-    private func generateTime(hour: Int, minute: Int) -> Date {
-        var components = Calendar.current.dateComponents([.year, .month, .day], from: targetTime)
-        components.hour = hour
-        components.minute = minute
-        components.second = 0
-        return Calendar.current.date(from: components) ?? targetTime
+    private func syncTimePickers() {
+        let cal = Calendar.current
+        let hour24 = (pickerHour % 12) + (pickerAmPm == 1 ? 12 : 0)
+        var comps = cal.dateComponents([.year, .month, .day], from: targetTime)
+        comps.hour = hour24
+        comps.minute = pickerMinute
+        comps.second = 0
+        if let date = cal.date(from: comps) { targetTime = date }
     }
 
     private func searchUser() async {
