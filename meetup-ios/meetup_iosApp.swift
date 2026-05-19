@@ -1,7 +1,6 @@
 import SwiftUI
 import UserNotifications
 import CoreLocation
-import Contacts
 import Supabase
 
 class AppDelegate: NSObject, UIApplicationDelegate {
@@ -16,12 +15,6 @@ class AppDelegate: NSObject, UIApplicationDelegate {
             }
         }
         LocationManager.shared.requestPermission()
-        Task {
-            let store = CNContactStore()
-            if CNContactStore.authorizationStatus(for: .contacts) == .notDetermined {
-                _ = try? await store.requestAccess(for: .contacts)
-            }
-        }
         return true
     }
 

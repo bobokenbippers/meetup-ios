@@ -107,11 +107,8 @@ struct PeopleListView: View {
             }
             .navigationTitle("People")
             .task {
-                await withTaskGroup(of: Void.self) { group in
-                    group.addTask { await load() }
-                    group.addTask { await contactsManager.load() }
-                    await group.waitForAll()
-                }
+                await load()
+                await contactsManager.load()
                 refreshSuggestions()
             }
             .alert("Error", isPresented: Binding(get: { error != nil }, set: { if !$0 { error = nil } })) {
