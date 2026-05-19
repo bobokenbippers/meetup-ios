@@ -92,8 +92,10 @@ struct MeetupDashboardView: View {
                             if !hasLoaded {
                                 ProgressView().padding()
                             } else {
-                                ForEach(participants) { p in
+                                ForEach(Array(participants.enumerated()), id: \.element.id) { idx, p in
                                     ParticipantTile(participant: p, isMe: p.userId == myUserId, targetArrivalAt: meetup.targetArrivalAt)
+                                        .transition(.move(edge: .leading).combined(with: .opacity))
+                                        .animation(.spring(response: 0.45, dampingFraction: 0.8).delay(Double(idx) * 0.06), value: hasLoaded)
                                     Divider().padding(.leading, 68)
                                 }
                             }
@@ -121,6 +123,9 @@ struct MeetupDashboardView: View {
                         .padding(.top, 4)
                         .padding(.bottom, 32)
                     }
+                    .opacity(hasLoaded ? 1 : 0)
+                    .offset(y: hasLoaded ? 0 : 28)
+                    .animation(.spring(response: 0.5, dampingFraction: 0.85), value: hasLoaded)
                     .animation(.spring(response: 0.45, dampingFraction: 0.75), value: myStatus)
                 }
             }
@@ -187,7 +192,10 @@ struct MeetupDashboardView: View {
     private func load() async {
         do {
             let fresh = try await MeetupService.shared.listParticipants(meetupId: meetup.id)
-            if fresh != participants { participants = fresh }
+            withAnimation(.spring(response: 0.5, dampingFraction: 0.85)) {
+                if fresh != participants { participants = fresh }
+                hasLoaded = true
+            }
             if myStatus == "accepted" && meetup.status == "active" {
                 LocationManager.shared.requestPermission()
                 LocationManager.shared.startTracking(meetup: meetup)
@@ -196,8 +204,8 @@ struct MeetupDashboardView: View {
             return
         } catch {
             self.error = error.localizedDescription
+            hasLoaded = true
         }
-        hasLoaded = true
     }
 
     private func respond(accept: Bool) async {
@@ -205,7 +213,7 @@ struct MeetupDashboardView: View {
         do {
             if accept {
                 try await MeetupService.shared.accept(meetupId: meetup.id)
-                showConfetti = true
+                withAnimation { showConfetti = true }
                 Task {
                     try? await Task.sleep(for: .seconds(2.5))
                     showConfetti = false
@@ -378,6 +386,8 @@ private struct ConfettiView: View {
         }
         .allowsHitTesting(false)
         .ignoresSafeArea()
-        .onAppear { drop = true }
+        .onAppear {
+            withAnimation(.linear(duration: 0.01)) { drop = true }
+        }
     }
 }

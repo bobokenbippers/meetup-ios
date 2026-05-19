@@ -136,13 +136,17 @@ struct MeetupsListView: View {
 
     private func load() async {
         do {
-            participations = try await MeetupService.shared.listMyParticipations()
+            let result = try await MeetupService.shared.listMyParticipations()
+            withAnimation(.spring(response: 0.5, dampingFraction: 0.85)) {
+                participations = result
+                hasLoaded = true
+            }
         } catch is CancellationError {
             return
         } catch {
             self.error = error.localizedDescription
+            hasLoaded = true
         }
-        hasLoaded = true
     }
 
     private func deleteParticipations(_ array: [MyParticipation], at indices: IndexSet) async {
