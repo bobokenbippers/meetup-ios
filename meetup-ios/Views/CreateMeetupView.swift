@@ -33,7 +33,9 @@ struct CreateMeetupView: View {
                         HStack {
                             VStack(alignment: .leading, spacing: 2) {
                                 Text(place.name ?? "").font(.subheadline).bold()
-                                Text(place.name ?? "").font(.caption).foregroundStyle(.secondary)
+                                if let sub = addressSubtitle(for: place) {
+                                    Text(sub).font(.caption).foregroundStyle(.secondary)
+                                }
                             }
                             Spacer()
                             Button("Change") {
@@ -45,10 +47,13 @@ struct CreateMeetupView: View {
                     } else {
                         TextField("Search for a place", text: $searchQuery)
                             .autocorrectionDisabled()
-                        ForEach(searchResults, id: \.self) { item in
+                        ForEach(searchResults, id: \.name) { item in
                             Button(action: { selectPlace(item) }) {
                                 VStack(alignment: .leading, spacing: 2) {
                                     Text(item.name ?? "Unknown").foregroundStyle(.primary)
+                                    if let sub = addressSubtitle(for: item) {
+                                        Text(sub).font(.caption).foregroundStyle(.secondary)
+                                    }
                                 }
                             }
                         }
@@ -62,17 +67,7 @@ struct CreateMeetupView: View {
                         HStack {
                             Text("Time")
                             Spacer()
-                            Picker("Time", selection: Binding(
-                                get: { targetTime },
-                                set: { newTime in
-                                    let components = Calendar.current.dateComponents([.year, .month, .day, .hour], from: newTime)
-                                    let minute = Calendar.current.component(.minute, from: newTime)
-                                    let roundedMinute = (minute / 15) * 15
-                                    if let date = Calendar.current.date(bySettingHour: components.hour ?? 0, minute: roundedMinute, second: 0, of: targetTime) {
-                                        targetTime = date
-                                    }
-                                }
-                            )) {
+                            Picker("Time", selection: $targetTime) {
                                 ForEach(0..<(24 * 4), id: \.self) { index in
                                     let hour = index / 4
                                     let minute = (index % 4) * 15
@@ -217,6 +212,12 @@ struct CreateMeetupView: View {
                 refreshSuggestions()
             }
         }
+    }
+
+    private func addressSubtitle(for item: MKMapItem) -> String? {
+        let addr = item.address
+        let parts = [addr?.street, addr?.city, addr?.state].compactMap { $0 }.filter { !$0.isEmpty }
+        return parts.isEmpty ? nil : parts.joined(separator: ", ")
     }
 
     private func selectPlace(_ item: MKMapItem) {

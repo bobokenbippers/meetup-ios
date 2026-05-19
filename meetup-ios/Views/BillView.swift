@@ -102,7 +102,7 @@ struct BillView: View {
                 ProgressView("Parsing receipt…")
                     .padding()
                     .background(.regularMaterial)
-                    .cornerRadius(12)
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
             }
         }
     }
@@ -149,7 +149,7 @@ struct BillView: View {
                 ProgressView("Saving…")
                     .padding()
                     .background(.regularMaterial)
-                    .cornerRadius(12)
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
             }
         }
     }

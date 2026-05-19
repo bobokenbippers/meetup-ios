@@ -30,7 +30,7 @@ struct Meetup: Codable, Identifiable {
     }
 }
 
-struct MeetupParticipant: Codable, Identifiable {
+struct MeetupParticipant: Codable, Identifiable, Equatable {
     let meetupId: UUID
     let userId: UUID
     let status: String
@@ -41,7 +41,7 @@ struct MeetupParticipant: Codable, Identifiable {
     let locationUpdatedAt: Date?
     let profiles: ParticipantProfile?
 
-    struct ParticipantProfile: Codable {
+    struct ParticipantProfile: Codable, Equatable {
         let displayName: String?
         let phoneE164: String?
         enum CodingKeys: String, CodingKey {

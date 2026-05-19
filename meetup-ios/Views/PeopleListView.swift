@@ -204,7 +204,8 @@ struct PeopleListView: View {
             phoneSearch = ""
             foundUser = nil
             error = "Friend request sent!"
-            DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+            Task {
+                try? await Task.sleep(for: .seconds(2))
                 error = nil
             }
         } catch {

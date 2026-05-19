@@ -41,7 +41,6 @@ struct SettingsView: View {
 
                 Section("Privacy") {
                     Toggle("Sync Contacts", isOn: $contactsEnabled)
-                        .onChange(of: contactsEnabled) { _, _ in saveSettings() }
                 }
 
                 Section {

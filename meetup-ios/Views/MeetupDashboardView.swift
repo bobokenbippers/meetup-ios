@@ -11,7 +11,6 @@ struct MeetupDashboardView: View {
     @State private var hasLoaded = false
     @State private var isActing = false
     @State private var error: String?
-    @State private var realtimeTask: Task<Void, Never>?
     @State private var showCancelConfirm = false
     @State private var showBill = false
 
@@ -140,10 +139,11 @@ struct MeetupDashboardView: View {
                 }
                 Button("Keep Meetup", role: .cancel) {}
             }
-            .task { await load() }
-            .onAppear { startRealtime() }
+            .task {
+                await load()
+                await startRealtime()
+            }
             .onDisappear {
-                realtimeTask?.cancel()
                 LocationManager.shared.stopTracking()
             }
             .alert("Error", isPresented: Binding(get: { error != nil }, set: { if !$0 { error = nil } })) {
@@ -154,27 +154,25 @@ struct MeetupDashboardView: View {
         }
     }
 
-    private func startRealtime() {
-        realtimeTask?.cancel()
-        realtimeTask = Task {
-            let channel = SupabaseManager.shared.client.realtimeV2.channel("meetup-\(meetup.id)")
-            let changes = channel.postgresChange(AnyAction.self, schema: "public", table: "meetup_participants")
-            do {
-                try await channel.subscribeWithError()
-            } catch {
-                return
-            }
-            for await _ in changes {
-                guard !Task.isCancelled else { break }
-                await load()
-            }
-            await SupabaseManager.shared.client.realtimeV2.removeChannel(channel)
+    private func startRealtime() async {
+        let channel = SupabaseManager.shared.client.realtimeV2.channel("meetup-\(meetup.id)")
+        let changes = channel.postgresChange(AnyAction.self, schema: "public", table: "meetup_participants")
+        do {
+            try await channel.subscribeWithError()
+        } catch {
+            return
         }
+        for await _ in changes {
+            guard !Task.isCancelled else { break }
+            await load()
+        }
+        await SupabaseManager.shared.client.realtimeV2.removeChannel(channel)
     }
 
     private func load() async {
         do {
-            participants = try await MeetupService.shared.listParticipants(meetupId: meetup.id)
+            let fresh = try await MeetupService.shared.listParticipants(meetupId: meetup.id)
+            if fresh != participants { participants = fresh }
             if myStatus == "accepted" && meetup.status == "active" {
                 LocationManager.shared.requestPermission()
                 LocationManager.shared.startTracking(meetup: meetup)

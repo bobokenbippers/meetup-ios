@@ -79,3 +79,13 @@ The Xcode project depends on `supabase-swift` via remote SPM (`git@github.com:su
 - `PRIVACY_POLICY.md` — current published privacy policy text.
 
 Milestones already done: M1 (auth), most of M3 (meetup creation, dashboard, accept/decline, basic realtime). M2 friends UI and M4 robust live-location/battery work are partially done at best — check the code, not the doc, before claiming a milestone is complete.
+
+## SwiftUI smoothness
+
+After touching any SwiftUI view, invoke the `swiftui-smoothness-auditor` skill (`.claude/agents/swiftui-smoothness-auditor.md`). Key invariants to watch for without running the auditor:
+- Never start realtime subscriptions in `.onAppear` — fold into `.task` so the lifecycle is tied to the task and cancellation propagates naturally.
+- Never use `try? await Task.sleep(...)` in loops — swallowing `CancellationError` prevents clean task teardown; use `do { try await } catch { return }`.
+- Guard `@Observable` array reassignment: if `MeetupParticipant` (which is `Equatable`) loads the same data, skip the write to prevent wasted SwiftUI diffing.
+- `DispatchQueue.main.asyncAfter` bypasses Swift actor isolation — use `Task { try? await Task.sleep(for:); ... }` instead.
+- Don't put duplicate `.onChange` handlers on both a control and its parent view.
+- Prefer `.clipShape(RoundedRectangle(cornerRadius:))` over deprecated `.cornerRadius()`.

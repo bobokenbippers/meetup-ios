@@ -51,11 +51,12 @@ final class AuthViewModel {
                 credentials: .init(provider: .apple, idToken: identityToken)
             )
 
-            if let fullName = credential.fullName {
+            if let fullName = credential.fullName,
+               let userId = supabase.auth.currentUser?.id {
                 let displayName = [fullName.givenName, fullName.familyName]
-                    .compactMap { $0 }
+                    .compactMap { $0 }.filter { !$0.isEmpty }
                     .joined(separator: " ")
-                if !displayName.isEmpty, let userId = session?.user.id {
+                if !displayName.isEmpty {
                     _ = try? await supabase
                         .from("profiles")
                         .update(["display_name": displayName])

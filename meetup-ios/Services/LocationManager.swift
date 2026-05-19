@@ -43,7 +43,11 @@ final class LocationManager: NSObject {
         uploadTask = Task {
             while !Task.isCancelled {
                 await uploadLocationAndETA()
-                try? await Task.sleep(for: .seconds(30))
+                do {
+                    try await Task.sleep(for: .seconds(30))
+                } catch {
+                    return
+                }
             }
         }
     }

@@ -120,7 +120,6 @@ struct MeetupsListView: View {
             }
             .sheet(item: $selectedMeetup) { meetup in
                 MeetupDashboardView(meetup: meetup)
-                    .onDisappear { Task { await load() } }
             }
             .task { loadHiddenIds(); if participations.isEmpty { await load() } }
             .refreshable { await load() }
