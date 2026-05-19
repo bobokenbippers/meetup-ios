@@ -137,6 +137,8 @@ struct MeetupsListView: View {
     private func load() async {
         do {
             participations = try await MeetupService.shared.listMyParticipations()
+        } catch is CancellationError {
+            return
         } catch {
             self.error = error.localizedDescription
         }

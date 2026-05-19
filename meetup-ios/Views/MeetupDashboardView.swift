@@ -192,6 +192,8 @@ struct MeetupDashboardView: View {
                 LocationManager.shared.requestPermission()
                 LocationManager.shared.startTracking(meetup: meetup)
             }
+        } catch is CancellationError {
+            return
         } catch {
             self.error = error.localizedDescription
         }

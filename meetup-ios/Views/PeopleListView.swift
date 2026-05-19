@@ -133,6 +133,8 @@ struct PeopleListView: View {
     private func load() async {
         do {
             people = try await MeetupService.shared.getPeopleFromMeetups()
+        } catch is CancellationError {
+            return
         } catch {
             self.error = error.localizedDescription
         }
