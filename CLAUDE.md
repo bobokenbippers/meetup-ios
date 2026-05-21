@@ -10,7 +10,7 @@ Build target: iOS 26.4, Swift 5.0, Xcode 26+ (uses `Map` content builder, `.glas
 
 ## Build / Run
 
-There is no test target and no SwiftPM manifest at the repo root — the only entry point is the Xcode project.
+There is no SwiftPM manifest at the repo root — the only entry point is the Xcode project.
 
 ```bash
 # Resolve SPM deps (once / after pulling)
@@ -20,9 +20,21 @@ xcodebuild -resolvePackageDependencies -project meetup-ios.xcodeproj
 xcodebuild -project meetup-ios.xcodeproj -scheme meetup-ios \
   -destination 'platform=iOS Simulator,name=iPhone 17 Pro' build
 
+# Run unit tests (Swift Testing, no simulator needed)
+xcodebuild -project meetup-ios.xcodeproj -scheme meetup-ios \
+  -destination 'platform=iOS Simulator,name=iPhone 17 Pro' \
+  test -only-testing:meetup-iosTests
+
+# Run UI tests (XCUITest, boots simulator — CPU-heavy)
+xcodebuild -project meetup-ios.xcodeproj -scheme meetup-ios \
+  -destination 'platform=iOS Simulator,name=iPhone 17 Pro' \
+  test -only-testing:meetup-iosUITests
+
 # Clean
 xcodebuild -project meetup-ios.xcodeproj -scheme meetup-ios clean
 ```
+
+In Xcode: **⌘U** runs all tests; use the Test Navigator (**⌘6**) to run a single target or test class.
 
 Day-to-day work happens in Xcode (`open meetup-ios.xcodeproj`). Sign in with Apple requires a real device or a simulator signed into an Apple ID — it does not work in a fresh, signed-out simulator.
 
