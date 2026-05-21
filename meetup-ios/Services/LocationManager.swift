@@ -52,15 +52,17 @@ final class LocationManager: NSObject {
     static let shared = LocationManager()
 
     private let clManager = CLLocationManager()
+    private let motionManager = CMMotionActivityManager()
     private var trackingMeetup: Meetup?
     private var uploadTask: Task<Void, Never>?
     private(set) var location: CLLocation?
+    private var motionMode: MotionMode = .unknown
+    private(set) var currentTier: LocationTier = .stationary
 
     override private init() {
         super.init()
         clManager.delegate = self
-        clManager.desiredAccuracy = kCLLocationAccuracyHundredMeters
-        clManager.distanceFilter = 50
+        applyTier(.stationary)
     }
 
     func requestPermission() {
@@ -73,6 +75,7 @@ final class LocationManager: NSObject {
         clManager.allowsBackgroundLocationUpdates = true
         clManager.pausesLocationUpdatesAutomatically = false
         clManager.startUpdatingLocation()
+        startMotionUpdates()
         startUploadLoop()
     }
 
@@ -80,8 +83,22 @@ final class LocationManager: NSObject {
         trackingMeetup = nil
         clManager.stopUpdatingLocation()
         clManager.allowsBackgroundLocationUpdates = false
+        motionManager.stopActivityUpdates()
         uploadTask?.cancel()
         uploadTask = nil
+    }
+
+    private func startMotionUpdates() {
+        guard CMMotionActivityManager.isActivityAvailable() else { return }
+        motionManager.startActivityUpdates(to: .main) { [weak self] activity in
+            guard let activity else { return }
+            if activity.automotive      { self?.motionMode = .driving }
+            else if activity.walking    { self?.motionMode = .walking }
+            else if activity.running    { self?.motionMode = .walking }
+            else if activity.cycling    { self?.motionMode = .cycling }
+            else if activity.stationary { self?.motionMode = .stationary }
+            else                        { self?.motionMode = .unknown }
+        }
     }
 
     private func startUploadLoop() {
@@ -89,8 +106,10 @@ final class LocationManager: NSObject {
         uploadTask = Task {
             while !Task.isCancelled {
                 await uploadLocationAndETA()
+                await checkArrived()
+                recalculateTier()
                 do {
-                    try await Task.sleep(for: .seconds(30))
+                    try await Task.sleep(for: .seconds(currentTier.uploadInterval))
                 } catch {
                     return
                 }
@@ -98,8 +117,24 @@ final class LocationManager: NSObject {
         }
     }
 
+    private func recalculateTier() {
+        guard let meetup = trackingMeetup, let loc = location else { return }
+        let dest = CLLocation(latitude: meetup.destinationLat, longitude: meetup.destinationLng)
+        let newTier = LocationTier.forContext(distanceToDestination: loc.distance(from: dest), motionMode: motionMode)
+        if newTier != currentTier {
+            currentTier = newTier
+            applyTier(newTier)
+        }
+    }
+
+    private func applyTier(_ tier: LocationTier) {
+        clManager.desiredAccuracy = tier.desiredAccuracy
+        clManager.distanceFilter = tier.distanceFilter
+    }
+
     private func uploadLocationAndETA() async {
         guard let meetup = trackingMeetup, let loc = location else { return }
+        guard LocationManager.isLocationValid(loc) else { return }
         let dest = CLLocationCoordinate2D(latitude: meetup.destinationLat, longitude: meetup.destinationLng)
         let eta = await calculateETA(from: loc.coordinate, to: dest)
         try? await MeetupService.shared.updateMyLocation(
@@ -109,6 +144,14 @@ final class LocationManager: NSObject {
             bearing: loc.course >= 0 ? loc.course : nil,
             etaSeconds: eta
         )
+    }
+
+    private func checkArrived() async {
+        guard let meetup = trackingMeetup, let loc = location else { return }
+        let dest = CLLocation(latitude: meetup.destinationLat, longitude: meetup.destinationLng)
+        guard loc.distance(from: dest) < 50 else { return }
+        try? await MeetupService.shared.updateParticipantStatus(meetupId: meetup.id, status: "arrived")
+        stopTracking()
     }
 
     private func calculateETA(from origin: CLLocationCoordinate2D, to destination: CLLocationCoordinate2D) async -> Int? {
