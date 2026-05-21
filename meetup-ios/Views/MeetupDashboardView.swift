@@ -20,126 +20,68 @@ struct MeetupDashboardView: View {
     private var destinationCoord: CLLocationCoordinate2D {
         CLLocationCoordinate2D(latitude: meetup.destinationLat, longitude: meetup.destinationLng)
     }
+    private var acceptedCount: Int {
+        participants.filter { $0.status == "accepted" || $0.status == "arrived" }.count
+    }
+    private var greeting: String {
+        let h = Calendar.current.component(.hour, from: Date())
+        switch h {
+        case 5..<12: return "Good morning"
+        case 12..<17: return "Good afternoon"
+        case 17..<21: return "Good evening"
+        default:      return "Good night"
+        }
+    }
 
     var body: some View {
         NavigationStack {
-            ScrollView {
-                VStack(spacing: 0) {
-                    Map {
-                        Marker(meetup.destinationName, coordinate: destinationCoord)
-                            .tint(.red)
-                        if meetup.status == "active" {
-                            ForEach(participants) { p in
-                                if let lat = p.lat, let lng = p.lng {
-                                    Annotation(p.displayName ?? "?", coordinate: CLLocationCoordinate2D(latitude: lat, longitude: lng)) {
-                                        ParticipantPin(participant: p)
-                                    }
+            VStack(spacing: 0) {
+                // Header
+                dashboardHeader
+                    .padding(.horizontal, 20)
+                    .padding(.top, 8)
+                    .padding(.bottom, 10)
+
+                // Destination card
+                destinationCard
+                    .padding(.horizontal, 14)
+                    .padding(.bottom, 10)
+
+                // Map — full-bleed, fills remaining space
+                Map {
+                    Annotation("", coordinate: destinationCoord) {
+                        DestinationMarker()
+                    }
+                    if meetup.status == "active" {
+                        ForEach(participants) { p in
+                            if let lat = p.lat, let lng = p.lng {
+                                Annotation("", coordinate: CLLocationCoordinate2D(latitude: lat, longitude: lng)) {
+                                    DashboardParticipantPin(
+                                        participant: p,
+                                        isMe: p.userId == myUserId,
+                                        targetArrivalAt: meetup.targetArrivalAt
+                                    )
                                 }
                             }
                         }
                     }
-                    .frame(height: 260)
-                    .disabled(true)
-
-                    VStack(alignment: .leading, spacing: 16) {
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text(meetup.destinationName).font(.title2.bold())
-                            if let addr = meetup.destinationAddress {
-                                Text(addr).font(.subheadline).foregroundStyle(.secondary)
-                            }
-                            if let target = meetup.targetArrivalAt {
-                                Label(
-                                    target.formatted(date: .abbreviated, time: .shortened),
-                                    systemImage: "clock"
-                                )
-                                .font(.subheadline)
-                                .foregroundStyle(.secondary)
-                            }
-                            if let category = meetup.category, !category.isEmpty {
-                                Text(category)
-                                    .font(.caption.weight(.medium))
-                                    .padding(.horizontal, 8)
-                                    .padding(.vertical, 3)
-                                    .background(.secondary.opacity(0.15))
-                                    .clipShape(Capsule())
-                                    .foregroundStyle(.secondary)
-                            }
-                        }
-                        .padding(.horizontal)
-                        .padding(.top, 16)
-
-                        if myStatus == "invited" {
-                            GlassEffectContainer(spacing: 12) {
-                                HStack(spacing: 12) {
-                                    Button("Decline") { Task { await respond(accept: false) } }
-                                        .buttonStyle(.glass)
-                                        .disabled(isActing)
-                                    Button("Accept") { Task { await respond(accept: true) } }
-                                        .buttonStyle(.glassProminent)
-                                        .disabled(isActing)
-                                }
-                            }
-                            .frame(maxWidth: .infinity)
-                            .padding(.horizontal)
-                            .transition(.scale(scale: 0.9, anchor: .top).combined(with: .opacity))
-                        }
-
-                        VStack(alignment: .leading, spacing: 0) {
-                            Text("People")
-                                .font(.headline)
-                                .padding(.horizontal)
-                                .padding(.bottom, 8)
-                            if !hasLoaded {
-                                ProgressView().padding()
-                            } else {
-                                ForEach(Array(participants.enumerated()), id: \.element.id) { idx, p in
-                                    ParticipantTile(participant: p, isMe: p.userId == myUserId, targetArrivalAt: meetup.targetArrivalAt)
-                                        .transition(.move(edge: .leading).combined(with: .opacity))
-                                        .animation(.spring(response: 0.45, dampingFraction: 0.8).delay(Double(idx) * 0.06), value: hasLoaded)
-                                    Divider().padding(.leading, 68)
-                                }
-                            }
-                        }
-
-                        Button {
-                            let url = URL(string: "http://maps.apple.com/?daddr=\(meetup.destinationLat),\(meetup.destinationLng)&dirflg=d")!
-                            UIApplication.shared.open(url)
-                        } label: {
-                            Label("Open in Apple Maps", systemImage: "map.fill")
-                                .frame(maxWidth: .infinity)
-                        }
-                        .buttonStyle(.glass)
-                        .padding(.horizontal)
-                        .padding(.top, 8)
-
-                        Button {
-                            showBill = true
-                        } label: {
-                            Label("Split Bill", systemImage: "receipt")
-                                .frame(maxWidth: .infinity)
-                        }
-                        .buttonStyle(.glass)
-                        .padding(.horizontal)
-                        .padding(.top, 4)
-                        .padding(.bottom, 32)
-                    }
-                    .opacity(hasLoaded ? 1 : 0)
-                    .offset(y: hasLoaded ? 0 : 28)
-                    .animation(.spring(response: 0.5, dampingFraction: 0.85), value: hasLoaded)
-                    .animation(.spring(response: 0.45, dampingFraction: 0.75), value: myStatus)
                 }
+                .frame(maxHeight: .infinity)
+                .disabled(true)
+
+                // Bottom panel
+                bottomPanel
             }
-            .navigationTitle(meetup.destinationName)
             .navigationBarTitleDisplayMode(.inline)
+            .navigationTitle("")
+            .toolbarBackground(.hidden, for: .navigationBar)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Close") { dismiss() }
                 }
                 if myUserId == meetup.hostId {
                     ToolbarItem(placement: .destructiveAction) {
-                        Button("Cancel Meetup", role: .destructive) {
-                            showCancelConfirm = true
-                        }
+                        Button("Cancel", role: .destructive) { showCancelConfirm = true }
                     }
                 }
             }
@@ -173,6 +115,158 @@ struct MeetupDashboardView: View {
             }
         }
     }
+
+    // MARK: - Sub-views
+
+    private var dashboardHeader: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text("\(greeting), \(auth.profile?.displayName ?? "there") 👋")
+                .font(.system(size: 12))
+                .foregroundStyle(.secondary)
+            Text(meetup.destinationName)
+                .font(.system(size: 24, weight: .black))
+                .lineLimit(1)
+            Text("You're meeting \(acceptedCount) \(acceptedCount == 1 ? "person" : "people")")
+                .font(.system(size: 12))
+                .foregroundStyle(.secondary)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private var destinationCard: some View {
+        HStack(spacing: 12) {
+            RoundedRectangle(cornerRadius: 10)
+                .fill(Color.coral)
+                .frame(width: 32, height: 32)
+                .overlay {
+                    Image(systemName: "mappin.circle.fill")
+                        .font(.system(size: 18))
+                        .foregroundStyle(.white)
+                }
+
+            VStack(alignment: .leading, spacing: 1) {
+                Text(meetup.destinationName)
+                    .font(.system(size: 13, weight: .bold))
+                    .lineLimit(1)
+                if let addr = meetup.destinationAddress {
+                    Text(addr)
+                        .font(.system(size: 10))
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
+            }
+
+            Spacer()
+
+            if let target = meetup.targetArrivalAt {
+                VStack(alignment: .trailing, spacing: 1) {
+                    Text(target, format: .dateTime.hour().minute())
+                        .font(.system(size: 13, weight: .bold))
+                    let mins = Int(target.timeIntervalSinceNow / 60)
+                    if mins > 0 {
+                        Text("in \(mins) min")
+                            .font(.system(size: 10, weight: .semibold))
+                            .foregroundStyle(Color.coral)
+                    }
+                }
+            }
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 12)
+        .background(.regularMaterial)
+        .clipShape(RoundedRectangle(cornerRadius: 14))
+        .overlay(
+            RoundedRectangle(cornerRadius: 14)
+                .strokeBorder(.white.opacity(0.08), lineWidth: 1)
+        )
+    }
+
+    private var bottomPanel: some View {
+        VStack(spacing: 0) {
+            // Drag handle
+            RoundedRectangle(cornerRadius: 2)
+                .fill(.white.opacity(0.18))
+                .frame(width: 32, height: 3)
+                .padding(.top, 10)
+                .padding(.bottom, 6)
+
+            // "Everyone" label
+            Text("Everyone")
+                .font(.system(size: 13, weight: .bold))
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 16)
+                .padding(.bottom, 8)
+
+            // Participant rows
+            if hasLoaded {
+                VStack(spacing: 0) {
+                    ForEach(Array(participants.enumerated()), id: \.element.id) { idx, p in
+                        DashboardParticipantRow(
+                            participant: p,
+                            isMe: p.userId == myUserId,
+                            targetArrivalAt: meetup.targetArrivalAt
+                        )
+                        .transition(.move(edge: .leading).combined(with: .opacity))
+                        .animation(
+                            .spring(response: 0.45, dampingFraction: 0.8).delay(Double(idx) * 0.05),
+                            value: hasLoaded
+                        )
+                        if idx < participants.count - 1 {
+                            Divider()
+                                .padding(.leading, 52)
+                        }
+                    }
+                }
+                .padding(.bottom, 8)
+            } else {
+                ProgressView().padding()
+            }
+
+            // Accept / Decline
+            if myStatus == "invited" {
+                GlassEffectContainer(spacing: 12) {
+                    HStack(spacing: 12) {
+                        Button("Decline") { Task { await respond(accept: false) } }
+                            .buttonStyle(.glass)
+                            .disabled(isActing)
+                        Button("Accept") { Task { await respond(accept: true) } }
+                            .buttonStyle(.glassProminent)
+                            .disabled(isActing)
+                    }
+                }
+                .padding(.horizontal, 16)
+                .padding(.bottom, 8)
+                .transition(.scale(scale: 0.9, anchor: .top).combined(with: .opacity))
+            }
+
+            // Action buttons
+            HStack(spacing: 12) {
+                Button {
+                    let url = URL(string: "http://maps.apple.com/?daddr=\(meetup.destinationLat),\(meetup.destinationLng)&dirflg=d")!
+                    UIApplication.shared.open(url)
+                } label: {
+                    Label("Maps", systemImage: "map.fill").frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.glass)
+
+                Button { showBill = true } label: {
+                    Label("Split Bill", systemImage: "receipt").frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.glass)
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
+        }
+        .background(.regularMaterial)
+        .clipShape(UnevenRoundedRectangle(cornerRadii: .init(topLeading: 22, topTrailing: 22)))
+        .overlay(
+            UnevenRoundedRectangle(cornerRadii: .init(topLeading: 22, topTrailing: 22))
+                .strokeBorder(.white.opacity(0.08), lineWidth: 1)
+        )
+        .animation(.spring(response: 0.45, dampingFraction: 0.75), value: myStatus)
+    }
+
+    // MARK: - Logic
 
     private func startRealtime() async {
         let channel = SupabaseManager.shared.client.realtimeV2.channel("meetup-\(meetup.id)")
@@ -229,94 +323,162 @@ struct MeetupDashboardView: View {
     }
 }
 
-struct ParticipantPin: View {
-    let participant: MeetupParticipant
+// MARK: - Destination Marker
 
-    private var color: Color {
-        switch participant.status {
-        case "accepted": return .green
-        case "declined": return .red
-        case "arrived":  return .blue
-        default:         return .orange
-        }
-    }
-
+private struct DestinationMarker: View {
     var body: some View {
-        Circle()
-            .fill(color)
-            .frame(width: 32, height: 32)
-            .overlay {
-                Text(String((participant.displayName ?? "?").prefix(1)).uppercased())
-                    .font(.caption.bold())
-                    .foregroundStyle(.white)
-            }
-            .shadow(radius: 2)
+        ZStack {
+            Circle()
+                .fill(Color.coral.opacity(0.2))
+                .frame(width: 44, height: 44)
+            Circle()
+                .fill(Color.coral)
+                .frame(width: 24, height: 24)
+                .overlay(Circle().strokeBorder(.white, lineWidth: 2))
+                .shadow(color: Color.coral.opacity(0.6), radius: 6)
+        }
     }
 }
 
-struct ParticipantTile: View {
+// MARK: - Participant Pin (on map)
+
+struct DashboardParticipantPin: View {
     let participant: MeetupParticipant
     let isMe: Bool
     let targetArrivalAt: Date?
 
-    private var statusColor: Color {
-        switch participant.status {
-        case "accepted": return .green
-        case "declined": return .red
-        case "arrived":  return .blue
-        default:         return .orange
-        }
+    private var etaText: String {
+        if participant.status == "arrived" { return "✓ Here" }
+        if let late = participant.lateLabel(target: targetArrivalAt) { return late }
+        return participant.etaLabel() ?? participant.status.capitalized
     }
 
-    private var statusLabel: String {
-        switch participant.status {
-        case "accepted": return "Accepted"
-        case "declined": return "Declined"
-        case "arrived":  return "Arrived"
-        default:         return "Invited"
+    private var etaColor: Color {
+        if participant.status == "arrived" { return .secondary }
+        if participant.lateLabel(target: targetArrivalAt) != nil { return Color(red: 1, green: 0.294, blue: 0.294) }
+        return Color(red: 0.180, green: 0.835, blue: 0.451)
+    }
+
+    private var avatarColor: Color {
+        pinColor(for: participant.userId)
+    }
+
+    var body: some View {
+        if isMe {
+            // Blue pulsing "You" dot
+            ZStack {
+                Circle()
+                    .fill(Color(red: 0.118, green: 0.565, blue: 1.0).opacity(0.25))
+                    .frame(width: 20, height: 20)
+                Circle()
+                    .fill(Color(red: 0.118, green: 0.565, blue: 1.0))
+                    .frame(width: 12, height: 12)
+                    .overlay(Circle().strokeBorder(.white, lineWidth: 2))
+                    .shadow(color: Color(red: 0.118, green: 0.565, blue: 1.0).opacity(0.6), radius: 4)
+            }
+        } else {
+            HStack(spacing: 4) {
+                // Avatar circle
+                Circle()
+                    .fill(avatarColor)
+                    .frame(width: 34, height: 34)
+                    .overlay(Circle().strokeBorder(.white, lineWidth: 2.5))
+                    .overlay {
+                        Text(String((participant.displayName ?? "?").prefix(1)).uppercased())
+                            .font(.system(size: 13, weight: .bold))
+                            .foregroundStyle(.white)
+                    }
+                    .shadow(radius: 3)
+
+                // Callout bubble
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(participant.displayName ?? "?")
+                        .font(.system(size: 10, weight: .bold))
+                        .foregroundStyle(.primary)
+                    Text(etaText)
+                        .font(.system(size: 9, weight: .semibold))
+                        .foregroundStyle(etaColor)
+                }
+                .padding(.horizontal, 7)
+                .padding(.vertical, 5)
+                .background(.regularMaterial)
+                .clipShape(RoundedRectangle(cornerRadius: 10))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 10)
+                        .strokeBorder(.white.opacity(0.1), lineWidth: 1)
+                )
+            }
         }
+    }
+}
+
+private func pinColor(for userId: UUID) -> Color {
+    let palette: [Color] = [
+        Color(red: 0.910, green: 0.361, blue: 0.016),
+        Color(red: 0.482, green: 0.361, blue: 0.749),
+        Color(red: 0.118, green: 0.565, blue: 1.000),
+        Color(red: 0.180, green: 0.800, blue: 0.443),
+        Color(red: 0.910, green: 0.212, blue: 0.278),
+        Color(red: 0.000, green: 0.780, blue: 0.941),
+    ]
+    return palette[abs(userId.hashValue) % palette.count]
+}
+
+// MARK: - Participant Row (in bottom panel)
+
+private struct DashboardParticipantRow: View {
+    let participant: MeetupParticipant
+    let isMe: Bool
+    let targetArrivalAt: Date?
+
+    private var etaText: String {
+        if participant.status == "arrived" { return "✓ Here" }
+        if let late = participant.lateLabel(target: targetArrivalAt) { return late }
+        return participant.etaLabel() ?? participant.status.capitalized
+    }
+
+    private var etaColor: Color {
+        if participant.status == "arrived" { return .secondary }
+        if participant.lateLabel(target: targetArrivalAt) != nil { return Color(red: 1, green: 0.294, blue: 0.294) }
+        if participant.status == "invited"  { return Color(red: 1, green: 0.839, blue: 0) }
+        if participant.status == "declined" { return .secondary }
+        return Color(red: 0.180, green: 0.835, blue: 0.451)
     }
 
     var body: some View {
         HStack(spacing: 12) {
             Circle()
-                .fill(statusColor.opacity(0.2))
-                .frame(width: 44, height: 44)
+                .fill(pinColor(for: participant.userId).opacity(0.8))
+                .frame(width: 30, height: 30)
                 .overlay {
                     Text(String((participant.displayName ?? "?").prefix(1)).uppercased())
-                        .font(.headline)
-                        .foregroundStyle(statusColor)
+                        .font(.system(size: 12, weight: .bold))
+                        .foregroundStyle(.white)
                 }
-                .animation(.spring(response: 0.4, dampingFraction: 0.6), value: participant.status)
 
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: 1) {
                 HStack(spacing: 4) {
                     Text(participant.displayName ?? "Unknown")
+                        .font(.system(size: 12, weight: .semibold))
                     if isMe {
-                        Text("(you)").foregroundStyle(.secondary).font(.subheadline)
+                        Text("(you)")
+                            .font(.system(size: 11))
+                            .foregroundStyle(.secondary)
                     }
                 }
-                if let late = participant.lateLabel(target: targetArrivalAt) {
-                    Text(late)
-                        .font(.caption)
-                        .foregroundStyle(.red)
-                } else if let eta = participant.etaLabel() {
-                    Text(eta)
-                        .font(.caption)
-                        .foregroundStyle(.green)
-                } else {
-                    Text(statusLabel)
-                        .font(.caption)
-                        .foregroundStyle(statusColor)
-                }
+                Text(etaText)
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(etaColor)
             }
 
             Spacer()
         }
-        .padding(.horizontal)
-        .padding(.vertical, 10)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 8)
     }
 }
+
+// MARK: - Confetti
 
 private struct ConfettiView: View {
     private struct Particle: Identifiable {
