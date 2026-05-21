@@ -122,7 +122,7 @@ final class LocationManager: NSObject {
     static func isLocationValid(_ location: CLLocation) -> Bool {
         location.horizontalAccuracy > 0 &&
         location.horizontalAccuracy <= 200 &&
-        location.timestamp.timeIntervalSinceNow > -90.5
+        location.timestamp.timeIntervalSinceNow >= -90
     }
 }
 

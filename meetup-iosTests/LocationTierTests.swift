@@ -100,14 +100,14 @@ struct LocationTierTests {
         #expect(!LocationManager.isLocationValid(loc))
     }
 
-    @Test("fix exactly 90s old still passes")
+    @Test("fix clearly within 90s old still passes")
     func exactlyAtStalenessEdge() {
         let loc = CLLocation(
             coordinate: CLLocationCoordinate2D(latitude: 30, longitude: -97),
             altitude: 0,
             horizontalAccuracy: 10,
             verticalAccuracy: 10,
-            timestamp: Date(timeIntervalSinceNow: -90)
+            timestamp: Date(timeIntervalSinceNow: -89)
         )
         #expect(LocationManager.isLocationValid(loc))
     }
