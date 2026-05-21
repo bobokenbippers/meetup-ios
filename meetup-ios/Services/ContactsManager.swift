@@ -15,23 +15,24 @@ final class ContactsManager {
     var authStatus: CNAuthorizationStatus = .notDetermined
 
     func load() async {
-        let store = CNContactStore()
+        guard contacts.isEmpty else { return }
+
         authStatus = CNContactStore.authorizationStatus(for: .contacts)
         if authStatus == .notDetermined {
-            _ = try? await store.requestAccess(for: .contacts)
+            _ = try? await CNContactStore().requestAccess(for: .contacts)
             authStatus = CNContactStore.authorizationStatus(for: .contacts)
         }
         guard authStatus != .denied && authStatus != .restricted && authStatus != .notDetermined else { return }
 
-        let keys = [
-            CNContactGivenNameKey, CNContactFamilyNameKey,
-            CNContactPhoneNumbersKey, CNContactEmailAddressesKey,
-            CNContactIdentifierKey
-        ] as [CNKeyDescriptor]
-        let request = CNContactFetchRequest(keysToFetch: keys)
-
-        // Run blocking enumeration off the main thread
+        // CNContactStore() init triggers IPC to contactsd — keep it off the main thread.
         let loaded: [DeviceContact] = await Task.detached(priority: .userInitiated) {
+            let store = CNContactStore()
+            let keys = [
+                CNContactGivenNameKey, CNContactFamilyNameKey,
+                CNContactPhoneNumbersKey, CNContactEmailAddressesKey,
+                CNContactIdentifierKey
+            ] as [CNKeyDescriptor]
+            let request = CNContactFetchRequest(keysToFetch: keys)
             var result: [DeviceContact] = []
             try? store.enumerateContacts(with: request) { contact, _ in
                 let name = [contact.givenName, contact.familyName]
