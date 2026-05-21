@@ -181,6 +181,16 @@ final class MeetupService {
             .execute()
     }
 
+    func updateParticipantStatus(meetupId: UUID, status: String) async throws {
+        guard let userId = supabase.auth.currentUser?.id else { return }
+        try await supabase
+            .from("meetup_participants")
+            .update(["status": status])
+            .eq("meetup_id", value: meetupId)
+            .eq("user_id", value: userId)
+            .execute()
+    }
+
     func cancelMeetup(meetupId: UUID) async throws {
         try await supabase
             .from("meetups")
