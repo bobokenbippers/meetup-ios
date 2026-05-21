@@ -129,6 +129,8 @@ struct MeetupsListView: View {
             .navigationTitle("Meetups")
             .toolbar {
                 Button("", systemImage: "plus") { showCreate = true }
+                    .accessibilityLabel("Create Meetup")
+                    .accessibilityIdentifier("btn_create_meetup")
             }
             .sheet(isPresented: $showCreate, onDismiss: { Task { await load() } }) {
                 CreateMeetupView()

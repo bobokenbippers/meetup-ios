@@ -131,6 +131,12 @@ struct PeopleListView: View {
     }
 
     private func load() async {
+        #if DEBUG
+        if ProcessInfo.processInfo.arguments.contains("--ui-testing") {
+            hasLoaded = true
+            return
+        }
+        #endif
         do {
             people = try await MeetupService.shared.getPeopleFromMeetups()
         } catch is CancellationError {

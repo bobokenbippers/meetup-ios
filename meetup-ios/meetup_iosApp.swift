@@ -42,7 +42,9 @@ struct meetup_iosApp: App {
     var body: some Scene {
         WindowGroup {
             Group {
-                if auth.session == nil {
+                if isUITestingMode {
+                    HomeView()
+                } else if auth.session == nil {
                     SignInView()
                 } else if auth.profile == nil {
                     ProgressView("Loading...")
@@ -54,5 +56,13 @@ struct meetup_iosApp: App {
             }
             .environment(auth)
         }
+    }
+
+    private var isUITestingMode: Bool {
+        #if DEBUG
+        ProcessInfo.processInfo.arguments.contains("--ui-testing")
+        #else
+        false
+        #endif
     }
 }

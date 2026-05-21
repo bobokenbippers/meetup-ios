@@ -14,6 +14,18 @@ final class AuthViewModel {
     private var authTask: Task<Void, Never>?
 
     init() {
+        #if DEBUG
+        if ProcessInfo.processInfo.arguments.contains("--ui-testing") {
+            profile = Profile(
+                id: UUID(uuidString: "00000000-0000-0000-0000-000000000001")!,
+                displayName: "Test User",
+                phoneE164: "+16469466861",
+                email: "test@example.com"
+            )
+            return
+        }
+        #endif
+
         // Load cached profile instantly so UI shows without waiting for network
         profile = Self.cachedProfile()
 

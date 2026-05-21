@@ -150,6 +150,7 @@ struct CreateMeetupView: View {
                         Button("Create") { Task { await create() } }
                             .buttonStyle(.glassProminent)
                             .disabled(selectedPlace == nil)
+                            .accessibilityIdentifier("btn_create_confirm")
                     }
                 }
             }
@@ -220,6 +221,7 @@ private struct DestinationSection: View {
             } else {
                 TextField("Search for a place", text: $searchQuery)
                     .autocorrectionDisabled()
+                    .accessibilityIdentifier("field_destination")
                 ForEach(searchResults, id: \.name) { item in
                     Button(action: { selectPlace(item) }) {
                         VStack(alignment: .leading, spacing: 2) {
