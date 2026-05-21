@@ -11,14 +11,18 @@ struct MeetupsListView: View {
     @State private var permanentlyHiddenIds: Set<UUID> = []
     @Environment(AuthViewModel.self) private var auth
 
+    private func isVisible(_ p: MyParticipation) -> Bool {
+        !deletedMeetupIds.contains(p.meetup.id) && !permanentlyHiddenIds.contains(p.meetup.id)
+    }
+
     private var invited: [MyParticipation] {
-        participations.filter { $0.status == "invited" && $0.meetup.status == "active" && !deletedMeetupIds.contains($0.meetup.id) && !permanentlyHiddenIds.contains($0.meetup.id) }
+        participations.filter { isVisible($0) && $0.status == "invited" && $0.meetup.status == "active" }
     }
     private var active: [MyParticipation] {
-        participations.filter { $0.status != "invited" && $0.meetup.status == "active" && !deletedMeetupIds.contains($0.meetup.id) && !permanentlyHiddenIds.contains($0.meetup.id) }
+        participations.filter { isVisible($0) && $0.status != "invited" && $0.meetup.status == "active" }
     }
     private var past: [MyParticipation] {
-        participations.filter { $0.meetup.status != "active" && $0.meetup.status != "cancelled" && !deletedMeetupIds.contains($0.meetup.id) && !permanentlyHiddenIds.contains($0.meetup.id) }
+        participations.filter { isVisible($0) && $0.meetup.status != "active" && $0.meetup.status != "cancelled" }
     }
     private var pastByCategory: [(key: String, value: [MyParticipation])] {
         let grouped = Dictionary(grouping: past) { $0.meetup.category ?? "" }
@@ -65,9 +69,10 @@ struct MeetupsListView: View {
                         if !invited.isEmpty {
                             Section("Invited") {
                                 ForEach(invited, id: \.meetup.id) { p in
-                                    MeetupRow(participation: p)
-                                        .contentShape(Rectangle())
-                                        .onTapGesture { selectedMeetup = p.meetup }
+                                    Button { selectedMeetup = p.meetup } label: {
+                                        MeetupRow(participation: p)
+                                    }
+                                    .buttonStyle(.plain)
                                 }
                                 .onDelete { indices in Task { await deleteParticipations(invited, at: indices) } }
                             }
@@ -75,9 +80,10 @@ struct MeetupsListView: View {
                         if !active.isEmpty {
                             Section("Active") {
                                 ForEach(active, id: \.meetup.id) { p in
-                                    MeetupRow(participation: p)
-                                        .contentShape(Rectangle())
-                                        .onTapGesture { selectedMeetup = p.meetup }
+                                    Button { selectedMeetup = p.meetup } label: {
+                                        MeetupRow(participation: p)
+                                    }
+                                    .buttonStyle(.plain)
                                 }
                                 .onDelete { indices in Task { await deleteParticipations(active, at: indices) } }
                             }
@@ -85,9 +91,10 @@ struct MeetupsListView: View {
                         ForEach(pastByCategory, id: \.key) { group in
                             Section(group.key.isEmpty ? "Uncategorized" : group.key) {
                                 ForEach(group.value, id: \.meetup.id) { p in
-                                    MeetupRow(participation: p)
-                                        .contentShape(Rectangle())
-                                        .onTapGesture { selectedMeetup = p.meetup }
+                                    Button { selectedMeetup = p.meetup } label: {
+                                        MeetupRow(participation: p)
+                                    }
+                                    .buttonStyle(.plain)
                                 }
                                 .onDelete { indices in Task { await deleteParticipations(group.value, at: indices) } }
                             }
@@ -145,7 +152,7 @@ struct MeetupsListView: View {
         do {
             let result = try await MeetupService.shared.listMyParticipations()
             withAnimation(.spring(response: 0.5, dampingFraction: 0.85)) {
-                participations = result
+                if result != participations { participations = result }
                 hasLoaded = true
             }
         } catch is CancellationError {
@@ -158,8 +165,7 @@ struct MeetupsListView: View {
 
     private func deleteParticipations(_ array: [MyParticipation], at indices: IndexSet) async {
         for index in indices {
-            let participation = array[index]
-            deletedMeetupIds.insert(participation.meetup.id)
+            deletedMeetupIds.insert(array[index].meetup.id)
         }
     }
 
@@ -191,13 +197,14 @@ struct MeetupRow: View {
                 Text(participation.meetup.destinationName)
                     .font(.headline)
                 if let category = participation.meetup.category, !category.isEmpty {
+                    let color = CategoryOption.presets.first(where: { $0.title == category })?.color ?? .secondary
                     Text(category)
                         .font(.caption2.weight(.medium))
                         .padding(.horizontal, 6)
                         .padding(.vertical, 2)
-                        .background(.secondary.opacity(0.15))
+                        .background(color.opacity(0.15))
                         .clipShape(Capsule())
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(color)
                 }
             }
             if let target = participation.meetup.targetArrivalAt {

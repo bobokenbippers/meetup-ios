@@ -207,7 +207,7 @@ struct PeopleListView: View {
             foundUser = nil
             error = "Friend request sent!"
             Task {
-                try? await Task.sleep(for: .seconds(2))
+                do { try await Task.sleep(for: .seconds(2)) } catch { return }
                 error = nil
             }
         } catch {

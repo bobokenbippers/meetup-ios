@@ -2,11 +2,24 @@ import SwiftUI
 import MapKit
 import Supabase
 
+struct CategoryOption: Identifiable {
+    let title: String
+    let color: Color
+    var id: String { title }
+
+    static let presets: [CategoryOption] = [
+        CategoryOption(title: "Squad Brunch", color: .orange),
+        CategoryOption(title: "Squad Happy Hour", color: .pink),
+        CategoryOption(title: "Squad Kickback", color: .teal),
+    ]
+}
+
 struct CreateMeetupView: View {
     @Environment(\.dismiss) private var dismiss
 
-    @State private var searchQuery = ""
-    @State private var searchResults: [MKMapItem] = []
+    // Only state needed at create() time lives here.
+    // Keyboard-driven state (search query, phone, contacts) lives in sub-views
+    // so typing there never re-renders this body.
     @State private var selectedPlace: MKMapItem?
 
     @State private var setTargetTime = false
@@ -26,13 +39,7 @@ struct CreateMeetupView: View {
         return cal.date(from: comps) ?? Date().addingTimeInterval(3600)
     }()
 
-    @State private var inviteePhone = ""
-    @State private var foundUser: FoundUser?
-    @State private var isSearchingUser = false
     @State private var invitees: [FoundUser] = []
-    @State private var contactsManager = ContactsManager()
-    @State private var contactSuggestions: [DeviceContact] = []
-
     @State private var isCreating = false
     @State private var selectedCategory: String? = nil
     @State private var customCategoryText = ""
@@ -42,37 +49,7 @@ struct CreateMeetupView: View {
     var body: some View {
         NavigationStack {
             Form {
-                Section("Destination") {
-                    if let place = selectedPlace {
-                        HStack {
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(place.name ?? "").font(.subheadline).bold()
-                                if let sub = addressSubtitle(for: place) {
-                                    Text(sub).font(.caption).foregroundStyle(.secondary)
-                                }
-                            }
-                            Spacer()
-                            Button("Change") {
-                                selectedPlace = nil
-                                searchQuery = ""
-                            }
-                            .font(.caption)
-                        }
-                    } else {
-                        TextField("Search for a place", text: $searchQuery)
-                            .autocorrectionDisabled()
-                        ForEach(searchResults, id: \.name) { item in
-                            Button(action: { selectPlace(item) }) {
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text(item.name ?? "Unknown").foregroundStyle(.primary)
-                                    if let sub = addressSubtitle(for: item) {
-                                        Text(sub).font(.caption).foregroundStyle(.secondary)
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
+                DestinationSection(selectedPlace: $selectedPlace)
 
                 Section("Time") {
                     Toggle("Set a target arrival time", isOn: $setTargetTime)
@@ -103,37 +80,47 @@ struct CreateMeetupView: View {
                             .frame(width: 70)
                             .clipped()
                         }
-                        .onChange(of: pickerHour) { _, _ in syncTimePickers() }
+                        .onChange(of: pickerHour)  { _, _ in syncTimePickers() }
                         .onChange(of: pickerMinute) { _, _ in syncTimePickers() }
-                        .onChange(of: pickerAmPm) { _, _ in syncTimePickers() }
+                        .onChange(of: pickerAmPm)   { _, _ in syncTimePickers() }
                     }
                 }
 
                 Section("Category") {
-                    ScrollView(.horizontal, showsIndicators: false) {
-                        HStack(spacing: 8) {
-                            ForEach(["Squad Brunch", "Squad Happy Hour", "Squad Kickback"], id: \.self) { cat in
-                                Button(cat) {
-                                    if selectedCategory == cat {
-                                        selectedCategory = nil
-                                        showingCustomCategory = false
-                                    } else {
-                                        selectedCategory = cat
-                                        showingCustomCategory = false
-                                    }
-                                }
-                                .buttonStyle(.bordered)
-                                .tint(selectedCategory == cat ? .accentColor : .secondary)
+                    LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
+                        ForEach(CategoryOption.presets) { option in
+                            Button {
+                                selectedCategory = (selectedCategory == option.title) ? nil : option.title
+                                showingCustomCategory = false
+                            } label: {
+                                Text(option.title)
+                                    .font(.subheadline.weight(.medium))
+                                    .multilineTextAlignment(.center)
+                                    .frame(maxWidth: .infinity, minHeight: 52)
+                                    .foregroundStyle(selectedCategory == option.title ? .white : option.color)
+                                    .background(
+                                        RoundedRectangle(cornerRadius: 12)
+                                            .fill(selectedCategory == option.title ? option.color : option.color.opacity(0.12))
+                                    )
                             }
-                            Button("Custom...") {
-                                showingCustomCategory.toggle()
-                                if !showingCustomCategory { selectedCategory = nil }
-                            }
-                            .buttonStyle(.bordered)
-                            .tint(showingCustomCategory ? .accentColor : .secondary)
+                            .buttonStyle(.plain)
                         }
-                        .padding(.vertical, 4)
+                        Button {
+                            showingCustomCategory.toggle()
+                            if !showingCustomCategory { selectedCategory = nil }
+                        } label: {
+                            Text("Custom...")
+                                .font(.subheadline.weight(.medium))
+                                .frame(maxWidth: .infinity, minHeight: 52)
+                                .foregroundStyle(showingCustomCategory ? .white : .purple)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 12)
+                                        .fill(showingCustomCategory ? Color.purple : Color.purple.opacity(0.12))
+                                )
+                        }
+                        .buttonStyle(.plain)
                     }
+                    .padding(.vertical, 4)
                     if showingCustomCategory {
                         TextField("e.g. Squad Picnic", text: $customCategoryText)
                             .onChange(of: customCategoryText) { _, v in
@@ -142,65 +129,7 @@ struct CreateMeetupView: View {
                     }
                 }
 
-                Section("Invite people") {
-                    HStack {
-                        TextField("Name or +1 (646) 946-6861", text: $inviteePhone)
-                            .keyboardType(.default)
-                            .autocorrectionDisabled()
-                            .onChange(of: inviteePhone) { _, v in
-                                if v.contains(where: { $0.isLetter }) {
-                                    contactSuggestions = Array(contactsManager.search(v).prefix(5))
-                                } else {
-                                    let raw = v.hasPrefix("+1") ? String(v.dropFirst(2)) : v
-                                    let digitsOnly = String(raw.filter { $0.isNumber }.prefix(10))
-                                    let formatted = formatPhone(digitsOnly)
-                                    if inviteePhone != formatted {
-                                        inviteePhone = formatted
-                                    } else {
-                                        contactSuggestions = Array(contactsManager.search(digitsOnly).prefix(5))
-                                    }
-                                }
-                            }
-                        if isSearchingUser {
-                            ProgressView()
-                        } else {
-                            Button("Search") { Task { await searchUser() } }
-                                .disabled({
-                                    let raw = inviteePhone.hasPrefix("+1") ? String(inviteePhone.dropFirst(2)) : inviteePhone
-                                    return raw.filter { $0.isNumber }.count < 10
-                                }())
-                        }
-                    }
-                    ForEach(contactSuggestions) { contact in
-                        Button { Task { await selectContact(contact) } } label: {
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(contact.displayName).foregroundStyle(.primary)
-                                Text(contact.phones.first ?? contact.emails.first ?? "")
-                                    .font(.caption).foregroundStyle(.secondary)
-                            }
-                        }
-                    }
-                    if let user = foundUser {
-                        HStack {
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(user.displayName).font(.subheadline)
-                                Text(user.phone).font(.caption).foregroundStyle(.secondary)
-                            }
-                            Spacer()
-                            Button("Add") { addInvitee(user) }
-                                .buttonStyle(.borderedProminent)
-                                .controlSize(.small)
-                        }
-                    }
-                    ForEach(invitees, id: \.id) { invitee in
-                        HStack {
-                            Text(invitee.displayName)
-                            Spacer()
-                            Text(invitee.phone).font(.caption).foregroundStyle(.secondary)
-                        }
-                    }
-                    .onDelete { indexSet in invitees.remove(atOffsets: indexSet) }
-                }
+                InviteSection(invitees: $invitees)
 
                 if let error {
                     Section {
@@ -224,65 +153,9 @@ struct CreateMeetupView: View {
                     }
                 }
             }
-            .task(id: searchQuery) {
-                if searchQuery.count < 2 {
-                    searchResults = []
-                    return
-                }
-                do {
-                    try await Task.sleep(for: .milliseconds(350))
-                } catch {
-                    return
-                }
-                await performSearch()
-            }
-            .task {
-                await contactsManager.load()
-                refreshSuggestions()
-            }
-        }
-    }
-
-    private func addressSubtitle(for item: MKMapItem) -> String? {
-        item.address?.shortAddress
-    }
-
-    private func selectPlace(_ item: MKMapItem) {
-        selectedPlace = item
-        searchResults = []
-        searchQuery = item.name ?? ""
-    }
-
-    private func performSearch() async {
-        guard selectedPlace == nil else { return }
-        guard searchQuery.count >= 2 else {
-            searchResults = []
-            return
-        }
-        let request = MKLocalSearch.Request()
-        request.naturalLanguageQuery = searchQuery
-        guard let response = try? await MKLocalSearch(request: request).start(),
-              !Task.isCancelled else { return }
-        searchResults = Array(response.mapItems.prefix(5))
-    }
-
-    private func refreshSuggestions() {
-        guard !inviteePhone.isEmpty else { contactSuggestions = []; return }
-        if inviteePhone.contains(where: { $0.isLetter }) {
-            contactSuggestions = Array(contactsManager.search(inviteePhone).prefix(5))
-        } else {
-            let raw = inviteePhone.hasPrefix("+1") ? String(inviteePhone.dropFirst(2)) : inviteePhone
-            let digits = raw.filter { $0.isNumber }
-            contactSuggestions = digits.isEmpty ? [] : Array(contactsManager.search(digits).prefix(5))
-        }
-    }
-
-    private func formatPhone(_ digits: String) -> String {
-        switch digits.count {
-        case 0:     return ""
-        case 1...3: return "+1 (\(digits)"
-        case 4...6: return "+1 (\(digits.prefix(3))) \(digits.dropFirst(3))"
-        default:    return "+1 (\(digits.prefix(3))) \(digits.dropFirst(3).prefix(3))-\(digits.dropFirst(6))"
+            .alert("Error", isPresented: Binding(get: { error != nil }, set: { if !$0 { error = nil } })) {
+                Button("OK") { error = nil }
+            } message: { Text(error ?? "") }
         }
     }
 
@@ -296,9 +169,176 @@ struct CreateMeetupView: View {
         if let date = cal.date(from: comps) { targetTime = date }
     }
 
-    private func searchUser() async {
+    private func create() async {
+        guard let place = selectedPlace else { return }
+        let coord = place.location.coordinate
+        isCreating = true
+        error = nil
+        do {
+            _ = try await MeetupService.shared.createMeetup(
+                destinationName: place.name ?? "Meeting Point",
+                destinationAddress: place.name,
+                lat: coord.latitude,
+                lng: coord.longitude,
+                targetArrivalAt: setTargetTime ? targetTime : nil,
+                category: selectedCategory,
+                invitees: invitees
+            )
+            dismiss()
+        } catch {
+            self.error = error.localizedDescription
+            isCreating = false
+        }
+    }
+}
+
+// MARK: - Destination Section
+// Owns its own searchQuery/searchResults so typing here never re-renders CreateMeetupView.
+
+private struct DestinationSection: View {
+    @Binding var selectedPlace: MKMapItem?
+    @State private var searchQuery = ""
+    @State private var searchResults: [MKMapItem] = []
+
+    var body: some View {
+        Section("Destination") {
+            if let place = selectedPlace {
+                HStack {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(place.name ?? "").font(.subheadline).bold()
+                        if let sub = place.address?.shortAddress {
+                            Text(sub).font(.caption).foregroundStyle(.secondary)
+                        }
+                    }
+                    Spacer()
+                    Button("Change") {
+                        selectedPlace = nil
+                        searchQuery = ""
+                    }
+                    .font(.caption)
+                }
+            } else {
+                TextField("Search for a place", text: $searchQuery)
+                    .autocorrectionDisabled()
+                ForEach(searchResults, id: \.name) { item in
+                    Button(action: { selectPlace(item) }) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(item.name ?? "Unknown").foregroundStyle(.primary)
+                            if let sub = item.address?.shortAddress {
+                                Text(sub).font(.caption).foregroundStyle(.secondary)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        .task(id: searchQuery) {
+            guard searchQuery.count >= 2 else { searchResults = []; return }
+            do { try await Task.sleep(for: .milliseconds(300)) } catch { return }
+            await runSearch()
+        }
+    }
+
+    private func selectPlace(_ item: MKMapItem) {
+        selectedPlace = item
+        searchResults = []
+        searchQuery = item.name ?? ""
+    }
+
+    private func runSearch() async {
+        guard selectedPlace == nil, searchQuery.count >= 2 else { searchResults = []; return }
+        let q = searchQuery
+        let request = MKLocalSearch.Request()
+        request.naturalLanguageQuery = q
+        guard let response = try? await MKLocalSearch(request: request).start(),
+              !Task.isCancelled,
+              searchQuery == q else { return }
+        searchResults = Array(response.mapItems.prefix(5))
+    }
+}
+
+// MARK: - Invite Section
+// Owns all phone/contacts state so typing here never re-renders CreateMeetupView.
+// Phone field stores raw input (no write-back formatting) to avoid the double-render
+// loop that the old onChange-writes-inviteePhone pattern caused.
+
+private struct InviteSection: View {
+    @Binding var invitees: [FoundUser]
+
+    @State private var inviteePhone = ""
+    @State private var foundUser: FoundUser?
+    @State private var isSearchingUser = false
+    @State private var contactsManager = ContactsManager()
+    @State private var contactSuggestions: [DeviceContact] = []
+    @State private var error: String?
+
+    private var phoneDigits: String {
         let raw = inviteePhone.hasPrefix("+1") ? String(inviteePhone.dropFirst(2)) : inviteePhone
-        let digits = raw.filter { $0.isNumber }
+        return raw.filter(\.isNumber)
+    }
+
+    var body: some View {
+        Section("Invite people") {
+            HStack {
+                TextField("Name or +1 (646) 946-6861", text: $inviteePhone)
+                    .keyboardType(.default)
+                    .autocorrectionDisabled()
+                    .onChange(of: inviteePhone) { _, v in
+                        // Single pass — no write-back to inviteePhone, so one render per keystroke.
+                        let query: String
+                        if v.contains(where: { $0.isLetter }) {
+                            query = v
+                        } else {
+                            let raw = v.hasPrefix("+1") ? String(v.dropFirst(2)) : v
+                            query = raw.filter(\.isNumber)
+                        }
+                        contactSuggestions = query.isEmpty ? [] : Array(contactsManager.search(query).prefix(5))
+                    }
+                if isSearchingUser {
+                    ProgressView()
+                } else {
+                    Button("Search") { Task { await searchUser() } }
+                        .disabled(phoneDigits.count < 10)
+                }
+            }
+            ForEach(contactSuggestions) { contact in
+                Button { Task { await selectContact(contact) } } label: {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(contact.displayName).foregroundStyle(.primary)
+                        Text(contact.phones.first ?? contact.emails.first ?? "")
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
+                }
+            }
+            if let user = foundUser {
+                HStack {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(user.displayName).font(.subheadline)
+                        Text(user.phone).font(.caption).foregroundStyle(.secondary)
+                    }
+                    Spacer()
+                    Button("Add") { addInvitee(user) }
+                        .buttonStyle(.borderedProminent)
+                        .controlSize(.small)
+                }
+            }
+            ForEach(invitees, id: \.id) { invitee in
+                HStack {
+                    Text(invitee.displayName)
+                    Spacer()
+                    Text(invitee.phone).font(.caption).foregroundStyle(.secondary)
+                }
+            }
+            .onDelete { indexSet in invitees.remove(atOffsets: indexSet) }
+        }
+        .task { await contactsManager.load() }
+        .alert("Error", isPresented: Binding(get: { error != nil }, set: { if !$0 { error = nil } })) {
+            Button("OK") { error = nil }
+        } message: { Text(error ?? "") }
+    }
+
+    private func searchUser() async {
+        let digits = phoneDigits
         guard digits.count == 10 else { return }
         let e164 = "+1" + digits
         let myId = SupabaseManager.shared.client.auth.currentUser?.id
@@ -307,13 +347,9 @@ struct CreateMeetupView: View {
         error = nil
         do {
             if let user = try await MeetupService.shared.findUserByPhone(e164) {
-                if user.id == myId {
-                    error = "That's you!"
-                } else if invitees.contains(where: { $0.id == user.id }) {
-                    error = "Already added"
-                } else {
-                    foundUser = user
-                }
+                if user.id == myId { error = "That's you!" }
+                else if invitees.contains(where: { $0.id == user.id }) { error = "Already added" }
+                else { foundUser = user }
             } else {
                 error = "No user found with that number"
             }
@@ -354,28 +390,5 @@ struct CreateMeetupView: View {
             error = "\(contact.displayName) isn't on the app yet"
         }
         isSearchingUser = false
-    }
-
-    private func create() async {
-        guard let place = selectedPlace else { return }
-        let location = place.location
-        let coord = location.coordinate
-        isCreating = true
-        error = nil
-        do {
-            _ = try await MeetupService.shared.createMeetup(
-                destinationName: place.name ?? "Meeting Point",
-                destinationAddress: place.name,
-                lat: coord.latitude,
-                lng: coord.longitude,
-                targetArrivalAt: setTargetTime ? targetTime : nil,
-                category: selectedCategory,
-                invitees: invitees
-            )
-            dismiss()
-        } catch {
-            self.error = error.localizedDescription
-            isCreating = false
-        }
     }
 }

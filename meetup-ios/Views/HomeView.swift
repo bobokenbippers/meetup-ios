@@ -51,7 +51,7 @@ struct SettingsView: View {
             }
             .navigationTitle("Settings")
             .preferredColorScheme(colorScheme)
-            .onAppear { loadSettings() }
+            .task { loadSettings() }
             .onChange(of: themePreference) { _, _ in saveSettings() }
             .onChange(of: boldText) { _, _ in saveSettings() }
             .onChange(of: largerText) { _, _ in saveSettings() }
@@ -70,13 +70,21 @@ struct SettingsView: View {
 
     private func loadSettings() {
         let defaults = UserDefaults.standard
+        let storedTheme: ThemePreference
         if let rawTheme = defaults.string(forKey: "themePreference") {
-            themePreference = ThemePreference(rawValue: rawTheme) ?? .system
+            storedTheme = ThemePreference(rawValue: rawTheme) ?? .system
+        } else {
+            storedTheme = .system
         }
-        boldText = defaults.bool(forKey: "boldText")
-        largerText = defaults.bool(forKey: "largerText")
-        reduceMotion = defaults.bool(forKey: "reduceMotion")
-        contactsEnabled = defaults.bool(forKey: "contactsEnabled")
+        if themePreference != storedTheme { themePreference = storedTheme }
+        let storedBold = defaults.bool(forKey: "boldText")
+        let storedLarger = defaults.bool(forKey: "largerText")
+        let storedReduceMotion = defaults.bool(forKey: "reduceMotion")
+        let storedContacts = defaults.bool(forKey: "contactsEnabled")
+        if boldText != storedBold { boldText = storedBold }
+        if largerText != storedLarger { largerText = storedLarger }
+        if reduceMotion != storedReduceMotion { reduceMotion = storedReduceMotion }
+        if contactsEnabled != storedContacts { contactsEnabled = storedContacts }
     }
 
     private func saveSettings() {

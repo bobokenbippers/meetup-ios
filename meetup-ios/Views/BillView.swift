@@ -1,5 +1,5 @@
 import SwiftUI
-import UniformTypeIdentifiers
+import PhotosUI
 import Supabase
 import Auth
 
@@ -18,8 +18,8 @@ struct BillView: View {
     @State private var showSummary = false
     @State private var realtimeTask: Task<Void, Never>?
 
-    @State private var showImagePicker = false
-    @State private var showDocPicker = false
+    @State private var selectedPhotoItem: PhotosPickerItem?
+    @State private var showCamera = false
     @State private var parsedReceipt: ParsedReceipt?
     @State private var editableItems: [BillItem] = []
 
@@ -70,32 +70,36 @@ struct BillView: View {
                 .padding(.horizontal)
             HStack(spacing: 16) {
                 Button {
-                    showImagePicker = true
+                    showCamera = true
                 } label: {
                     Label("Take Photo", systemImage: "camera")
                         .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.glass)
-                Button {
-                    showDocPicker = true
-                } label: {
-                    Label("Choose PDF", systemImage: "doc.fill")
+                PhotosPicker(selection: $selectedPhotoItem, matching: .images) {
+                    Label("Camera Roll", systemImage: "photo.on.rectangle")
                         .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.glass)
+                .onChange(of: selectedPhotoItem) { _, item in
+                    guard let item else { return }
+                    Task {
+                        if let data = try? await item.loadTransferable(type: Data.self),
+                           let image = UIImage(data: data) {
+                            await handleImage(image)
+                        }
+                        selectedPhotoItem = nil
+                    }
+                }
             }
             .padding(.horizontal)
             Spacer()
         }
-        .sheet(isPresented: $showImagePicker) {
-            ImagePickerView { image in
+        .sheet(isPresented: $showCamera) {
+            CameraPickerView { image in
                 Task { await handleImage(image) }
             }
-        }
-        .sheet(isPresented: $showDocPicker) {
-            DocumentPickerView { url in
-                Task { await handlePDF(url) }
-            }
+            .ignoresSafeArea()
         }
         .overlay {
             if isProcessing {
@@ -157,18 +161,14 @@ struct BillView: View {
     // MARK: - Checklist view
 
     private func checklistView(bill: Bill) -> some View {
-        let currentItems = items
-        let currentClaims = claims
-        let currentParticipants = participants
-        let currentMyUserId = myUserId
-        return VStack(spacing: 0) {
+        VStack(spacing: 0) {
             List {
                 Section {
-                    ForEach(currentItems) { item in
-                        let itemClaims = currentClaims.filter { $0.billItemId == item.id }
-                        let isMine = itemClaims.contains { $0.userId == currentMyUserId }
+                    ForEach(items) { item in
+                        let itemClaims = claims.filter { $0.billItemId == item.id }
+                        let isMine = itemClaims.contains { $0.userId == myUserId }
                         let claimNames = itemClaims.compactMap { c in
-                            currentParticipants.first(where: { $0.userId == c.userId })?.displayName
+                            participants.first(where: { $0.userId == c.userId })?.displayName
                         }
                         HStack {
                             VStack(alignment: .leading, spacing: 2) {
@@ -190,7 +190,7 @@ struct BillView: View {
                 } header: {
                     Text("Items")
                 } footer: {
-                    if currentItems.contains(where: { i in !currentClaims.contains(where: { $0.billItemId == i.id }) }) {
+                    if items.contains(where: { i in !claims.contains(where: { $0.billItemId == i.id }) }) {
                         Text("Unclaimed items shown in orange").foregroundStyle(.orange)
                     }
                 }
@@ -238,8 +238,7 @@ struct BillView: View {
     // MARK: - Helpers
 
     private func myTotal(bill: Bill) -> Double {
-        let myId = myUserId
-        let myClaims = claims.filter { $0.userId == myId }
+        let myClaims = claims.filter { $0.userId == myUserId }
         var sub = 0.0
         for claim in myClaims {
             guard let item = items.first(where: { $0.id == claim.billItemId }) else { continue }
@@ -247,7 +246,8 @@ struct BillView: View {
             sub += item.price / splitCount
         }
         let billSub = bill.subtotal > 0 ? bill.subtotal : 1
-        return sub + (sub / billSub) * bill.tax + (sub / billSub) * bill.tip
+        let share = sub / billSub
+        return sub + share * bill.tax + share * bill.tip
     }
 
     private func toggleClaim(item: BillItem, isMine: Bool) async {
@@ -266,16 +266,6 @@ struct BillView: View {
     private func handleImage(_ image: UIImage) async {
         isProcessing = true
         let parsed = await ReceiptParser.parse(image: image)
-        parsedReceipt = parsed
-        editableItems = parsed.items.enumerated().map { idx, i in
-            BillItem(id: UUID(), billId: UUID(), name: i.name, price: i.price, position: idx)
-        }
-        isProcessing = false
-    }
-
-    private func handlePDF(_ url: URL) async {
-        isProcessing = true
-        let parsed = await ReceiptParser.parse(pdfURL: url)
         parsedReceipt = parsed
         editableItems = parsed.items.enumerated().map { idx, i in
             BillItem(id: UUID(), billId: UUID(), name: i.name, price: i.price, position: idx)
@@ -324,7 +314,7 @@ struct BillView: View {
 
     private func startRealtime() {
         guard let b = bill else { return }
-        realtimeTask?.cancel()
+        guard realtimeTask == nil else { return }
         realtimeTask = Task {
             let channel = SupabaseManager.shared.client.realtimeV2.channel("bill-\(b.id)")
             let changes = channel.postgresChange(AnyAction.self, schema: "public", table: "bill_item_claims")
@@ -340,7 +330,7 @@ struct BillView: View {
 
 // MARK: - UIKit wrappers
 
-struct ImagePickerView: UIViewControllerRepresentable {
+struct CameraPickerView: UIViewControllerRepresentable {
     let onImage: (UIImage) -> Void
     func makeCoordinator() -> Coordinator { Coordinator(onImage: onImage) }
     func makeUIViewController(context: Context) -> UIImagePickerController {
@@ -356,24 +346,6 @@ struct ImagePickerView: UIViewControllerRepresentable {
         func imagePickerController(_ picker: UIImagePickerController, didFinishPickingMediaWithInfo info: [UIImagePickerController.InfoKey: Any]) {
             if let img = info[.originalImage] as? UIImage { onImage(img) }
             picker.dismiss(animated: true)
-        }
-    }
-}
-
-struct DocumentPickerView: UIViewControllerRepresentable {
-    let onURL: (URL) -> Void
-    func makeCoordinator() -> Coordinator { Coordinator(onURL: onURL) }
-    func makeUIViewController(context: Context) -> UIDocumentPickerViewController {
-        let vc = UIDocumentPickerViewController(forOpeningContentTypes: [.pdf])
-        vc.delegate = context.coordinator
-        return vc
-    }
-    func updateUIViewController(_ uiViewController: UIDocumentPickerViewController, context: Context) {}
-    class Coordinator: NSObject, UIDocumentPickerDelegate {
-        let onURL: (URL) -> Void
-        init(onURL: @escaping (URL) -> Void) { self.onURL = onURL }
-        func documentPicker(_ controller: UIDocumentPickerViewController, didPickDocumentsAt urls: [URL]) {
-            if let url = urls.first { onURL(url) }
         }
     }
 }

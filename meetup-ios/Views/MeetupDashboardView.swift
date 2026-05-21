@@ -215,7 +215,7 @@ struct MeetupDashboardView: View {
                 try await MeetupService.shared.accept(meetupId: meetup.id)
                 withAnimation { showConfetti = true }
                 Task {
-                    try? await Task.sleep(for: .seconds(2.5))
+                    do { try await Task.sleep(for: .seconds(2.5)) } catch { return }
                     showConfetti = false
                 }
             } else {
@@ -277,24 +277,6 @@ struct ParticipantTile: View {
         }
     }
 
-    private var etaLabel: String? {
-        guard let seconds = participant.etaSeconds, participant.status == "accepted" else { return nil }
-        let minutes = seconds / 60
-        if minutes < 1 { return "Almost there" }
-        if minutes < 60 { return "\(minutes) min away" }
-        return "\(minutes / 60)h \(minutes % 60)m away"
-    }
-
-    private var lateLabel: String? {
-        guard let target = targetArrivalAt,
-              let seconds = participant.etaSeconds,
-              participant.status == "accepted" else { return nil }
-        let eta = Date().addingTimeInterval(TimeInterval(seconds))
-        guard eta > target else { return nil }
-        let lateBy = Int(eta.timeIntervalSince(target)) / 60
-        return "\(lateBy) min late"
-    }
-
     var body: some View {
         HStack(spacing: 12) {
             Circle()
@@ -314,11 +296,11 @@ struct ParticipantTile: View {
                         Text("(you)").foregroundStyle(.secondary).font(.subheadline)
                     }
                 }
-                if let late = lateLabel {
+                if let late = participant.lateLabel(target: targetArrivalAt) {
                     Text(late)
                         .font(.caption)
                         .foregroundStyle(.red)
-                } else if let eta = etaLabel {
+                } else if let eta = participant.etaLabel() {
                     Text(eta)
                         .font(.caption)
                         .foregroundStyle(.green)

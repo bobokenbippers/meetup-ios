@@ -1,6 +1,6 @@
 import Foundation
 
-struct Meetup: Codable, Identifiable {
+struct Meetup: Codable, Identifiable, Equatable {
     let id: UUID
     let hostId: UUID
     let destinationName: String
@@ -82,7 +82,7 @@ extension MeetupParticipant {
     }
 }
 
-struct MyParticipation: Codable {
+struct MyParticipation: Codable, Equatable {
     let status: String
     let meetup: Meetup
 

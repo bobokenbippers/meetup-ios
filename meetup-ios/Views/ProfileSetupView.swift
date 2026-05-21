@@ -28,7 +28,8 @@ struct ProfileSetupView: View {
                     .textFieldStyle(.roundedBorder)
                     .keyboardType(.numberPad)
                     .onChange(of: phone) { _, newValue in
-                        phone = formatted(newValue)
+                        let candidate = formatted(newValue)
+                        if phone != candidate { phone = candidate }
                     }
             }
             .padding(.horizontal)
