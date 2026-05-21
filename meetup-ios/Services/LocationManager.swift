@@ -23,7 +23,7 @@ enum LocationTier: Equatable {
         switch self {
         case .stationary:       return kCLLocationAccuracyHundredMeters
         case .walking:          return kCLLocationAccuracyNearestTenMeters
-        case .driving:          return kCLLocationAccuracyNearestTenMeters
+        case .driving:          return kCLLocationAccuracyNearestTenMeters  // same as walking — 10m is sufficient for route tracking
         case .nearDestination:  return kCLLocationAccuracyBest
         }
     }
