@@ -1,6 +1,52 @@
 import Foundation
 import CoreLocation
+import CoreMotion
 import MapKit
+
+enum MotionMode {
+    case stationary, walking, cycling, driving, unknown
+}
+
+enum LocationTier: Equatable {
+    case stationary, walking, driving, nearDestination
+
+    var uploadInterval: TimeInterval {
+        switch self {
+        case .stationary:       return 60
+        case .walking:          return 20
+        case .driving:          return 15
+        case .nearDestination:  return 10
+        }
+    }
+
+    var desiredAccuracy: CLLocationAccuracy {
+        switch self {
+        case .stationary:       return kCLLocationAccuracyHundredMeters
+        case .walking:          return kCLLocationAccuracyNearestTenMeters
+        case .driving:          return kCLLocationAccuracyNearestTenMeters
+        case .nearDestination:  return kCLLocationAccuracyBest
+        }
+    }
+
+    var distanceFilter: CLLocationDistance {
+        switch self {
+        case .stationary:       return 50
+        case .walking:          return 15
+        case .driving:          return 20
+        case .nearDestination:  return 5
+        }
+    }
+
+    static func forContext(distanceToDestination: CLLocationDistance, motionMode: MotionMode) -> LocationTier {
+        if distanceToDestination < 500 { return .nearDestination }
+        switch motionMode {
+        case .stationary:           return .stationary
+        case .walking, .cycling:    return .walking
+        case .driving:              return .driving
+        case .unknown:              return .walking
+        }
+    }
+}
 
 final class LocationManager: NSObject {
     static let shared = LocationManager()
@@ -67,12 +113,16 @@ final class LocationManager: NSObject {
 
     private func calculateETA(from origin: CLLocationCoordinate2D, to destination: CLLocationCoordinate2D) async -> Int? {
         let request = MKDirections.Request()
-        let sourceLocation = CLLocation(latitude: origin.latitude, longitude: origin.longitude)
-        let destLocation = CLLocation(latitude: destination.latitude, longitude: destination.longitude)
-        request.source = MKMapItem(location: sourceLocation, address: nil)
-        request.destination = MKMapItem(location: destLocation, address: nil)
+        request.source = MKMapItem(location: CLLocation(latitude: origin.latitude, longitude: origin.longitude), address: nil)
+        request.destination = MKMapItem(location: CLLocation(latitude: destination.latitude, longitude: destination.longitude), address: nil)
         request.transportType = .automobile
         return try? await MKDirections(request: request).calculate().routes.first.map { Int($0.expectedTravelTime) }
+    }
+
+    static func isLocationValid(_ location: CLLocation) -> Bool {
+        location.horizontalAccuracy > 0 &&
+        location.horizontalAccuracy <= 200 &&
+        location.timestamp.timeIntervalSinceNow > -90.5
     }
 }
 
