@@ -37,7 +37,7 @@ struct PeopleListView: View {
                                         } else {
                                             let raw = v.hasPrefix("+1") ? String(v.dropFirst(2)) : v
                                             let digitsOnly = String(raw.filter { $0.isNumber }.prefix(10))
-                                            let formatted = formatPhone(digitsOnly)
+                                            let formatted = PhoneFormatter.formatWithCountryCode(digitsOnly)
                                             if phoneSearch != formatted {
                                                 phoneSearch = formatted
                                             } else {
@@ -141,20 +141,8 @@ struct PeopleListView: View {
         hasLoaded = true
     }
 
-    private func formatPhone(_ digits: String) -> String {
-        switch digits.count {
-        case 0:     return ""
-        case 1...3: return "+1 (\(digits)"
-        case 4...6: return "+1 (\(digits.prefix(3))) \(digits.dropFirst(3))"
-        default:    return "+1 (\(digits.prefix(3))) \(digits.dropFirst(3).prefix(3))-\(digits.dropFirst(6))"
-        }
-    }
-
     private func searchUser() async {
-        let raw = phoneSearch.hasPrefix("+1") ? String(phoneSearch.dropFirst(2)) : phoneSearch
-        let digits = raw.filter { $0.isNumber }
-        guard digits.count == 10 else { return }
-        let e164 = "+1" + digits
+        guard let e164 = PhoneFormatter.toE164(phoneSearch) else { return }
         let myId = SupabaseManager.shared.client.auth.currentUser?.id
         isSearching = true
         foundUser = nil

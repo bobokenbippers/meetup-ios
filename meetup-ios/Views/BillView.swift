@@ -210,7 +210,7 @@ struct BillView: View {
 
     private var summarySheet: some View {
         NavigationStack {
-            let totals = BillService.shared.computeTotals(
+            let totals = BillService.computeTotals(
                 bill: bill!,
                 items: items,
                 claims: claims,

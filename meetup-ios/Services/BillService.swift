@@ -127,7 +127,7 @@ final class BillService {
         var total: Double
     }
 
-    func computeTotals(
+    static func computeTotals(
         bill: Bill,
         items: [BillItem],
         claims: [BillItemClaim],

@@ -49,7 +49,7 @@ struct ReceiptParser {
         }
     }
 
-    private static func parseText(_ lines: [String]) -> ParsedReceipt {
+    static func parseText(_ lines: [String]) -> ParsedReceipt {
         let pricePattern = #"(\d+\.\d{2})"#
         let priceRegex = try! NSRegularExpression(pattern: pricePattern)
 

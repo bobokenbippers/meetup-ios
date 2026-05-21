@@ -28,7 +28,7 @@ struct ProfileSetupView: View {
                     .textFieldStyle(.roundedBorder)
                     .keyboardType(.numberPad)
                     .onChange(of: phone) { _, newValue in
-                        let candidate = formatted(newValue)
+                        let candidate = PhoneFormatter.format(newValue)
                         if phone != candidate { phone = candidate }
                     }
             }
@@ -46,21 +46,7 @@ struct ProfileSetupView: View {
         .padding()
     }
 
-    private func formatted(_ input: String) -> String {
-        let digits = String(input.filter { $0.isNumber }.prefix(10))
-        switch digits.count {
-        case 0:        return ""
-        case 1...3:    return "(\(digits)"
-        case 4...6:    return "(\(digits.prefix(3))) \(digits.dropFirst(3))"
-        default:       return "(\(digits.prefix(3))) \(digits.dropFirst(3).prefix(3))-\(digits.dropFirst(6))"
-        }
-    }
-
-    private var normalizedPhone: String? {
-        let digits = phone.filter { $0.isNumber }
-        guard digits.count == 10 else { return nil }
-        return "+1" + digits
-    }
+    private var normalizedPhone: String? { PhoneFormatter.toE164(phone) }
 
     private func save() async {
         guard let phone = normalizedPhone, let userId = auth.session?.user.id else { return }

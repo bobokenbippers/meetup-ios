@@ -10,8 +10,19 @@
 		BA2864C12FB8EFBE00BD5B1C /* Supabase in Frameworks */ = {isa = PBXBuildFile; productRef = BA2864C02FB8EFBE00BD5B1C /* Supabase */; };
 /* End PBXBuildFile section */
 
+/* Begin PBXContainerItemProxy section */
+		BA90010B2FB8EFA100BD5B1C /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = BA2864A92FB8EFA000BD5B1C /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = BA2864B02FB8EFA000BD5B1C;
+			remoteInfo = "meetup-ios";
+		};
+/* End PBXContainerItemProxy section */
+
 /* Begin PBXFileReference section */
 		BA2864B12FB8EFA000BD5B1C /* meetup-ios.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "meetup-ios.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		BA9001012FB8EFA100BD5B1C /* meetup-iosTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "meetup-iosTests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -33,6 +44,11 @@
 			path = "meetup-ios";
 			sourceTree = "<group>";
 		};
+		BA9001022FB8EFA100BD5B1C /* meetup-iosTests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = "meetup-iosTests";
+			sourceTree = "<group>";
+		};
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -44,6 +60,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		BA9001052FB8EFA100BD5B1C /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -52,6 +75,7 @@
 			children = (
 				BA2864B32FB8EFA000BD5B1C /* meetup-ios */,
 				BA2864B22FB8EFA000BD5B1C /* Products */,
+				BA5D0E052FBEA73A0050B215 /* Recovered References */,
 			);
 			sourceTree = "<group>";
 		};
@@ -59,8 +83,17 @@
 			isa = PBXGroup;
 			children = (
 				BA2864B12FB8EFA000BD5B1C /* meetup-ios.app */,
+				BA9001012FB8EFA100BD5B1C /* meetup-iosTests.xctest */,
 			);
 			name = Products;
+			sourceTree = "<group>";
+		};
+		BA5D0E052FBEA73A0050B215 /* Recovered References */ = {
+			isa = PBXGroup;
+			children = (
+				BA9001022FB8EFA100BD5B1C /* meetup-iosTests */,
+			);
+			name = "Recovered References";
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -89,6 +122,27 @@
 			productReference = BA2864B12FB8EFA000BD5B1C /* meetup-ios.app */;
 			productType = "com.apple.product-type.application";
 		};
+		BA9001072FB8EFA100BD5B1C /* meetup-iosTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = BA90010A2FB8EFA100BD5B1C /* Build configuration list for PBXNativeTarget "meetup-iosTests" */;
+			buildPhases = (
+				BA9001042FB8EFA100BD5B1C /* Sources */,
+				BA9001052FB8EFA100BD5B1C /* Frameworks */,
+				BA9001062FB8EFA100BD5B1C /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				BA90010C2FB8EFA100BD5B1C /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				BA9001022FB8EFA100BD5B1C /* meetup-iosTests */,
+			);
+			name = "meetup-iosTests";
+			productName = "meetup-iosTests";
+			productReference = BA9001012FB8EFA100BD5B1C /* meetup-iosTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -101,6 +155,10 @@
 				TargetAttributes = {
 					BA2864B02FB8EFA000BD5B1C = {
 						CreatedOnToolsVersion = 26.4.1;
+					};
+					BA9001072FB8EFA100BD5B1C = {
+						CreatedOnToolsVersion = 26.4.1;
+						TestTargetID = BA2864B02FB8EFA000BD5B1C;
 					};
 				};
 			};
@@ -122,12 +180,20 @@
 			projectRoot = "";
 			targets = (
 				BA2864B02FB8EFA000BD5B1C /* meetup-ios */,
+				BA9001072FB8EFA100BD5B1C /* meetup-iosTests */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
 		BA2864AF2FB8EFA000BD5B1C /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		BA9001062FB8EFA100BD5B1C /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -144,7 +210,22 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		BA9001042FB8EFA100BD5B1C /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		BA90010C2FB8EFA100BD5B1C /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = BA2864B02FB8EFA000BD5B1C /* meetup-ios */;
+			targetProxy = BA90010B2FB8EFA100BD5B1C /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
 		BA2864BA2FB8EFA100BD5B1C /* Debug */ = {
@@ -353,6 +434,40 @@
 			};
 			name = Release;
 		};
+		BA9001082FB8EFA100BD5B1C /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = KLT4S6K9X8;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.4;
+				PRODUCT_BUNDLE_IDENTIFIER = "gautamlgtm.meetup-iosTests";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/meetup-ios.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/meetup-ios";
+			};
+			name = Debug;
+		};
+		BA9001092FB8EFA100BD5B1C /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = KLT4S6K9X8;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.4;
+				PRODUCT_BUNDLE_IDENTIFIER = "gautamlgtm.meetup-iosTests";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/meetup-ios.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/meetup-ios";
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -370,6 +485,15 @@
 			buildConfigurations = (
 				BA2864BD2FB8EFA100BD5B1C /* Debug */,
 				BA2864BE2FB8EFA100BD5B1C /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		BA90010A2FB8EFA100BD5B1C /* Build configuration list for PBXNativeTarget "meetup-iosTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				BA9001082FB8EFA100BD5B1C /* Debug */,
+				BA9001092FB8EFA100BD5B1C /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
