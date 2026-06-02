@@ -980,14 +980,19 @@ create policy "host creates meetups"
   on public.meetups for insert
   with check (auth.uid() = host_id);
 
+-- NOTE: Do NOT reference the meetups table here — doing so creates a circular RLS
+-- dependency (meetup_participants policy → meetups → meetup_participants → …) that
+-- causes infinite recursion for non-host participants, resulting in empty results.
+-- The base case user_id = auth.uid() breaks the cycle without any cross-table lookup.
 create policy "see participants of meetups you're in"
   on public.meetup_participants for select
   using (
-    exists (select 1 from public.meetups m
-            where m.id = meetup_participants.meetup_id
-              and (m.host_id = auth.uid()
-                   or exists (select 1 from public.meetup_participants p
-                              where p.meetup_id = m.id and p.user_id = auth.uid())))
+    user_id = auth.uid()
+    or exists (
+      select 1 from public.meetup_participants self
+      where self.meetup_id = meetup_participants.meetup_id
+        and self.user_id = auth.uid()
+    )
   );
 
 create policy "host adds participants on create"
@@ -1510,6 +1515,114 @@ When the participant is `arrived`:
 **Goal:** During an active meetup with a target time, dashboard tiles are color-coded by punctuality. Late participants trigger push notifications to the host. "Leave by" notifications fire to participants who haven't started.
 
 **Estimated time:** 1 weekend.
+
+### M5.0 Supabase Edge Functions + DB Triggers (Push Delivery)
+
+Three Edge Functions live in `supabase/functions/`. They are deployed via:
+
+```bash
+supabase functions deploy push-meetup-invite
+supabase functions deploy push-meetup-status
+supabase functions deploy push-friend-request
+```
+
+Required secrets (set once per project):
+
+```bash
+supabase secrets set APPLE_TEAM_ID=<your 10-char team ID>
+supabase secrets set APNS_KEY_ID=<10-char key ID from Apple Developer>
+supabase secrets set APNS_AUTH_KEY="$(cat /path/to/AuthKey_XXXX.p8)"
+supabase secrets set APNS_USE_SANDBOX=true   # true for dev/TestFlight, false for prod
+```
+
+The shared APNs helper lives in `supabase/functions/_shared/apns.ts`. It handles JWT signing (ES256), APNs host switching, single retry on 5xx, and clearing stale tokens on 410.
+
+#### DB Triggers
+
+Apply these in the Supabase SQL editor after deploying the functions. Replace `<project-ref>` with `boyrqhbdkqzffvfokpri`.
+
+```sql
+-- Enable pg_net extension (only needed once per project)
+create extension if not exists pg_net;
+
+-- 1. Meetup invite push: fires when a participant row is inserted with status='invited'
+create or replace function notify_meetup_invite()
+returns trigger language plpgsql as $$
+begin
+  if new.status = 'invited' then
+    perform pg_net.http_post(
+      url := 'https://<project-ref>.supabase.co/functions/v1/push-meetup-invite',
+      headers := jsonb_build_object(
+        'Content-Type', 'application/json',
+        'Authorization', 'Bearer ' || current_setting('app.service_role_key', true)
+      ),
+      body := jsonb_build_object('participantId', new.id)
+    );
+  end if;
+  return new;
+end;
+$$;
+
+create or replace trigger trg_meetup_invite
+  after insert on meetup_participants
+  for each row execute function notify_meetup_invite();
+
+-- 2. Meetup status push: fires when participant status changes to accepted/declined/arrived
+create or replace function notify_meetup_status()
+returns trigger language plpgsql as $$
+begin
+  if old.status is distinct from new.status
+     and new.status in ('accepted', 'declined', 'arrived') then
+    perform pg_net.http_post(
+      url := 'https://<project-ref>.supabase.co/functions/v1/push-meetup-status',
+      headers := jsonb_build_object(
+        'Content-Type', 'application/json',
+        'Authorization', 'Bearer ' || current_setting('app.service_role_key', true)
+      ),
+      body := jsonb_build_object('participantId', new.id, 'newStatus', new.status)
+    );
+  end if;
+  return new;
+end;
+$$;
+
+create or replace trigger trg_meetup_status
+  after update on meetup_participants
+  for each row execute function notify_meetup_status();
+
+-- 3. Friend request push: fires on new friendship row or acceptance
+create or replace function notify_friendship()
+returns trigger language plpgsql as $$
+begin
+  if TG_OP = 'INSERT' and new.status = 'pending' then
+    perform pg_net.http_post(
+      url := 'https://<project-ref>.supabase.co/functions/v1/push-friend-request',
+      headers := jsonb_build_object(
+        'Content-Type', 'application/json',
+        'Authorization', 'Bearer ' || current_setting('app.service_role_key', true)
+      ),
+      body := jsonb_build_object('friendshipId', new.id, 'event', 'friend_request')
+    );
+  elsif TG_OP = 'UPDATE' and old.status = 'pending' and new.status = 'accepted' then
+    perform pg_net.http_post(
+      url := 'https://<project-ref>.supabase.co/functions/v1/push-friend-request',
+      headers := jsonb_build_object(
+        'Content-Type', 'application/json',
+        'Authorization', 'Bearer ' || current_setting('app.service_role_key', true)
+      ),
+      body := jsonb_build_object('friendshipId', new.id, 'event', 'friend_accepted')
+    );
+  end if;
+  return new;
+end;
+$$;
+
+create or replace trigger trg_friendship_push
+  after insert or update on friendships
+  for each row execute function notify_friendship();
+```
+
+> **Note:** `current_setting('app.service_role_key', true)` requires the service role key to be set as a Postgres config var: `alter database postgres set app.service_role_key = '<key>';` — or replace with a hardcoded value during initial setup and rotate to the config var approach before prod.
 
 ### M5.1 Punctuality Computation (Backend)
 

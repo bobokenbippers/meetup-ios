@@ -2,12 +2,15 @@ import SwiftUI
 import UserNotifications
 import CoreLocation
 import Supabase
+import GooglePlacesSwift
 
 class AppDelegate: NSObject, UIApplicationDelegate {
     func application(
         _ application: UIApplication,
         didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
     ) -> Bool {
+        _ = PlacesClient.provideAPIKey("AIzaSyByrHVgXGbeepjyXWc3xP1jdVeF6rquCsA")
+        UNUserNotificationCenter.current().delegate = self
         UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .badge, .sound]) { granted, _ in
             guard granted else { return }
             Task { @MainActor in
@@ -34,10 +37,43 @@ class AppDelegate: NSObject, UIApplicationDelegate {
     }
 }
 
+extension AppDelegate: UNUserNotificationCenterDelegate {
+    // Show notification banner even when app is foregrounded
+    func userNotificationCenter(
+        _ center: UNUserNotificationCenter,
+        willPresent notification: UNNotification,
+        withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void
+    ) {
+        completionHandler([.banner, .sound, .badge])
+    }
+
+    // Handle tap — deep-link into the right screen
+    func userNotificationCenter(
+        _ center: UNUserNotificationCenter,
+        didReceive response: UNNotificationResponse,
+        withCompletionHandler completionHandler: @escaping () -> Void
+    ) {
+        let info = response.notification.request.content.userInfo
+        guard let event = info["event"] as? String else { completionHandler(); return }
+
+        NotificationCenter.default.post(
+            name: .pushNotificationReceived,
+            object: nil,
+            userInfo: ["event": event, "meetupId": info["meetupId"] as? String ?? ""]
+        )
+        completionHandler()
+    }
+}
+
+extension Notification.Name {
+    static let pushNotificationReceived = Notification.Name("pushNotificationReceived")
+}
+
 @main
 struct meetup_iosApp: App {
     @UIApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
     @State private var auth = AuthViewModel()
+    @State private var settings = AppSettings()
 
     var body: some Scene {
         WindowGroup {
@@ -55,6 +91,7 @@ struct meetup_iosApp: App {
                 }
             }
             .environment(auth)
+            .environment(settings)
         }
     }
 
