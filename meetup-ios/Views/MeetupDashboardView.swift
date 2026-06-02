@@ -7,6 +7,8 @@ struct MeetupDashboardView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(AuthViewModel.self) private var auth
 
+    @Environment(AppSettings.self) private var settings
+
     @State private var participants: [MeetupParticipant] = []
     @State private var hasLoaded = false
     @State private var isActing = false
@@ -88,6 +90,7 @@ struct MeetupDashboardView: View {
             .sheet(isPresented: $showBill) {
                 BillView(meetup: meetup, participants: participants)
                     .environment(auth)
+                    .environment(settings)
             }
             .confirmationDialog("Cancel this meetup?", isPresented: $showCancelConfirm, titleVisibility: .visible) {
                 Button("Cancel Meetup", role: .destructive) {
@@ -242,10 +245,9 @@ struct MeetupDashboardView: View {
             // Action buttons
             HStack(spacing: 12) {
                 Button {
-                    let url = URL(string: "http://maps.apple.com/?daddr=\(meetup.destinationLat),\(meetup.destinationLng)&dirflg=d")!
-                    UIApplication.shared.open(url)
+                    openDirections()
                 } label: {
-                    Label("Maps", systemImage: "map.fill").frame(maxWidth: .infinity)
+                    Label("Directions", systemImage: "map.fill").frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.glass)
 
@@ -267,6 +269,18 @@ struct MeetupDashboardView: View {
     }
 
     // MARK: - Logic
+
+    private func openDirections() {
+        let lat = meetup.destinationLat
+        let lng = meetup.destinationLng
+        let gmNative = URL(string: "comgooglemaps://?daddr=\(lat),\(lng)&directionsmode=driving")!
+        if UIApplication.shared.canOpenURL(gmNative) {
+            UIApplication.shared.open(gmNative)
+        } else {
+            let gmWeb = URL(string: "https://www.google.com/maps/dir/?api=1&destination=\(lat),\(lng)&travelmode=driving")!
+            UIApplication.shared.open(gmWeb)
+        }
+    }
 
     private func startRealtime() async {
         let channel = SupabaseManager.shared.client.realtimeV2.channel("meetup-\(meetup.id)")
@@ -481,6 +495,8 @@ private struct DashboardParticipantRow: View {
 // MARK: - Confetti
 
 private struct ConfettiView: View {
+    @Environment(AppSettings.self) private var settings
+
     private struct Particle: Identifiable {
         let id = UUID()
         let x: CGFloat
@@ -512,26 +528,36 @@ private struct ConfettiView: View {
     }()
 
     @State private var drop = false
+    @State private var opacity: Double = 1
 
     var body: some View {
-        GeometryReader { geo in
-            ForEach(particles) { p in
-                RoundedRectangle(cornerRadius: 2)
-                    .fill(p.color)
-                    .frame(width: p.width, height: p.height)
-                    .rotationEffect(.degrees(drop ? p.endAngle : p.startAngle))
-                    .position(
-                        x: geo.size.width * p.x + (drop ? p.drift : 0),
-                        y: drop ? geo.size.height + 30 : -10
-                    )
-                    .opacity(drop ? 0 : 1)
-                    .animation(.easeIn(duration: p.duration).delay(p.delay), value: drop)
+        if settings.reduceMotion {
+            // Reduce motion: simple fade flash instead of falling particles
+            Color.white
+                .opacity(opacity)
+                .ignoresSafeArea()
+                .allowsHitTesting(false)
+                .onAppear {
+                    withAnimation(.easeOut(duration: 0.6)) { opacity = 0 }
+                }
+        } else {
+            GeometryReader { geo in
+                ForEach(particles) { p in
+                    RoundedRectangle(cornerRadius: 2)
+                        .fill(p.color)
+                        .frame(width: p.width, height: p.height)
+                        .rotationEffect(.degrees(drop ? p.endAngle : p.startAngle))
+                        .position(
+                            x: geo.size.width * p.x + (drop ? p.drift : 0),
+                            y: drop ? geo.size.height + 30 : -10
+                        )
+                        .opacity(drop ? 0 : 1)
+                        .animation(.easeIn(duration: p.duration).delay(p.delay), value: drop)
+                }
             }
-        }
-        .allowsHitTesting(false)
-        .ignoresSafeArea()
-        .onAppear {
-            withAnimation(.linear(duration: 0.01)) { drop = true }
+            .allowsHitTesting(false)
+            .ignoresSafeArea()
+            .onAppear { drop = true }
         }
     }
 }

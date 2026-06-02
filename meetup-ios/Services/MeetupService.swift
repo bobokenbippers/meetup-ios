@@ -229,6 +229,32 @@ final class MeetupService {
             .execute()
     }
 
+    func getFriends() async throws -> [Profile] {
+        guard let myId = supabase.auth.currentUser?.id else { return [] }
+        struct FriendshipRow: Codable {
+            let userAId: UUID
+            let userBId: UUID
+            enum CodingKeys: String, CodingKey {
+                case userAId = "user_a_id"
+                case userBId = "user_b_id"
+            }
+        }
+        let rows: [FriendshipRow] = try await supabase
+            .from("friendships")
+            .select("user_a_id,user_b_id")
+            .or("user_a_id.eq.\(myId),user_b_id.eq.\(myId)")
+            .execute()
+            .value
+        let ids = rows.map { $0.userAId == myId ? $0.userBId : $0.userAId }
+        guard !ids.isEmpty else { return [] }
+        return try await supabase
+            .from("profiles")
+            .select()
+            .in("id", values: ids.map { $0.uuidString })
+            .execute()
+            .value
+    }
+
     func getPeopleFromMeetups() async throws -> [Profile] {
         guard let myId = supabase.auth.currentUser?.id else { return [] }
 
@@ -272,11 +298,11 @@ final class MeetupService {
 
         try await supabase
             .from("friendships")
-            .insert(FriendshipInsert(
-                userAId: myId,
-                userBId: userId,
-                status: "pending"
-            ))
+            .upsert(
+                FriendshipInsert(userAId: myId, userBId: userId, status: "pending"),
+                onConflict: "user_a_id,user_b_id",
+                ignoreDuplicates: true
+            )
             .execute()
     }
 

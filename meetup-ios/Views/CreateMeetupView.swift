@@ -1,5 +1,5 @@
 import SwiftUI
-import MapKit
+import CoreLocation
 import Supabase
 
 struct CategoryOption: Identifiable {
@@ -20,7 +20,7 @@ struct CreateMeetupView: View {
     // Only state needed at create() time lives here.
     // Keyboard-driven state (search query, phone, contacts) lives in sub-views
     // so typing there never re-renders this body.
-    @State private var selectedPlace: MKMapItem?
+    @State private var selectedPlace: SelectedPlace?
 
     @State private var setTargetTime = false
     @State private var targetTime = CreateMeetupView.defaultPickerTime
@@ -172,15 +172,14 @@ struct CreateMeetupView: View {
 
     private func create() async {
         guard let place = selectedPlace else { return }
-        let coord = place.location.coordinate
         isCreating = true
         error = nil
         do {
             _ = try await MeetupService.shared.createMeetup(
-                destinationName: place.name ?? "Meeting Point",
-                destinationAddress: place.name,
-                lat: coord.latitude,
-                lng: coord.longitude,
+                destinationName: place.name,
+                destinationAddress: place.address,
+                lat: place.coordinate.latitude,
+                lng: place.coordinate.longitude,
                 targetArrivalAt: setTargetTime ? targetTime : nil,
                 category: selectedCategory,
                 invitees: invitees
@@ -197,18 +196,19 @@ struct CreateMeetupView: View {
 // Owns its own searchQuery/searchResults so typing here never re-renders CreateMeetupView.
 
 private struct DestinationSection: View {
-    @Binding var selectedPlace: MKMapItem?
+    @Binding var selectedPlace: SelectedPlace?
     @State private var searchQuery = ""
-    @State private var searchResults: [MKMapItem] = []
+    @State private var predictions: [GooglePlacePrediction] = []
+    @State private var isLoadingDetails = false
 
     var body: some View {
         Section("Destination") {
             if let place = selectedPlace {
                 HStack {
                     VStack(alignment: .leading, spacing: 2) {
-                        Text(place.name ?? "").font(.subheadline).bold()
-                        if let sub = place.address?.shortAddress {
-                            Text(sub).font(.caption).foregroundStyle(.secondary)
+                        Text(place.name).font(.subheadline).bold()
+                        if let addr = place.address {
+                            Text(addr).font(.caption).foregroundStyle(.secondary)
                         }
                     }
                     Spacer()
@@ -222,12 +222,15 @@ private struct DestinationSection: View {
                 TextField("Search for a place", text: $searchQuery)
                     .autocorrectionDisabled()
                     .accessibilityIdentifier("field_destination")
-                ForEach(searchResults, id: \.name) { item in
-                    Button(action: { selectPlace(item) }) {
+                if isLoadingDetails {
+                    ProgressView().frame(maxWidth: .infinity)
+                }
+                ForEach(predictions) { prediction in
+                    Button(action: { Task { await selectPrediction(prediction) } }) {
                         VStack(alignment: .leading, spacing: 2) {
-                            Text(item.name ?? "Unknown").foregroundStyle(.primary)
-                            if let sub = item.address?.shortAddress {
-                                Text(sub).font(.caption).foregroundStyle(.secondary)
+                            Text(prediction.mainText).foregroundStyle(.primary)
+                            if !prediction.secondaryText.isEmpty {
+                                Text(prediction.secondaryText).font(.caption).foregroundStyle(.secondary)
                             }
                         }
                     }
@@ -235,27 +238,27 @@ private struct DestinationSection: View {
             }
         }
         .task(id: searchQuery) {
-            guard searchQuery.count >= 2 else { searchResults = []; return }
+            guard searchQuery.count >= 2 else { predictions = []; return }
             do { try await Task.sleep(for: .milliseconds(300)) } catch { return }
             await runSearch()
         }
     }
 
-    private func selectPlace(_ item: MKMapItem) {
-        selectedPlace = item
-        searchResults = []
-        searchQuery = item.name ?? ""
+    private func selectPrediction(_ prediction: GooglePlacePrediction) async {
+        isLoadingDetails = true
+        predictions = []
+        if let place = await GooglePlacesService.shared.details(for: prediction) {
+            selectedPlace = place
+        }
+        isLoadingDetails = false
     }
 
     private func runSearch() async {
-        guard selectedPlace == nil, searchQuery.count >= 2 else { searchResults = []; return }
+        guard selectedPlace == nil, searchQuery.count >= 2 else { predictions = []; return }
         let q = searchQuery
-        let request = MKLocalSearch.Request()
-        request.naturalLanguageQuery = q
-        guard let response = try? await MKLocalSearch(request: request).start(),
-              !Task.isCancelled,
-              searchQuery == q else { return }
-        searchResults = Array(response.mapItems.prefix(5))
+        let results = await GooglePlacesService.shared.autocomplete(query: q)
+        guard !Task.isCancelled, searchQuery == q else { return }
+        predictions = results
     }
 }
 
@@ -387,7 +390,7 @@ private struct InviteSection: View {
         if let user = found {
             if user.id == myId { error = "That's you!" }
             else if invitees.contains(where: { $0.id == user.id }) { error = "Already added" }
-            else { foundUser = user }
+            else { addInvitee(user) }
         } else {
             error = "\(contact.displayName) isn't on the app yet"
         }

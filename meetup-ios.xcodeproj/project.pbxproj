@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		BA2864C12FB8EFBE00BD5B1C /* Supabase in Frameworks */ = {isa = PBXBuildFile; productRef = BA2864C02FB8EFBE00BD5B1C /* Supabase */; };
+		BA777700000100009C8E0001 /* GooglePlacesSwift in Frameworks */ = {isa = PBXBuildFile; productRef = BA777700000100009C8E0003 /* GooglePlacesSwift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -70,6 +71,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				BA2864C12FB8EFBE00BD5B1C /* Supabase in Frameworks */,
+				BA777700000100009C8E0001 /* GooglePlacesSwift in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -128,6 +130,7 @@
 				BA2864AD2FB8EFA000BD5B1C /* Sources */,
 				BA2864AE2FB8EFA000BD5B1C /* Frameworks */,
 				BA2864AF2FB8EFA000BD5B1C /* Resources */,
+				BAB01D00BAB01D00BAB01D00 /* Stamp build number from git */,
 			);
 			buildRules = (
 			);
@@ -139,6 +142,7 @@
 			name = "meetup-ios";
 			packageProductDependencies = (
 				BA2864C02FB8EFBE00BD5B1C /* Supabase */,
+				BA777700000100009C8E0003 /* GooglePlacesSwift */,
 			);
 			productName = "meetup-ios";
 			productReference = BA2864B12FB8EFA000BD5B1C /* meetup-ios.app */;
@@ -220,6 +224,7 @@
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
 				BA53CC082FB8F39F00A19C8E /* XCRemoteSwiftPackageReference "supabase-swift" */,
+				BA777700000100009C8E0002 /* XCRemoteSwiftPackageReference "ios-places-sdk" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = BA2864B22FB8EFA000BD5B1C /* Products */;
@@ -256,6 +261,29 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXResourcesBuildPhase section */
+
+/* Begin PBXShellScriptBuildPhase section */
+		BAB01D00BAB01D00BAB01D00 /* Stamp build number from git */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+				"$(TARGET_BUILD_DIR)/$(INFOPLIST_PATH)",
+			);
+			name = "Stamp build number from git";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "# Stamp CFBundleVersion (build number) from the git commit count.\n# Runs for Release builds only (archives), leaving Debug builds untouched.\nif [ \"${CONFIGURATION}\" = \"Release\" ]; then\n  if command -v git >/dev/null 2>&1 && git -C \"${SRCROOT}\" rev-parse >/dev/null 2>&1; then\n    build_number=$(git -C \"${SRCROOT}\" rev-list --count HEAD)\n    plist=\"${TARGET_BUILD_DIR}/${INFOPLIST_PATH}\"\n    if [ -f \"${plist}\" ]; then\n      /usr/libexec/PlistBuddy -c \"Set :CFBundleVersion ${build_number}\" \"${plist}\"\n      echo \"Set CFBundleVersion to ${build_number} (git commit count)\"\n    else\n      echo \"warning: Info.plist not found at ${plist}; skipping build-number stamping\"\n    fi\n  else\n    echo \"warning: git unavailable; CFBundleVersion left unchanged\"\n  fi\nfi\n";
+		};
+/* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
 		BA2864AD2FB8EFA000BD5B1C /* Sources */ = {
@@ -398,7 +426,7 @@
 				DEVELOPMENT_TEAM = KLT4S6K9X8;
 				ENABLE_NS_ASSERTIONS = NO;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
-				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				GCC_C_LANGUAGE_STANDARD = gnu17;
 				GCC_NO_COMMON_BLOCKS = YES;
 				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
@@ -426,7 +454,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = "meetup-ios/meetup-ios.entitlements";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1.0.5;
+				CURRENT_PROJECT_VERSION = 3.0.0;
 				DEVELOPMENT_TEAM = KLT4S6K9X8;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
@@ -447,7 +475,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.0.5;
+				MARKETING_VERSION = 3.0.0;
 				PRODUCT_BUNDLE_IDENTIFIER = "gautamlgtm.meetup-ios";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
@@ -467,7 +495,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = "meetup-ios/meetup-ios.entitlements";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1.0.5;
+				CURRENT_PROJECT_VERSION = 3.0.0;
 				DEVELOPMENT_TEAM = KLT4S6K9X8;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
@@ -488,7 +516,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.0.5;
+				MARKETING_VERSION = 3.0.0;
 				PRODUCT_BUNDLE_IDENTIFIER = "gautamlgtm.meetup-ios";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
@@ -617,6 +645,14 @@
 				minimumVersion = 2.5.1;
 			};
 		};
+		BA777700000100009C8E0002 /* XCRemoteSwiftPackageReference "ios-places-sdk" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/googlemaps/ios-places-sdk";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 9.0.0;
+			};
+		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -624,6 +660,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = BA53CC082FB8F39F00A19C8E /* XCRemoteSwiftPackageReference "supabase-swift" */;
 			productName = Supabase;
+		};
+		BA777700000100009C8E0003 /* GooglePlacesSwift */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = BA777700000100009C8E0002 /* XCRemoteSwiftPackageReference "ios-places-sdk" */;
+			productName = GooglePlacesSwift;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

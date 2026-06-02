@@ -151,11 +151,14 @@ struct MeetupsListView: View {
             if !invited.isEmpty {
                 Section {
                     ForEach(invited, id: \.meetup.id) { p in
-                        MeetupRowCard(participation: p)
-                            .onTapGesture { selectedMeetup = p.meetup }
-                            .listRowBackground(Color.clear)
-                            .listRowSeparator(.hidden)
-                            .listRowInsets(EdgeInsets(top: 5, leading: 16, bottom: 5, trailing: 16))
+                        Button { selectedMeetup = p.meetup } label: {
+                            MeetupRowCard(participation: p)
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("Open \(p.meetup.destinationName)")
+                        .listRowBackground(Color.clear)
+                        .listRowSeparator(.hidden)
+                        .listRowInsets(EdgeInsets(top: 5, leading: 16, bottom: 5, trailing: 16))
                     }
                     .onDelete { indices in Task { await deleteParticipations(invited, at: indices) } }
                 } header: {
@@ -167,11 +170,14 @@ struct MeetupsListView: View {
             if !active.isEmpty {
                 Section {
                     ForEach(active, id: \.meetup.id) { p in
-                        MeetupRowCard(participation: p)
-                            .onTapGesture { selectedMeetup = p.meetup }
-                            .listRowBackground(Color.clear)
-                            .listRowSeparator(.hidden)
-                            .listRowInsets(EdgeInsets(top: 5, leading: 16, bottom: 5, trailing: 16))
+                        Button { selectedMeetup = p.meetup } label: {
+                            MeetupRowCard(participation: p)
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("Open \(p.meetup.destinationName)")
+                        .listRowBackground(Color.clear)
+                        .listRowSeparator(.hidden)
+                        .listRowInsets(EdgeInsets(top: 5, leading: 16, bottom: 5, trailing: 16))
                     }
                     .onDelete { indices in Task { await deleteParticipations(active, at: indices) } }
                 } header: {
@@ -183,11 +189,14 @@ struct MeetupsListView: View {
             ForEach(pastByCategory, id: \.key) { group in
                 Section {
                     ForEach(group.value, id: \.meetup.id) { p in
-                        MeetupRowCard(participation: p)
-                            .onTapGesture { selectedMeetup = p.meetup }
-                            .listRowBackground(Color.clear)
-                            .listRowSeparator(.hidden)
-                            .listRowInsets(EdgeInsets(top: 5, leading: 16, bottom: 5, trailing: 16))
+                        Button { selectedMeetup = p.meetup } label: {
+                            MeetupRowCard(participation: p)
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("Open \(p.meetup.destinationName)")
+                        .listRowBackground(Color.clear)
+                        .listRowSeparator(.hidden)
+                        .listRowInsets(EdgeInsets(top: 5, leading: 16, bottom: 5, trailing: 16))
                     }
                     .onDelete { indices in Task { await deleteParticipations(group.value, at: indices) } }
                 } header: {

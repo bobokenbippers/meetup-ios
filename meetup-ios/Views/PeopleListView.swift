@@ -232,7 +232,12 @@ struct PeopleListView: View {
         }
         #endif
         do {
-            people = try await MeetupService.shared.getPeopleFromMeetups()
+            async let friendsFetch = MeetupService.shared.getFriends()
+            async let meetupFetch = MeetupService.shared.getPeopleFromMeetups()
+            let (friends, meetupPeople) = try await (friendsFetch, meetupFetch)
+            var seen = Set<UUID>()
+            people = (friends + meetupPeople).filter { seen.insert($0.id).inserted }
+                .sorted { ($0.displayName ?? "") < ($1.displayName ?? "") }
         } catch is CancellationError {
             return
         } catch {
@@ -300,11 +305,7 @@ struct PeopleListView: View {
                 try await MeetupService.shared.addFriend(userId: user.id)
                 phoneSearch = ""
                 foundUser = nil
-                error = "Friend request sent!"
-                Task {
-                    do { try await Task.sleep(for: .seconds(2)) } catch { return }
-                    error = nil
-                }
+                await load()
             } catch {
                 self.error = error.localizedDescription
             }

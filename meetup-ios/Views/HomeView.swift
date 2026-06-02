@@ -16,17 +16,14 @@ struct HomeView: View {
 
 struct SettingsView: View {
     @Environment(AuthViewModel.self) private var auth
-    @State private var themePreference = ThemePreference.system
-    @State private var boldText = false
-    @State private var largerText = false
-    @State private var reduceMotion = false
-    @State private var contactsEnabled = false
+    @Environment(AppSettings.self) private var settings
 
     var body: some View {
+        @Bindable var settings = settings
         NavigationStack {
             Form {
                 Section("Appearance") {
-                    Picker("Theme", selection: $themePreference) {
+                    Picker("Theme", selection: $settings.themePreference) {
                         Text("Light").tag(ThemePreference.light)
                         Text("Dark").tag(ThemePreference.dark)
                         Text("System").tag(ThemePreference.system)
@@ -35,13 +32,13 @@ struct SettingsView: View {
                 }
 
                 Section("Accessibility") {
-                    Toggle("Bold Text", isOn: $boldText)
-                    Toggle("Larger Text", isOn: $largerText)
-                    Toggle("Reduce Motion", isOn: $reduceMotion)
+                    Toggle("Bold Text", isOn: $settings.boldText)
+                    Toggle("Larger Text", isOn: $settings.largerText)
+                    Toggle("Reduce Motion", isOn: $settings.reduceMotion)
                 }
 
                 Section("Privacy") {
-                    Toggle("Sync Contacts", isOn: $contactsEnabled)
+                    Toggle("Sync Contacts", isOn: $settings.contactsEnabled)
                 }
 
                 Section {
@@ -51,55 +48,16 @@ struct SettingsView: View {
                 }
             }
             .navigationTitle("Settings")
-            .preferredColorScheme(colorScheme)
-            .task { loadSettings() }
-            .onChange(of: themePreference) { _, _ in saveSettings() }
-            .onChange(of: boldText) { _, _ in saveSettings() }
-            .onChange(of: largerText) { _, _ in saveSettings() }
-            .onChange(of: reduceMotion) { _, _ in saveSettings() }
-            .onChange(of: contactsEnabled) { _, _ in saveSettings() }
+            .preferredColorScheme(colorScheme(for: settings.themePreference))
         }
     }
 
-    private var colorScheme: ColorScheme? {
-        switch themePreference {
+    private func colorScheme(for preference: ThemePreference) -> ColorScheme? {
+        switch preference {
         case .light: return .light
         case .dark: return .dark
         case .system: return nil
         }
     }
-
-    private func loadSettings() {
-        let defaults = UserDefaults.standard
-        let storedTheme: ThemePreference
-        if let rawTheme = defaults.string(forKey: "themePreference") {
-            storedTheme = ThemePreference(rawValue: rawTheme) ?? .system
-        } else {
-            storedTheme = .system
-        }
-        if themePreference != storedTheme { themePreference = storedTheme }
-        let storedBold = defaults.bool(forKey: "boldText")
-        let storedLarger = defaults.bool(forKey: "largerText")
-        let storedReduceMotion = defaults.bool(forKey: "reduceMotion")
-        let storedContacts = defaults.bool(forKey: "contactsEnabled")
-        if boldText != storedBold { boldText = storedBold }
-        if largerText != storedLarger { largerText = storedLarger }
-        if reduceMotion != storedReduceMotion { reduceMotion = storedReduceMotion }
-        if contactsEnabled != storedContacts { contactsEnabled = storedContacts }
-    }
-
-    private func saveSettings() {
-        let defaults = UserDefaults.standard
-        defaults.set(themePreference.rawValue, forKey: "themePreference")
-        defaults.set(boldText, forKey: "boldText")
-        defaults.set(largerText, forKey: "largerText")
-        defaults.set(reduceMotion, forKey: "reduceMotion")
-        defaults.set(contactsEnabled, forKey: "contactsEnabled")
-    }
 }
 
-enum ThemePreference: String {
-    case light
-    case dark
-    case system
-}

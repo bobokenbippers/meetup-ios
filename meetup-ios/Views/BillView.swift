@@ -182,9 +182,14 @@ struct BillView: View {
                             Spacer()
                             Text(item.price, format: .currency(code: "USD"))
                                 .foregroundStyle(itemClaims.isEmpty ? .orange : .primary)
-                            Image(systemName: isMine ? "checkmark.circle.fill" : "circle")
-                                .foregroundStyle(isMine ? Color.accentColor : Color.secondary)
-                                .onTapGesture { Task { await toggleClaim(item: item, isMine: isMine) } }
+                            Button {
+                                Task { await toggleClaim(item: item, isMine: isMine) }
+                            } label: {
+                                Image(systemName: isMine ? "checkmark.circle.fill" : "circle")
+                                    .foregroundStyle(isMine ? Color.accentColor : Color.secondary)
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityLabel(isMine ? "Unclaim \(item.name)" : "Claim \(item.name)")
                         }
                     }
                 } header: {
@@ -210,19 +215,25 @@ struct BillView: View {
 
     private var summarySheet: some View {
         NavigationStack {
-            let totals = BillService.computeTotals(
-                bill: bill!,
-                items: items,
-                claims: claims,
-                participants: participants
-            )
-            List {
-                ForEach(totals, id: \.userId) { t in
-                    HStack {
-                        Text(t.displayName)
-                        Spacer()
-                        Text(t.total, format: .currency(code: "USD")).bold()
+            Group {
+                if let bill {
+                    let totals = BillService.computeTotals(
+                        bill: bill,
+                        items: items,
+                        claims: claims,
+                        participants: participants
+                    )
+                    List {
+                        ForEach(totals, id: \.userId) { t in
+                            HStack {
+                                Text(t.displayName)
+                                Spacer()
+                                Text(t.total, format: .currency(code: "USD")).bold()
+                            }
+                        }
                     }
+                } else {
+                    ProgressView()
                 }
             }
             .navigationTitle("Who owes what")

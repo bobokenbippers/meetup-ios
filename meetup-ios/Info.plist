@@ -35,5 +35,9 @@
 	</array>
 	<key>NSMotionUsageDescription</key>
 	<string>Used to adapt location updates to save battery during active meetups.</string>
+	<key>LSApplicationQueriesSchemes</key>
+	<array>
+		<string>comgooglemaps</string>
+	</array>
 </dict>
 </plist>
