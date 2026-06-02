@@ -143,11 +143,10 @@ final class BillService {
             }
         }
         let billSubtotal = bill.subtotal > 0 ? bill.subtotal : 1
-        return participants.compactMap { p in
+        return participants.map { p in
             let sub = subtotals[p.userId] ?? 0
-            guard sub > 0 else { return nil }
-            let taxShare = (sub / billSubtotal) * bill.tax
-            let tipShare = (sub / billSubtotal) * bill.tip
+            let taxShare = sub > 0 ? (sub / billSubtotal) * bill.tax : 0
+            let tipShare = sub > 0 ? (sub / billSubtotal) * bill.tip : 0
             return PersonTotal(
                 userId: p.userId,
                 displayName: p.displayName ?? "Unknown",
@@ -156,7 +155,7 @@ final class BillService {
                 tipShare: tipShare,
                 total: sub + taxShare + tipShare
             )
-        }
+        }.sorted { $0.total > $1.total }
     }
 
     // MARK: - Private

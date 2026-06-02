@@ -1,5 +1,6 @@
 import SwiftUI
 import PhotosUI
+import UniformTypeIdentifiers
 import Supabase
 import Auth
 
@@ -20,10 +21,16 @@ struct BillView: View {
 
     @State private var selectedPhotoItem: PhotosPickerItem?
     @State private var showCamera = false
+    @State private var showFilePicker = false
     @State private var parsedReceipt: ParsedReceipt?
     @State private var editableItems: [BillItem] = []
 
     private var myUserId: UUID? { auth.session?.user.id }
+
+    private var canShare: Bool {
+        !editableItems.isEmpty &&
+        editableItems.allSatisfy { !$0.name.trimmingCharacters(in: .whitespaces).isEmpty && $0.price > 0 }
+    }
 
     var body: some View {
         NavigationStack {
@@ -68,16 +75,16 @@ struct BillView: View {
                 .multilineTextAlignment(.center)
                 .foregroundStyle(.secondary)
                 .padding(.horizontal)
-            HStack(spacing: 16) {
+            HStack(spacing: 12) {
                 Button {
                     showCamera = true
                 } label: {
-                    Label("Take Photo", systemImage: "camera")
+                    Label("Camera", systemImage: "camera")
                         .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.glass)
                 PhotosPicker(selection: $selectedPhotoItem, matching: .images) {
-                    Label("Camera Roll", systemImage: "photo.on.rectangle")
+                    Label("Photos", systemImage: "photo.on.rectangle")
                         .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.glass)
@@ -91,8 +98,31 @@ struct BillView: View {
                         selectedPhotoItem = nil
                     }
                 }
+                Button {
+                    showFilePicker = true
+                } label: {
+                    Label("PDF", systemImage: "doc.fill")
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.glass)
             }
             .padding(.horizontal)
+            .fileImporter(
+                isPresented: $showFilePicker,
+                allowedContentTypes: [UTType.pdf],
+                allowsMultipleSelection: false
+            ) { result in
+                guard case .success(let urls) = result, let url = urls.first else { return }
+                Task {
+                    isProcessing = true
+                    let parsed = await ReceiptParser.parse(pdfURL: url)
+                    parsedReceipt = parsed
+                    editableItems = parsed.items.enumerated().map { idx, i in
+                        BillItem(id: UUID(), billId: UUID(), name: i.name, price: i.price, position: idx)
+                    }
+                    isProcessing = false
+                }
+            }
             Spacer()
         }
         .sheet(isPresented: $showCamera) {
@@ -126,8 +156,20 @@ struct BillView: View {
                                 .keyboardType(.decimalPad)
                                 .frame(width: 80)
                         }
+                        .foregroundStyle(
+                            editableItems[idx].name.trimmingCharacters(in: .whitespaces).isEmpty || editableItems[idx].price <= 0
+                                ? AnyShapeStyle(Color.orange) : AnyShapeStyle(Color.primary)
+                        )
                     }
                     .onDelete { editableItems.remove(atOffsets: $0) }
+                    Button {
+                        editableItems.append(
+                            BillItem(id: UUID(), billId: UUID(), name: "", price: 0, position: editableItems.count)
+                        )
+                    } label: {
+                        Label("Add Item", systemImage: "plus.circle")
+                            .foregroundStyle(Color.accentColor)
+                    }
                 }
                 if let parsed = parsedReceipt {
                     Section("Summary") {
@@ -145,8 +187,14 @@ struct BillView: View {
                     .frame(maxWidth: .infinity)
             }
             .buttonStyle(.glassProminent)
-            .disabled(isProcessing || editableItems.isEmpty)
+            .disabled(isProcessing || !canShare)
             .padding()
+            if !canShare && !isProcessing {
+                Text("Fix items with missing names or $0 prices")
+                    .font(.caption)
+                    .foregroundStyle(.orange)
+                    .padding(.bottom, 8)
+            }
         }
         .overlay {
             if isProcessing {
@@ -225,10 +273,19 @@ struct BillView: View {
                     )
                     List {
                         ForEach(totals, id: \.userId) { t in
-                            HStack {
-                                Text(t.displayName)
+                            HStack(alignment: .top) {
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(t.displayName)
+                                    if t.total == 0 {
+                                        Text("Hasn't claimed yet")
+                                            .font(.caption)
+                                            .foregroundStyle(.secondary)
+                                    }
+                                }
                                 Spacer()
-                                Text(t.total, format: .currency(code: "USD")).bold()
+                                Text(t.total, format: .currency(code: "USD"))
+                                    .bold()
+                                    .foregroundStyle(t.total == 0 ? .secondary : .primary)
                             }
                         }
                     }

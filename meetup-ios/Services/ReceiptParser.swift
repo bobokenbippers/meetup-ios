@@ -18,8 +18,30 @@ struct ReceiptParser {
     }
 
     static func parse(pdfURL: URL) async -> ParsedReceipt {
-        guard let doc = PDFDocument(url: pdfURL),
-              let page = doc.page(at: 0) else {
+        // Prefer embedded text extraction — fast and lossless.
+        // Fall back to Vision OCR only if the PDF has no selectable text (scanned receipt).
+        let accessed = pdfURL.startAccessingSecurityScopedResource()
+        defer { if accessed { pdfURL.stopAccessingSecurityScopedResource() } }
+
+        guard let doc = PDFDocument(url: pdfURL) else {
+            return ParsedReceipt(items: [], subtotal: 0, tax: 0, tip: 0, total: 0)
+        }
+
+        // Try embedded text across all pages
+        let embeddedText = (0..<doc.pageCount)
+            .compactMap { doc.page(at: $0)?.string }
+            .joined(separator: "\n")
+        let embeddedLines = embeddedText
+            .components(separatedBy: .newlines)
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+            .filter { !$0.isEmpty }
+
+        if !embeddedLines.isEmpty {
+            return parseText(embeddedLines)
+        }
+
+        // Scanned PDF — rasterize page 0 and OCR it
+        guard let page = doc.page(at: 0) else {
             return ParsedReceipt(items: [], subtotal: 0, tax: 0, tip: 0, total: 0)
         }
         let pageRect = page.bounds(for: .mediaBox)
@@ -50,7 +72,7 @@ struct ReceiptParser {
     }
 
     static func parseText(_ lines: [String]) -> ParsedReceipt {
-        let pricePattern = #"(\d+\.\d{2})"#
+        let pricePattern = #"\$(\d+(?:\.\d{1,2})?)|\b(\d+\.\d{1,2})\b"#
         let priceRegex = try! NSRegularExpression(pattern: pricePattern)
 
         var items: [(name: String, price: Double)] = []
@@ -68,9 +90,10 @@ struct ReceiptParser {
 
         for line in lines {
             let lower = line.lowercased()
-            guard let match = priceRegex.firstMatch(in: line, range: NSRange(line.startIndex..., in: line)),
-                  let range = Range(match.range(at: 1), in: line),
-                  let price = Double(line[range]) else { continue }
+            guard let match = priceRegex.firstMatch(in: line, range: NSRange(line.startIndex..., in: line)) else { continue }
+            let priceStr = Range(match.range(at: 1), in: line).map { String(line[$0]) }
+                        ?? Range(match.range(at: 2), in: line).map { String(line[$0]) }
+            guard let priceStr, let price = Double(priceStr), price >= 0.01 else { continue }
 
             if subtotalKeywords.contains(where: { lower.contains($0) }) {
                 subtotal = price
