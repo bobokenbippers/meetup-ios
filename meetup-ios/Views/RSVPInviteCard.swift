@@ -33,12 +33,12 @@ struct RSVPInviteCard: View {
                     VStack(alignment: .leading, spacing: 2) {
                         Text(participation.meetup.destinationName)
                             .font(.system(size: 14, weight: .bold))
-                            .foregroundStyle(.white)
+                            .foregroundStyle(Color(.label))
                             .lineLimit(1)
                         if let addr = participation.meetup.destinationAddress, !addr.isEmpty {
                             Text(addr)
                                 .font(.system(size: 11))
-                                .foregroundStyle(.white.opacity(0.5))
+                                .foregroundStyle(Color(.secondaryLabel))
                                 .lineLimit(1)
                         }
                     }
@@ -48,7 +48,7 @@ struct RSVPInviteCard: View {
                     if let target = participation.meetup.targetArrivalAt {
                         Text(target, format: .dateTime.weekday(.abbreviated).hour().minute())
                             .font(.system(size: 10, weight: .medium))
-                            .foregroundStyle(.white.opacity(0.5))
+                            .foregroundStyle(Color(.secondaryLabel))
                     }
                 }
                 .padding(.horizontal, 16)
@@ -92,7 +92,7 @@ struct RSVPInviteCard: View {
                     participantStatus: participation.status
                 ))
             RoundedRectangle(cornerRadius: 18)
-                .strokeBorder(.white.opacity(0.10), lineWidth: 1)
+                .strokeBorder(Color(.separator), lineWidth: 1)
         }
         .keyframeAnimator(initialValue: CGFloat(0), trigger: wobbleCount) { content, angle in
             content.rotationEffect(.degrees(angle))

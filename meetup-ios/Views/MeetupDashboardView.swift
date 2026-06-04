@@ -180,7 +180,7 @@ struct MeetupDashboardView: View {
         .clipShape(RoundedRectangle(cornerRadius: 14))
         .overlay(
             RoundedRectangle(cornerRadius: 14)
-                .strokeBorder(.white.opacity(0.08), lineWidth: 1)
+                .strokeBorder(Color(.separator).opacity(0.5), lineWidth: 1)
         )
     }
 
@@ -188,7 +188,7 @@ struct MeetupDashboardView: View {
         VStack(spacing: 0) {
             // Drag handle
             RoundedRectangle(cornerRadius: 2)
-                .fill(.white.opacity(0.18))
+                .fill(Color(.tertiaryLabel))
                 .frame(width: 32, height: 3)
                 .padding(.top, 10)
                 .padding(.bottom, 6)
@@ -266,7 +266,7 @@ struct MeetupDashboardView: View {
         .clipShape(UnevenRoundedRectangle(cornerRadii: .init(topLeading: 22, topTrailing: 22)))
         .overlay(
             UnevenRoundedRectangle(cornerRadii: .init(topLeading: 22, topTrailing: 22))
-                .strokeBorder(.white.opacity(0.08), lineWidth: 1)
+                .strokeBorder(Color(.separator).opacity(0.5), lineWidth: 1)
         )
         .animation(.spring(response: 0.45, dampingFraction: 0.75), value: myStatus)
     }
@@ -433,7 +433,7 @@ struct DashboardParticipantPin: View {
                 .clipShape(RoundedRectangle(cornerRadius: 10))
                 .overlay(
                     RoundedRectangle(cornerRadius: 10)
-                        .strokeBorder(.white.opacity(0.1), lineWidth: 1)
+                        .strokeBorder(Color(.separator).opacity(0.5), lineWidth: 1)
                 )
             }
         }
