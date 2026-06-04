@@ -273,9 +273,10 @@ struct BillView: View {
                     )
                     List {
                         ForEach(totals, id: \.userId) { t in
-                            HStack(alignment: .top) {
+                            HStack {
                                 VStack(alignment: .leading, spacing: 2) {
                                     Text(t.displayName)
+                                        .foregroundStyle(t.total == 0 ? .secondary : .primary)
                                     if t.total == 0 {
                                         Text("Hasn't claimed yet")
                                             .font(.caption)
