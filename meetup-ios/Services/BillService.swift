@@ -142,20 +142,21 @@ final class BillService {
                 subtotals[uid, default: 0] += share
             }
         }
-        let billSubtotal = bill.subtotal > 0 ? bill.subtotal : 1
-        return participants.map { p in
-            let sub = subtotals[p.userId] ?? 0
-            let taxShare = sub > 0 ? (sub / billSubtotal) * bill.tax : 0
-            let tipShare = sub > 0 ? (sub / billSubtotal) * bill.tip : 0
-            return PersonTotal(
-                userId: p.userId,
-                displayName: p.displayName ?? "Unknown",
-                subtotal: sub,
-                taxShare: taxShare,
-                tipShare: tipShare,
-                total: sub + taxShare + tipShare
-            )
-        }.sorted { $0.total > $1.total }
+        return participants
+            .map { p in
+                let sub = subtotals[p.userId] ?? 0
+                let taxShare = bill.subtotal > 0 ? (sub / bill.subtotal) * bill.tax : 0
+                let tipShare = bill.subtotal > 0 ? (sub / bill.subtotal) * bill.tip : 0
+                return PersonTotal(
+                    userId: p.userId,
+                    displayName: p.displayName ?? "Unknown",
+                    subtotal: sub,
+                    taxShare: taxShare,
+                    tipShare: tipShare,
+                    total: sub + taxShare + tipShare
+                )
+            }
+            .sorted { $0.total > $1.total }
     }
 
     // MARK: - Private
