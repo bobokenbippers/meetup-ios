@@ -27,7 +27,6 @@ platform :ios do
       code_sign_identity: "Apple Distribution",
       profile_name: "match AppStore gautamlgtm.meetup-ios"
     )
-    build_num = ENV["GITHUB_RUN_NUMBER"] || Time.now.to_i.to_s
     build_app(
       project: "meetup-ios.xcodeproj",
       scheme: "meetup-ios",
@@ -37,8 +36,7 @@ platform :ios do
         provisioningProfiles: {
           "gautamlgtm.meetup-ios" => "match AppStore gautamlgtm.meetup-ios"
         }
-      },
-      xcargs: "CURRENT_PROJECT_VERSION=#{build_num}"
+      }
     )
     upload_to_testflight(
       skip_waiting_for_build_processing: true
