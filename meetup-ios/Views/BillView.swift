@@ -194,7 +194,7 @@ struct BillView: View {
             if !canShare && !isProcessing {
                 Text("Fix items with missing names or $0 prices")
                     .font(.caption)
-                    .foregroundStyle(.coral)
+                    .foregroundStyle(Color.coral)
                     .padding(.bottom, 8)
             }
         }
@@ -231,7 +231,7 @@ struct BillView: View {
                             }
                             Spacer()
                             Text(item.price, format: .currency(code: "USD"))
-                                .foregroundStyle(itemClaims.isEmpty ? .coral : .primary)
+                                .foregroundStyle(itemClaims.isEmpty ? Color.coral : Color.primary)
                             Button {
                                 Task { await toggleClaim(item: item, isMine: isMine) }
                             } label: {
@@ -246,7 +246,7 @@ struct BillView: View {
                     Text("Items")
                 } footer: {
                     if items.contains(where: { i in !claims.contains(where: { $0.billItemId == i.id }) }) {
-                        Text("Unclaimed items shown in indigo").foregroundStyle(.coral)
+                        Text("Unclaimed items shown in indigo").foregroundStyle(Color.coral)
                     }
                 }
             }
