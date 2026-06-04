@@ -32,7 +32,11 @@ platform :ios do
         provisioningProfiles: {
           "gautamlgtm.meetup-ios" => "match AppStore gautamlgtm.meetup-ios"
         }
-      }
+      },
+      xcargs: "CODE_SIGN_STYLE=Manual " \
+              "CODE_SIGN_IDENTITY='Apple Distribution' " \
+              "PROVISIONING_PROFILE_SPECIFIER='match AppStore gautamlgtm.meetup-ios' " \
+              "DEVELOPMENT_TEAM=KLT4S6K9X8"
     )
     upload_to_testflight(
       skip_waiting_for_build_processing: true
