@@ -59,10 +59,7 @@ struct ReceiptParser {
     // MARK: - Private
 
     private static func extractText(from image: UIImage) async -> [String] {
-        // Camera images carry EXIF rotation in imageOrientation — cgImage is the raw
-        // un-rotated sensor data. Redraw into a fresh context so Vision sees upright pixels.
-        let normalized = normalizeOrientation(image)
-        guard let cgImage = normalized.cgImage else { return [] }
+        guard let cgImage = image.cgImage else { return [] }
         return await withCheckedContinuation { continuation in
             let request = VNRecognizeTextRequest { req, _ in
                 let lines = (req.results as? [VNRecognizedTextObservation] ?? [])
@@ -70,21 +67,7 @@ struct ReceiptParser {
                 continuation.resume(returning: lines)
             }
             request.recognitionLevel = .accurate
-            request.usesLanguageCorrection = true
-            do {
-                try VNImageRequestHandler(cgImage: cgImage).perform([request])
-            } catch {
-                continuation.resume(returning: [])
-            }
-        }
-    }
-
-    private static func normalizeOrientation(_ image: UIImage) -> UIImage {
-        guard image.imageOrientation != .up else { return image }
-        let format = UIGraphicsImageRendererFormat()
-        format.scale = image.scale
-        return UIGraphicsImageRenderer(size: image.size, format: format).image { _ in
-            image.draw(in: CGRect(origin: .zero, size: image.size))
+            try? VNImageRequestHandler(cgImage: cgImage).perform([request])
         }
     }
 
@@ -103,11 +86,7 @@ struct ReceiptParser {
         let tipKeywords = ["tip", "gratuity", "service charge"]
         let totalKeywords = ["total", "amount due", "balance due", "grand total"]
         let summaryKeywords = subtotalKeywords + taxKeywords + tipKeywords + totalKeywords
-            + ["change", "cash", "credit", "visa", "mastercard", "amex", "thank you", "receipt",
-               "surcharge", "fee", "discount", "happy hour", "join us", "book your",
-               "monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday",
-               "www.", "email", "phone", "for more", "fill out", "online form", "private event",
-               "mini martini", "special offer", "oyster monday"]
+            + ["change", "cash", "credit", "visa", "mastercard", "amex", "thank you", "receipt"]
 
         for line in lines {
             let lower = line.lowercased()
@@ -125,24 +104,12 @@ struct ReceiptParser {
             } else if totalKeywords.contains(where: { lower.contains($0) }) {
                 if price > total { total = price }
             } else if !summaryKeywords.contains(where: { lower.contains($0) }) {
-                // Strip the line-item price, per-unit annotations (e.g. "3$"), and OCR artifacts.
-                var name = line
+                let name = line
                     .replacingOccurrences(of: pricePattern, with: "", options: .regularExpression)
-                    .replacingOccurrences(of: #"\b\d+\$"#, with: "", options: .regularExpression)
-                    .replacingOccurrences(of: #"\bsingle\b"#, with: "", options: [.regularExpression, .caseInsensitive])
-                // Remove OCR garbage: runs of characters that aren't letters, digits, spaces, or basic punctuation
-                name = name.replacingOccurrences(of: #"[^a-zA-Z0-9\s',\.\-&]+"#, with: " ", options: .regularExpression)
-                // Strip trailing isolated 1-2 char noise tokens from photo background texture (e.g. "Ue.", "Sy ae")
-                // Capped at 2 chars to avoid stripping real short words like "Bun", "Bao", "Oil"
-                name = name.replacingOccurrences(of: #"(\s+[A-Za-z]{1,2}\.?){1,4}\s*$"#, with: "", options: .regularExpression)
-                // Strip trailing digit + short-char noise (e.g. "2 Oe i" from OCR misreading background)
-                name = name.replacingOccurrences(of: #"\s+\d+(\s+[A-Za-z]{1,2})+\s*$"#, with: "", options: .regularExpression)
-                // Collapse multiple spaces
-                name = name.replacingOccurrences(of: #"\s{2,}"#, with: " ", options: .regularExpression)
                     .trimmingCharacters(in: .whitespaces)
-                // Skip if the name is mostly non-letter content (OCR noise line)
-                let letterCount = name.filter(\.isLetter).count
-                if !name.isEmpty && letterCount >= 3 {
+                    .trimmingCharacters(in: CharacterSet(charactersIn: "$"))
+                    .trimmingCharacters(in: .whitespaces)
+                if !name.isEmpty {
                     items.append((name: name, price: price))
                 }
             }

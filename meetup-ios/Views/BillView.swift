@@ -269,7 +269,7 @@ struct BillView: View {
                         bill: bill,
                         items: items,
                         claims: claims,
-                        participants: acceptedParticipants
+                        participants: participants
                     )
                     List {
                         ForEach(totals, id: \.userId) { t in
@@ -306,13 +306,16 @@ struct BillView: View {
     // MARK: - Helpers
 
     private func myTotal(bill: Bill) -> Double {
-        guard let uid = myUserId else { return 0 }
-        let totals = BillService.computeTotals(bill: bill, items: items, claims: claims, participants: participants)
-        return totals.first(where: { $0.userId == uid })?.total ?? 0
-    }
-
-    private var acceptedParticipants: [MeetupParticipant] {
-        participants.filter { $0.status == "accepted" || $0.status == "arrived" }
+        let myClaims = claims.filter { $0.userId == myUserId }
+        var sub = 0.0
+        for claim in myClaims {
+            guard let item = items.first(where: { $0.id == claim.billItemId }) else { continue }
+            let splitCount = Double(claims.filter { $0.billItemId == item.id }.count)
+            sub += item.price / splitCount
+        }
+        let billSub = bill.subtotal > 0 ? bill.subtotal : 1
+        let share = sub / billSub
+        return sub + share * bill.tax + share * bill.tip
     }
 
     private func toggleClaim(item: BillItem, isMine: Bool) async {
@@ -344,7 +347,6 @@ struct BillView: View {
         var adjusted = parsed
         adjusted.items = editableItems.map { (name: $0.name, price: $0.price) }
         adjusted.subtotal = adjusted.items.reduce(0) { $0 + $1.price }
-        adjusted.total = adjusted.subtotal + adjusted.tax + adjusted.tip
         do {
             let (newBill, newItems) = try await BillService.shared.createBill(meetupId: meetup.id, receipt: adjusted)
             bill = newBill
@@ -385,13 +387,9 @@ struct BillView: View {
             let channel = SupabaseManager.shared.client.realtimeV2.channel("bill-\(b.id)")
             let changes = channel.postgresChange(AnyAction.self, schema: "public", table: "bill_item_claims")
             do { try await channel.subscribeWithError() } catch { return }
-            do {
-                for await _ in changes {
-                    try Task.checkCancellation()
-                    await loadClaims()
-                }
-            } catch {
-                // CancellationError — fall through to removeChannel
+            for await _ in changes {
+                guard !Task.isCancelled else { break }
+                await loadClaims()
             }
             await SupabaseManager.shared.client.realtimeV2.removeChannel(channel)
         }

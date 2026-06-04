@@ -102,7 +102,7 @@ final class BillService {
         }
         try await supabase
             .from("bill_item_claims")
-            .upsert(ClaimInsert(billItemId: billItemId, userId: userId), onConflict: "bill_item_id,user_id")
+            .insert(ClaimInsert(billItemId: billItemId, userId: userId))
             .execute()
     }
 
