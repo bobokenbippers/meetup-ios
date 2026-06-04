@@ -19,6 +19,14 @@ platform :ios do
   desc "Build and upload to TestFlight"
   lane :beta do
     match(type: "appstore", readonly: is_ci)
+    update_code_signing_settings(
+      use_automatic_signing: false,
+      path: "meetup-ios.xcodeproj",
+      team_id: "KLT4S6K9X8",
+      bundle_identifier: "gautamlgtm.meetup-ios",
+      code_sign_identity: "Apple Distribution",
+      profile_name: "match AppStore gautamlgtm.meetup-ios"
+    )
     increment_build_number(
       build_number: ENV["GITHUB_RUN_NUMBER"] || Time.now.to_i.to_s,
       xcodeproj: "meetup-ios.xcodeproj"
@@ -33,10 +41,6 @@ platform :ios do
           "gautamlgtm.meetup-ios" => "match AppStore gautamlgtm.meetup-ios"
         }
       },
-      xcargs: "CODE_SIGN_STYLE=Manual " \
-              "CODE_SIGN_IDENTITY='Apple Distribution' " \
-              "PROVISIONING_PROFILE_SPECIFIER='match AppStore gautamlgtm.meetup-ios' " \
-              "DEVELOPMENT_TEAM=KLT4S6K9X8"
     )
     upload_to_testflight(
       skip_waiting_for_build_processing: true
