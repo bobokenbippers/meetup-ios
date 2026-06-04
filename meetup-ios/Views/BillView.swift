@@ -161,7 +161,7 @@ struct BillView: View {
                         }
                         .foregroundStyle(
                             editableItems[idx].name.trimmingCharacters(in: .whitespaces).isEmpty || editableItems[idx].price <= 0
-                                ? AnyShapeStyle(Color.orange) : AnyShapeStyle(Color.primary)
+                                ? AnyShapeStyle(Color.coral) : AnyShapeStyle(Color.primary)
                         )
                     }
                     .onDelete { editableItems.remove(atOffsets: $0) }
@@ -194,7 +194,7 @@ struct BillView: View {
             if !canShare && !isProcessing {
                 Text("Fix items with missing names or $0 prices")
                     .font(.caption)
-                    .foregroundStyle(.orange)
+                    .foregroundStyle(.coral)
                     .padding(.bottom, 8)
             }
         }
@@ -231,7 +231,7 @@ struct BillView: View {
                             }
                             Spacer()
                             Text(item.price, format: .currency(code: "USD"))
-                                .foregroundStyle(itemClaims.isEmpty ? .orange : .primary)
+                                .foregroundStyle(itemClaims.isEmpty ? .coral : .primary)
                             Button {
                                 Task { await toggleClaim(item: item, isMine: isMine) }
                             } label: {
@@ -246,7 +246,7 @@ struct BillView: View {
                     Text("Items")
                 } footer: {
                     if items.contains(where: { i in !claims.contains(where: { $0.billItemId == i.id }) }) {
-                        Text("Unclaimed items shown in orange").foregroundStyle(.orange)
+                        Text("Unclaimed items shown in indigo").foregroundStyle(.coral)
                     }
                 }
             }

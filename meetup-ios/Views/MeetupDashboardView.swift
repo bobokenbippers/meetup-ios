@@ -369,8 +369,8 @@ struct DashboardParticipantPin: View {
 
     private var etaColor: Color {
         if participant.status == "arrived" { return .secondary }
-        if participant.lateLabel(target: targetArrivalAt) != nil { return Color(red: 1, green: 0.294, blue: 0.294) }
-        return Color(red: 0.180, green: 0.835, blue: 0.451)
+        if participant.lateLabel(target: targetArrivalAt) != nil { return .statusLate }
+        return .statusLive
     }
 
     private var avatarColor: Color {
@@ -427,16 +427,8 @@ struct DashboardParticipantPin: View {
 }
 
 private enum ParticipantPalette {
-    private static let colors: [Color] = [
-        Color(red: 0.910, green: 0.361, blue: 0.016),
-        Color(red: 0.482, green: 0.361, blue: 0.749),
-        Color(red: 0.118, green: 0.565, blue: 1.000),
-        Color(red: 0.180, green: 0.800, blue: 0.443),
-        Color(red: 0.910, green: 0.212, blue: 0.278),
-        Color(red: 0.000, green: 0.780, blue: 0.941),
-    ]
     static func color(for userId: UUID) -> Color {
-        colors[abs(userId.hashValue) % colors.count]
+        Color.participantPalette[abs(userId.hashValue) % Color.participantPalette.count]
     }
 }
 
@@ -457,10 +449,10 @@ private struct DashboardParticipantRow: View {
 
     private var etaColor: Color {
         if participant.status == "arrived" { return .secondary }
-        if participant.lateLabel(target: targetArrivalAt) != nil { return Color(red: 1, green: 0.294, blue: 0.294) }
-        if participant.status == "invited"  { return Color(red: 1, green: 0.839, blue: 0) }
+        if participant.lateLabel(target: targetArrivalAt) != nil { return .statusLate }
+        if participant.status == "invited"  { return .statusPending }
         if participant.status == "declined" { return .secondary }
-        return Color(red: 0.180, green: 0.835, blue: 0.451)
+        return .statusLive
     }
 
     var body: some View {
@@ -515,7 +507,7 @@ private struct ConfettiView: View {
     }
 
     @State private var particles: [Particle] = {
-        let palette: [Color] = [.pink, .purple, .blue, .orange, .yellow, .green, .red, .cyan, .mint, .indigo]
+        let palette: [Color] = [.pink, .purple, .blue, .coral, .statusPending, .green, .red, .cyan, .mint, .indigo]
         return (0..<60).map { _ in
             Particle(
                 x: .random(in: 0.05...0.95),
