@@ -1,0 +1,105 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <defs>
+    <radialGradient id="bg" cx="50%" cy="50%" r="70%">
+      <stop offset="0%" stop-color="#0d1b3e"/>
+      <stop offset="100%" stop-color="#060b1a"/>
+    </radialGradient>
+    <radialGradient id="centerGlow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.9"/>
+      <stop offset="40%" stop-color="#7c3aed" stop-opacity="0.6"/>
+      <stop offset="100%" stop-color="#7c3aed" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="pinGlow" cx="50%" cy="45%" r="50%">
+      <stop offset="0%" stop-color="#a78bfa"/>
+      <stop offset="100%" stop-color="#6d28d9"/>
+    </radialGradient>
+    <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="8" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="softGlow" x="-80%" y="-80%" width="260%" height="260%">
+      <feGaussianBlur stdDeviation="18" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <linearGradient id="trail1" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#3b82f6" stop-opacity="0.1"/>
+      <stop offset="100%" stop-color="#3b82f6" stop-opacity="0.9"/>
+    </linearGradient>
+    <linearGradient id="trail2" x1="100%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#8b5cf6" stop-opacity="0.1"/>
+      <stop offset="100%" stop-color="#8b5cf6" stop-opacity="0.9"/>
+    </linearGradient>
+    <linearGradient id="trail3" x1="50%" y1="0%" x2="50%" y2="100%">
+      <stop offset="0%" stop-color="#06b6d4" stop-opacity="0.1"/>
+      <stop offset="100%" stop-color="#06b6d4" stop-opacity="0.9"/>
+    </linearGradient>
+    <linearGradient id="trail4" x1="0%" y1="50%" x2="100%" y2="50%">
+      <stop offset="0%" stop-color="#a78bfa" stop-opacity="0.1"/>
+      <stop offset="100%" stop-color="#a78bfa" stop-opacity="0.9"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1024" height="1024" fill="url(#bg)"/>
+
+  <!-- Subtle grid lines -->
+  <g opacity="0.06" stroke="#4f46e5" stroke-width="1">
+    <line x1="256" y1="0" x2="256" y2="1024"/>
+    <line x1="512" y1="0" x2="512" y2="1024"/>
+    <line x1="768" y1="0" x2="768" y2="1024"/>
+    <line x1="0" y1="256" x2="1024" y2="256"/>
+    <line x1="0" y1="512" x2="1024" y2="512"/>
+    <line x1="0" y1="768" x2="1024" y2="768"/>
+  </g>
+
+  <!-- Converging trail 1: top-left corner → center pin -->
+  <path d="M 140 140 Q 280 300 512 470" fill="none" stroke="url(#trail1)" stroke-width="5" stroke-linecap="round" filter="url(#glow)"/>
+  <!-- Dot at start -->
+  <circle cx="140" cy="140" r="14" fill="#3b82f6" opacity="0.9" filter="url(#glow)"/>
+  <circle cx="140" cy="140" r="7" fill="#ffffff"/>
+
+  <!-- Converging trail 2: top-right corner → center pin -->
+  <path d="M 884 140 Q 740 300 512 470" fill="none" stroke="url(#trail2)" stroke-width="5" stroke-linecap="round" filter="url(#glow)"/>
+  <circle cx="884" cy="140" r="14" fill="#8b5cf6" opacity="0.9" filter="url(#glow)"/>
+  <circle cx="884" cy="140" r="7" fill="#ffffff"/>
+
+  <!-- Converging trail 3: bottom-left → center pin -->
+  <path d="M 160 820 Q 320 680 512 470" fill="none" stroke="url(#trail3)" stroke-width="5" stroke-linecap="round" filter="url(#glow)"/>
+  <circle cx="160" cy="820" r="14" fill="#06b6d4" opacity="0.9" filter="url(#glow)"/>
+  <circle cx="160" cy="820" r="7" fill="#ffffff"/>
+
+  <!-- Converging trail 4: bottom-right → center pin -->
+  <path d="M 864 820 Q 700 680 512 470" fill="none" stroke="url(#trail4)" stroke-width="5" stroke-linecap="round" filter="url(#glow)"/>
+  <circle cx="864" cy="820" r="14" fill="#a78bfa" opacity="0.9" filter="url(#glow)"/>
+  <circle cx="864" cy="820" r="7" fill="#ffffff"/>
+
+  <!-- Center glow halo -->
+  <circle cx="512" cy="480" r="120" fill="url(#centerGlow)" opacity="0.5"/>
+
+  <!-- Location pin body -->
+  <path d="M 512 390
+           C 469 390 434 425 434 468
+           C 434 520 512 590 512 590
+           C 512 590 590 520 590 468
+           C 590 425 555 390 512 390 Z"
+        fill="url(#pinGlow)" filter="url(#softGlow)"/>
+
+  <!-- Pin inner circle -->
+  <circle cx="512" cy="462" r="28" fill="#0d1b3e" opacity="0.85"/>
+  <circle cx="512" cy="462" r="14" fill="#e9d5ff"/>
+
+  <!-- Pin highlight -->
+  <ellipse cx="498" cy="450" rx="8" ry="5" fill="#ffffff" opacity="0.5"/>
+
+  <!-- Subtle outer ring -->
+  <circle cx="512" cy="468" r="150" fill="none" stroke="#7c3aed" stroke-width="1.5" opacity="0.25"/>
+  <circle cx="512" cy="468" r="200" fill="none" stroke="#3b82f6" stroke-width="1" opacity="0.15"/>
+
+  <!-- App name -->
+  <text x="512" y="680" font-family="-apple-system, SF Pro Display, Helvetica Neue, sans-serif"
+        font-size="68" font-weight="700" fill="#ffffff" text-anchor="middle"
+        letter-spacing="-1" opacity="0.95">squad</text>
+  <text x="512" y="750" font-family="-apple-system, SF Pro Display, Helvetica Neue, sans-serif"
+        font-size="48" font-weight="300" fill="#a78bfa" text-anchor="middle"
+        letter-spacing="8" opacity="0.9">BRUNCH</text>
+</svg>
