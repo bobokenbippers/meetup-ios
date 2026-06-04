@@ -64,6 +64,7 @@ struct MeetupsListView: View {
     // Memoized: dictionary-group + sort runs only when participations/hidden sets change.
     @State private var cachedPastByCategory: [(key: String, value: [MyParticipation])] = []
     @Environment(AuthViewModel.self) private var auth
+    @Environment(NavigationState.self) private var navState
 
     private func isVisible(_ p: MyParticipation) -> Bool {
         !deletedMeetupIds.contains(p.meetup.id) && !permanentlyHiddenIds.contains(p.meetup.id)
@@ -153,6 +154,21 @@ struct MeetupsListView: View {
                 Button("OK") { error = nil }
             } message: {
                 Text(error ?? "")
+            }
+            .onChange(of: navState.pendingMeetupId) { _, meetupId in
+                guard let meetupId else { return }
+                navState.pendingMeetupId = nil
+                if let p = participations.first(where: { $0.meetup.id == meetupId }) {
+                    selectedMeetup = p.meetup
+                } else {
+                    // Data not yet loaded — load then open
+                    Task {
+                        await load()
+                        if let p = participations.first(where: { $0.meetup.id == meetupId }) {
+                            selectedMeetup = p.meetup
+                        }
+                    }
+                }
             }
         }
     }

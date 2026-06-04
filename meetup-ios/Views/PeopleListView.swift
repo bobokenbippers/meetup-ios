@@ -14,6 +14,7 @@ struct PeopleListView: View {
     @State private var contactsManager = ContactsManager()
     @State private var contactSuggestions: [DeviceContact] = []
     @State private var contactNameOverrides: [UUID: String] = [:]
+    @Environment(NavigationState.self) private var navState
 
     private var isSearchEnabled: Bool {
         let raw = phoneSearch.hasPrefix("+1") ? String(phoneSearch.dropFirst(2)) : phoneSearch
@@ -141,6 +142,16 @@ struct PeopleListView: View {
                 enrichWithContactNames()
                 refreshSuggestions()
                 await startFriendRequestRealtime()
+            }
+            .onChange(of: navState.showFriendRequests) { _, show in
+                guard show else { return }
+                navState.showFriendRequests = false
+                // Reload to pick up any new incoming requests, then the
+                // "Friend Requests" section at the top of the list will be visible.
+                Task {
+                    await load()
+                    enrichWithContactNames()
+                }
             }
             .alert("Error", isPresented: Binding(get: { error != nil }, set: { if !$0 { error = nil } })) {
                 Button("OK") { error = nil }
