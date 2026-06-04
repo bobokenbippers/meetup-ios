@@ -70,24 +70,24 @@ struct RecapView: View {
                 Text(meetupCategoryEmoji(meetup.category))
                     .font(.system(size: 28))
                     .frame(width: 48, height: 48)
-                    .background(Color.white.opacity(0.06))
+                    .background(Color(.tertiarySystemBackground))
                     .clipShape(RoundedRectangle(cornerRadius: 12))
 
                 VStack(alignment: .leading, spacing: 2) {
                     Text(meetup.destinationName)
                         .font(.system(size: 20, weight: .bold))
-                        .foregroundStyle(.white)
+                        .foregroundStyle(Color(.label))
                         .lineLimit(2)
                     if let addr = meetup.destinationAddress, !addr.isEmpty {
                         Text(addr)
                             .font(.system(size: 12))
-                            .foregroundStyle(.white.opacity(0.5))
+                            .foregroundStyle(Color(.secondaryLabel))
                             .lineLimit(1)
                     }
                 }
             }
 
-            Divider().background(Color.white.opacity(0.08))
+            Divider()
 
             VStack(spacing: 8) {
                 if let target = meetup.targetArrivalAt {
@@ -103,11 +103,11 @@ struct RecapView: View {
             }
         }
         .padding(16)
-        .background(Color.white.opacity(0.04))
+        .background(Color(.secondarySystemBackground))
         .clipShape(RoundedRectangle(cornerRadius: 20))
         .overlay(
             RoundedRectangle(cornerRadius: 20)
-                .strokeBorder(Color.white.opacity(0.07), lineWidth: 1)
+                .strokeBorder(Color(.separator).opacity(0.5), lineWidth: 1)
         )
     }
 
@@ -115,15 +115,15 @@ struct RecapView: View {
         HStack(spacing: 8) {
             Image(systemName: icon)
                 .font(.system(size: 12))
-                .foregroundStyle(.white.opacity(0.4))
+                .foregroundStyle(.secondary)
                 .frame(width: 16)
             Text(label)
                 .font(.system(size: 12))
-                .foregroundStyle(.white.opacity(0.4))
+                .foregroundStyle(.secondary)
             Spacer()
             Text(value)
                 .font(.system(size: 12, weight: .medium))
-                .foregroundStyle(.white.opacity(0.75))
+                .foregroundStyle(Color(.label))
                 .multilineTextAlignment(.trailing)
         }
     }
@@ -138,10 +138,10 @@ struct RecapView: View {
             VStack(spacing: 4) {
                 Text("\(came) of \(total)")
                     .font(.system(size: 28, weight: .black))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(Color(.label))
                 Text("people showed up")
                     .font(.system(size: 13))
-                    .foregroundStyle(.white.opacity(0.45))
+                    .foregroundStyle(.secondary)
             }
             Spacer()
         }
@@ -165,11 +165,11 @@ struct RecapView: View {
                 attendeeGroup(title: "Said yes, didn't show", icon: "xmark.circle", iconColor: .statusLate, people: noShow)
             }
             if !declined.isEmpty {
-                attendeeGroup(title: "Said no / maybe", icon: "minus.circle", iconColor: Color.white.opacity(0.3), people: declined)
+                attendeeGroup(title: "Said no / maybe", icon: "minus.circle", iconColor: Color(.secondaryLabel), people: declined)
             }
             if !hasLoaded {
                 RoundedRectangle(cornerRadius: 16)
-                    .fill(Color.white.opacity(0.04))
+                    .fill(Color(.secondarySystemBackground))
                     .frame(height: 80)
                     .overlay(ProgressView())
             }
@@ -184,11 +184,11 @@ struct RecapView: View {
                     .foregroundStyle(iconColor)
                 Text(title.uppercased())
                     .font(.system(size: 10, weight: .semibold))
-                    .foregroundStyle(.white.opacity(0.4))
+                    .foregroundStyle(.secondary)
                 Spacer()
                 Text("\(people.count)")
                     .font(.system(size: 10, weight: .semibold))
-                    .foregroundStyle(.white.opacity(0.3))
+                    .foregroundStyle(.secondary)
             }
             .padding(.horizontal, 14)
             .padding(.top, 12)
@@ -197,7 +197,6 @@ struct RecapView: View {
             ForEach(Array(people.enumerated()), id: \.element.id) { index, person in
                 if index > 0 {
                     Divider()
-                        .background(Color.white.opacity(0.05))
                         .padding(.leading, 46)
                 }
                 HStack(spacing: 10) {
@@ -211,18 +210,18 @@ struct RecapView: View {
                         )
                     Text(person.displayName ?? "Unknown")
                         .font(.system(size: 14))
-                        .foregroundStyle(.white.opacity(0.8))
+                        .foregroundStyle(Color(.label))
                     Spacer()
                 }
                 .padding(.horizontal, 14)
                 .padding(.vertical, 10)
             }
         }
-        .background(Color.white.opacity(0.04))
+        .background(Color(.secondarySystemBackground))
         .clipShape(RoundedRectangle(cornerRadius: 16))
         .overlay(
             RoundedRectangle(cornerRadius: 16)
-                .strokeBorder(Color.white.opacity(0.06), lineWidth: 1)
+                .strokeBorder(Color(.separator).opacity(0.5), lineWidth: 1)
         )
     }
 
@@ -243,19 +242,19 @@ struct RecapView: View {
                 VStack(alignment: .leading, spacing: 2) {
                     Text("No receipts")
                         .font(.system(size: 14, weight: .semibold))
-                        .foregroundStyle(.white.opacity(0.8))
+                        .foregroundStyle(Color(.label))
                     Text("Bill splitting not started")
                         .font(.system(size: 12))
-                        .foregroundStyle(.white.opacity(0.4))
+                        .foregroundStyle(.secondary)
                 }
                 Spacer()
             }
             .padding(14)
-            .background(Color.white.opacity(0.04))
+            .background(Color(.secondarySystemBackground))
             .clipShape(RoundedRectangle(cornerRadius: 16))
             .overlay(
                 RoundedRectangle(cornerRadius: 16)
-                    .strokeBorder(Color.white.opacity(0.06), lineWidth: 1)
+                    .strokeBorder(Color(.separator).opacity(0.5), lineWidth: 1)
             )
         } else {
             billBreakdownCard
@@ -275,17 +274,17 @@ struct RecapView: View {
                 }
                 Text("Bill Summary")
                     .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(.white.opacity(0.8))
+                    .foregroundStyle(Color(.label))
                 Spacer()
                 Text("\(receipts.count) place\(receipts.count == 1 ? "" : "s")")
                     .font(.system(size: 11))
-                    .foregroundStyle(.white.opacity(0.35))
+                    .foregroundStyle(.secondary)
             }
             .padding(.horizontal, 14)
             .padding(.top, 14)
             .padding(.bottom, 10)
 
-            Divider().background(Color.white.opacity(0.06))
+            Divider()
 
             ForEach(receipts) { receipt in
                 let payerName = participants.first(where: { $0.userId == receipt.payerUserId })?.displayName ?? "Unknown"
@@ -294,10 +293,10 @@ struct RecapView: View {
                     VStack(alignment: .leading, spacing: 2) {
                         Text(receipt.placeName)
                             .font(.system(size: 13, weight: .medium))
-                            .foregroundStyle(.white.opacity(0.75))
+                            .foregroundStyle(Color(.label))
                         Text("Paid by \(payerName)")
                             .font(.system(size: 11))
-                            .foregroundStyle(.white.opacity(0.35))
+                            .foregroundStyle(.secondary)
                     }
                     Spacer()
                     if myOwed > 0 {
@@ -307,7 +306,7 @@ struct RecapView: View {
                     } else {
                         Text(receipt.totalAmount, format: .currency(code: "USD"))
                             .font(.system(size: 12))
-                            .foregroundStyle(.white.opacity(0.4))
+                            .foregroundStyle(.secondary)
                     }
                 }
                 .padding(.horizontal, 14)
@@ -315,18 +314,17 @@ struct RecapView: View {
 
                 if receipt.id != receipts.last?.id {
                     Divider()
-                        .background(Color.white.opacity(0.04))
                         .padding(.leading, 14)
                 }
             }
 
             let crossTotal = crossReceiptMyTotalRecap
             if crossTotal > 0 {
-                Divider().background(Color.white.opacity(0.06))
+                Divider()
                 HStack {
                     Text("Total you owe")
                         .font(.system(size: 12, weight: .semibold))
-                        .foregroundStyle(.white.opacity(0.55))
+                        .foregroundStyle(.secondary)
                     Spacer()
                     Text(crossTotal, format: .currency(code: "USD"))
                         .font(.system(size: 14, weight: .bold))
@@ -336,11 +334,11 @@ struct RecapView: View {
                 .padding(.vertical, 10)
             }
         }
-        .background(Color.white.opacity(0.04))
+        .background(Color(.secondarySystemBackground))
         .clipShape(RoundedRectangle(cornerRadius: 16))
         .overlay(
             RoundedRectangle(cornerRadius: 16)
-                .strokeBorder(Color.white.opacity(0.06), lineWidth: 1)
+                .strokeBorder(Color(.separator).opacity(0.5), lineWidth: 1)
         )
     }
 

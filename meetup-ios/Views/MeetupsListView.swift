@@ -5,7 +5,7 @@ func meetupCategoryGradient(category: String?, meetupStatus: String, participant
     let isActive = meetupStatus == "active"
     let isInvited = participantStatus == "invited"
     guard isActive && !isInvited else {
-        return AnyShapeStyle(Color.white.opacity(isActive ? 0.05 : 0.03))
+        return AnyShapeStyle(Color(.secondarySystemBackground))
     }
     let c = (category ?? "").lowercased()
     if c.contains("brunch") || c.contains("dinner") || c.contains("food") || c.contains("lunch") {
@@ -26,7 +26,17 @@ func meetupCategoryGradient(category: String?, meetupStatus: String, participant
                      Color(red: 0.047, green: 0.239, blue: 0.125)],
             startPoint: .topLeading, endPoint: .bottomTrailing))
     }
-    return AnyShapeStyle(Color.white.opacity(0.05))
+    return AnyShapeStyle(Color(.secondarySystemBackground))
+}
+
+func meetupHasDarkBackground(category: String?, meetupStatus: String, participantStatus: String) -> Bool {
+    let isActive = meetupStatus == "active"
+    let isInvited = participantStatus == "invited"
+    guard isActive && !isInvited else { return false }
+    let c = (category ?? "").lowercased()
+    return c.contains("brunch") || c.contains("dinner") || c.contains("food") || c.contains("lunch") ||
+           c.contains("happy hour") || c.contains("cocktail") || c.contains("drink") ||
+           c.contains("coffee") || c.contains("café") || c.contains("cafe")
 }
 
 func meetupCategoryEmoji(_ category: String?) -> String {
@@ -266,7 +276,7 @@ struct MeetupsListView: View {
     private func sectionHeader(_ title: String) -> some View {
         Text(title.uppercased())
             .font(.system(size: 10, weight: .semibold))
-            .foregroundStyle(.white.opacity(0.4))
+            .foregroundStyle(.secondary)
             .textCase(nil)
             .padding(.leading, 4)
             .padding(.top, 8)
@@ -411,6 +421,22 @@ struct MeetupRowCard: View {
         participation.meetup.status != "active" || participation.status == "invited"
     }
 
+    private var hasDarkBackground: Bool {
+        meetupHasDarkBackground(
+            category: participation.meetup.category,
+            meetupStatus: participation.meetup.status,
+            participantStatus: participation.status
+        )
+    }
+
+    private var primaryTextColor: Color {
+        hasDarkBackground ? .white : Color(.label)
+    }
+
+    private var secondaryTextColor: Color {
+        hasDarkBackground ? .white.opacity(0.5) : Color(.secondaryLabel)
+    }
+
     var body: some View {
         HStack(spacing: 12) {
             Text(meetupCategoryEmoji(participation.meetup.category))
@@ -419,13 +445,13 @@ struct MeetupRowCard: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(participation.meetup.destinationName)
                     .font(.system(size: 14, weight: .bold))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(primaryTextColor)
                     .lineLimit(1)
 
                 if let addr = participation.meetup.destinationAddress, !addr.isEmpty {
                     Text(addr)
                         .font(.system(size: 11))
-                        .foregroundStyle(.white.opacity(0.5))
+                        .foregroundStyle(secondaryTextColor)
                         .lineLimit(1)
                 }
             }
@@ -436,7 +462,7 @@ struct MeetupRowCard: View {
                 if let target = participation.meetup.targetArrivalAt {
                     Text(target, format: .dateTime.weekday(.abbreviated).hour().minute())
                         .font(.system(size: 10, weight: .medium))
-                        .foregroundStyle(.white.opacity(0.5))
+                        .foregroundStyle(secondaryTextColor)
                 }
                 MeetupStatusPill(participation: participation)
             }
@@ -452,10 +478,7 @@ struct MeetupRowCard: View {
                 ))
             if needsBorder {
                 RoundedRectangle(cornerRadius: 18)
-                    .strokeBorder(
-                        .white.opacity(participation.meetup.status != "active" ? 0.05 : 0.08),
-                        lineWidth: 1
-                    )
+                    .strokeBorder(Color(.separator), lineWidth: 1)
             }
         }
         .opacity(participation.meetup.status != "active" ? 0.55 : 1.0)
