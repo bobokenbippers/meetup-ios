@@ -56,6 +56,8 @@ struct MeetupsListView: View {
     @State private var selectedMeetup: Meetup?
     @State private var deletedMeetupIds: Set<UUID> = []
     @State private var permanentlyHiddenIds: Set<UUID> = []
+    // Memoized: dictionary-group + sort runs only when participations/hidden sets change.
+    @State private var cachedPastByCategory: [(key: String, value: [MyParticipation])] = []
     @Environment(AuthViewModel.self) private var auth
 
     private func isVisible(_ p: MyParticipation) -> Bool {
@@ -71,7 +73,15 @@ struct MeetupsListView: View {
     private var past: [MyParticipation] {
         participations.filter { isVisible($0) && $0.meetup.status != "active" && $0.meetup.status != "cancelled" }
     }
-    private var pastByCategory: [(key: String, value: [MyParticipation])] {
+    private var deleted: [MyParticipation] {
+        participations.filter {
+            deletedMeetupIds.contains($0.meetup.id) &&
+            !permanentlyHiddenIds.contains($0.meetup.id) &&
+            $0.meetup.status != "cancelled"
+        }
+    }
+
+    private func buildPastByCategory() -> [(key: String, value: [MyParticipation])] {
         let grouped = Dictionary(grouping: past) { $0.meetup.category ?? "" }
         return grouped
             .sorted { a, b in
@@ -88,13 +98,6 @@ struct MeetupsListView: View {
                 }
                 return (key: key, value: sorted)
             }
-    }
-    private var deleted: [MyParticipation] {
-        participations.filter {
-            deletedMeetupIds.contains($0.meetup.id) &&
-            !permanentlyHiddenIds.contains($0.meetup.id) &&
-            $0.meetup.status != "cancelled"
-        }
     }
 
     var body: some View {
@@ -131,8 +134,8 @@ struct MeetupsListView: View {
             }
             .task { loadHiddenIds(); if participations.isEmpty { await load() } }
             .refreshable { await load() }
-            .onChange(of: deletedMeetupIds) { _, _ in saveHiddenIds() }
-            .onChange(of: permanentlyHiddenIds) { _, _ in saveHiddenIds() }
+            .onChange(of: deletedMeetupIds) { _, _ in saveHiddenIds(); cachedPastByCategory = buildPastByCategory() }
+            .onChange(of: permanentlyHiddenIds) { _, _ in saveHiddenIds(); cachedPastByCategory = buildPastByCategory() }
             .alert("Error", isPresented: Binding(get: { error != nil }, set: { if !$0 { error = nil } })) {
                 Button("OK") { error = nil }
             } message: {
@@ -186,7 +189,7 @@ struct MeetupsListView: View {
                 .listSectionSeparator(.hidden)
             }
 
-            ForEach(pastByCategory, id: \.key) { group in
+            ForEach(cachedPastByCategory, id: \.key) { group in
                 Section {
                     ForEach(group.value, id: \.meetup.id) { p in
                         Button { selectedMeetup = p.meetup } label: {
@@ -259,6 +262,7 @@ struct MeetupsListView: View {
                 if result != participations { participations = result }
                 hasLoaded = true
             }
+            cachedPastByCategory = buildPastByCategory()
         } catch is CancellationError {
             return
         } catch {
