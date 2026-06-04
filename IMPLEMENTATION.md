@@ -582,6 +582,18 @@ create policy "users can update friendships they're part of"
   on public.friendships for update
   using (auth.uid() = user_a_id or auth.uid() = user_b_id);
 
+-- Required for decline (delete pending row) and removeFriend
+create policy "users can delete friendships they're part of"
+  on public.friendships for delete
+  using (auth.uid() = user_a_id or auth.uid() = user_b_id);
+
+-- NOTE: The initiated_by column tracks direction. user_a_id < user_b_id is enforced
+-- by the check constraint. iOS always sets initiated_by = auth.uid() and orders
+-- user_a_id/user_b_id by UUID string comparison (min < max).
+-- Incoming requests: status='pending' AND initiated_by != auth.uid()
+-- Outgoing pending: status='pending' AND initiated_by = auth.uid()
+-- Accepted friends: status='accepted'
+
 -- Helper: search profiles by phone (only returns the matched profile, no listing)
 create or replace function public.find_user_by_phone(search_phone text)
 returns table (id uuid, display_name text)
