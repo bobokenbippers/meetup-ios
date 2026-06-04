@@ -57,6 +57,10 @@ final class ContactsManager {
         return nil
     }
 
+    func name(forPhone phone: String) -> String? {
+        contacts.first { $0.phones.contains(phone) }?.displayName
+    }
+
     func search(_ query: String) -> [DeviceContact] {
         guard !query.isEmpty else { return [] }
         let q = query.lowercased()
