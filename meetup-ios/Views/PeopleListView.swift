@@ -4,6 +4,8 @@ import Contacts
 
 struct PeopleListView: View {
     @State private var people: [Profile] = []
+    @State private var incomingRequests: [IncomingFriendRequest] = []
+    @State private var pendingOutgoingIds: Set<UUID> = []
     @State private var hasLoaded = false
     @State private var error: String?
     @State private var phoneSearch = ""
@@ -74,9 +76,24 @@ struct PeopleListView: View {
                             .padding(.bottom, 8)
                     }
 
-                    // People from meetups
+                    // Incoming friend requests
+                    if !incomingRequests.isEmpty {
+                        sectionLabel("Friend Requests")
+                            .padding(.horizontal, 20)
+                            .padding(.top, 16)
+                            .padding(.bottom, 6)
+
+                        LazyVStack(spacing: 8) {
+                            ForEach(incomingRequests) { request in
+                                incomingRequestCard(request)
+                            }
+                        }
+                        .padding(.horizontal, 16)
+                    }
+
+                    // People list (friends + outgoing pending + meetup people)
                     if hasLoaded && !people.isEmpty {
-                        sectionLabel("From Meetups")
+                        sectionLabel("People")
                             .padding(.horizontal, 20)
                             .padding(.top, 16)
                             .padding(.bottom, 6)
@@ -85,14 +102,16 @@ struct PeopleListView: View {
                             ForEach(people) { person in
                                 PersonCard(
                                     person: person,
-                                    contactName: contactNameOverrides[person.id]
+                                    contactName: contactNameOverrides[person.id],
+                                    isPending: pendingOutgoingIds.contains(person.id)
                                 ) {
                                     Task { await removePerson(person) }
                                 }
                             }
                         }
                         .padding(.horizontal, 16)
-                    } else if hasLoaded && people.isEmpty && contactSuggestions.isEmpty && foundUser == nil {
+                    } else if hasLoaded && people.isEmpty && incomingRequests.isEmpty
+                                && contactSuggestions.isEmpty && foundUser == nil {
                         VStack(spacing: 12) {
                             Image(systemName: "person.2.circle")
                                 .font(.system(size: 48))
@@ -121,6 +140,7 @@ struct PeopleListView: View {
                 await contactsManager.load()
                 enrichWithContactNames()
                 refreshSuggestions()
+                await startFriendRequestRealtime()
             }
             .alert("Error", isPresented: Binding(get: { error != nil }, set: { if !$0 { error = nil } })) {
                 Button("OK") { error = nil }
@@ -210,6 +230,61 @@ struct PeopleListView: View {
         )
     }
 
+    private func incomingRequestCard(_ request: IncomingFriendRequest) -> some View {
+        HStack(spacing: 12) {
+            Circle()
+                .fill(Color.coral.opacity(0.15))
+                .frame(width: 42, height: 42)
+                .overlay {
+                    Text(String((request.requester.displayName ?? "?").prefix(1)).uppercased())
+                        .font(.system(size: 17, weight: .bold))
+                        .foregroundStyle(Color.coral)
+                }
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(request.requester.displayName ?? "Unknown")
+                    .font(.system(size: 14, weight: .semibold))
+                if let phone = request.requester.phoneE164 {
+                    Text(phone)
+                        .font(.system(size: 12))
+                        .foregroundStyle(.secondary)
+                }
+            }
+
+            Spacer()
+
+            HStack(spacing: 8) {
+                Button("Accept") {
+                    Task { await acceptRequest(request) }
+                }
+                .font(.system(size: 13, weight: .bold))
+                .foregroundStyle(.white)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 8)
+                .background(Color.coral)
+                .clipShape(Capsule())
+
+                Button("Decline") {
+                    Task { await declineRequest(request) }
+                }
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(.secondary)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+                .background(Color.white.opacity(0.1))
+                .clipShape(Capsule())
+            }
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 12)
+        .background(.regularMaterial)
+        .clipShape(RoundedRectangle(cornerRadius: 14))
+        .overlay(
+            RoundedRectangle(cornerRadius: 14)
+                .strokeBorder(Color.coral.opacity(0.4), lineWidth: 1)
+        )
+    }
+
     private func sectionLabel(_ title: String) -> some View {
         Text(title.uppercased())
             .font(.system(size: 10, weight: .semibold))
@@ -256,16 +331,50 @@ struct PeopleListView: View {
         do {
             async let friendsFetch = MeetupService.shared.getFriends()
             async let meetupFetch = MeetupService.shared.getPeopleFromMeetups()
-            let (friends, meetupPeople) = try await (friendsFetch, meetupFetch)
+            async let incomingFetch = MeetupService.shared.getPendingIncomingRequests()
+            async let outgoingFetch = MeetupService.shared.getPendingOutgoingRequests()
+            let (friends, meetupPeople, incoming, outgoing) = try await (friendsFetch, meetupFetch, incomingFetch, outgoingFetch)
+
+            let incomingIds = Set(incoming.map { $0.requester.id })
+            let outgoingIds = Set(outgoing.map { $0.addressee.id })
+
             var seen = Set<UUID>()
-            people = (friends + meetupPeople).filter { seen.insert($0.id).inserted }
-                .sorted { ($0.displayName ?? "") < ($1.displayName ?? "") }
+            // Friends + meetup people, excluding anyone who has a pending incoming request (not friends yet)
+            var combined: [Profile] = (friends + meetupPeople)
+                .filter { !incomingIds.contains($0.id) }
+                .filter { seen.insert($0.id).inserted }
+            // Append outgoing pending addressees (shown with "Pending" badge)
+            for req in outgoing where seen.insert(req.addressee.id).inserted {
+                combined.append(req.addressee)
+            }
+            combined.sort { ($0.displayName ?? "") < ($1.displayName ?? "") }
+
+            incomingRequests = incoming
+            pendingOutgoingIds = outgoingIds
+            people = combined
         } catch is CancellationError {
             return
         } catch {
             self.error = error.localizedDescription
         }
         hasLoaded = true
+    }
+
+    private func startFriendRequestRealtime() async {
+        guard let myId = SupabaseManager.shared.client.auth.currentUser?.id else { return }
+        let channel = SupabaseManager.shared.client.realtimeV2.channel("friend-requests-\(myId)")
+        let changes = channel.postgresChange(AnyAction.self, schema: "public", table: "friendships")
+        do {
+            try await channel.subscribeWithError()
+        } catch {
+            return
+        }
+        for await _ in changes {
+            guard !Task.isCancelled else { break }
+            await load()
+            enrichWithContactNames()
+        }
+        await SupabaseManager.shared.client.realtimeV2.removeChannel(channel)
     }
 
     private func searchUser() async {
@@ -326,7 +435,28 @@ struct PeopleListView: View {
         do {
             try await MeetupService.shared.removeFriend(userId: person.id)
             people.removeAll { $0.id == person.id }
+            pendingOutgoingIds.remove(person.id)
             contactNameOverrides.removeValue(forKey: person.id)
+        } catch {
+            self.error = error.localizedDescription
+        }
+    }
+
+    private func acceptRequest(_ request: IncomingFriendRequest) async {
+        do {
+            try await MeetupService.shared.acceptFriendRequest(friendshipId: request.id)
+            incomingRequests.removeAll { $0.id == request.id }
+            await load()
+            enrichWithContactNames()
+        } catch {
+            self.error = error.localizedDescription
+        }
+    }
+
+    private func declineRequest(_ request: IncomingFriendRequest) async {
+        do {
+            try await MeetupService.shared.declineFriendRequest(friendshipId: request.id)
+            incomingRequests.removeAll { $0.id == request.id }
         } catch {
             self.error = error.localizedDescription
         }
@@ -339,6 +469,7 @@ struct PeopleListView: View {
                 phoneSearch = ""
                 foundUser = nil
                 await load()
+                enrichWithContactNames()
             } catch {
                 self.error = error.localizedDescription
             }
@@ -351,7 +482,15 @@ struct PeopleListView: View {
 private struct PersonCard: View {
     let person: Profile
     let contactName: String?
+    let isPending: Bool
     let onRemove: () -> Void
+
+    init(person: Profile, contactName: String?, isPending: Bool = false, onRemove: @escaping () -> Void) {
+        self.person = person
+        self.contactName = contactName
+        self.isPending = isPending
+        self.onRemove = onRemove
+    }
 
     private var displayedName: String {
         contactName ?? person.displayName ?? "Unknown"
@@ -380,13 +519,23 @@ private struct PersonCard: View {
 
             Spacer()
 
-            Button(action: onRemove) {
-                Image(systemName: "person.badge.minus")
-                    .font(.system(size: 15))
-                    .foregroundStyle(.red.opacity(0.75))
+            if isPending {
+                Text("Pending")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(.secondary)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 5)
+                    .background(Color.white.opacity(0.1))
+                    .clipShape(Capsule())
+            } else {
+                Button(action: onRemove) {
+                    Image(systemName: "person.badge.minus")
+                        .font(.system(size: 15))
+                        .foregroundStyle(.red.opacity(0.75))
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Remove \(displayedName)")
             }
-            .buttonStyle(.plain)
-            .accessibilityLabel("Remove \(displayedName)")
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 12)
@@ -397,8 +546,10 @@ private struct PersonCard: View {
                 .strokeBorder(.white.opacity(0.08), lineWidth: 1)
         )
         .contextMenu {
-            Button(role: .destructive, action: onRemove) {
-                Label("Remove", systemImage: "trash")
+            if !isPending {
+                Button(role: .destructive, action: onRemove) {
+                    Label("Remove", systemImage: "trash")
+                }
             }
         }
     }

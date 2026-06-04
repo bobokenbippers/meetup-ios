@@ -243,6 +243,7 @@ final class MeetupService {
             .from("friendships")
             .select("user_a_id,user_b_id")
             .or("user_a_id.eq.\(myId),user_b_id.eq.\(myId)")
+            .eq("status", value: "accepted")
             .execute()
             .value
         let ids = rows.map { $0.userAId == myId ? $0.userBId : $0.userAId }
@@ -253,6 +254,94 @@ final class MeetupService {
             .in("id", values: ids.map { $0.uuidString })
             .execute()
             .value
+    }
+
+    func getPendingIncomingRequests() async throws -> [IncomingFriendRequest] {
+        guard let myId = supabase.auth.currentUser?.id else { return [] }
+        struct Row: Codable {
+            let id: UUID
+            let initiatedBy: UUID
+            enum CodingKeys: String, CodingKey {
+                case id
+                case initiatedBy = "initiated_by"
+            }
+        }
+        let rows: [Row] = try await supabase
+            .from("friendships")
+            .select("id,initiated_by")
+            .or("user_a_id.eq.\(myId),user_b_id.eq.\(myId)")
+            .eq("status", value: "pending")
+            .neq("initiated_by", value: myId.uuidString)
+            .execute()
+            .value
+        guard !rows.isEmpty else { return [] }
+        let profiles: [Profile] = try await supabase
+            .from("profiles")
+            .select()
+            .in("id", values: rows.map { $0.initiatedBy.uuidString })
+            .execute()
+            .value
+        let profileMap = Dictionary(uniqueKeysWithValues: profiles.map { ($0.id, $0) })
+        return rows.compactMap { row in
+            guard let profile = profileMap[row.initiatedBy] else { return nil }
+            return IncomingFriendRequest(id: row.id, requester: profile)
+        }
+    }
+
+    func getPendingOutgoingRequests() async throws -> [PendingOutgoingRequest] {
+        guard let myId = supabase.auth.currentUser?.id else { return [] }
+        struct Row: Codable {
+            let id: UUID
+            let userAId: UUID
+            let userBId: UUID
+            let initiatedBy: UUID
+            enum CodingKeys: String, CodingKey {
+                case id
+                case userAId = "user_a_id"
+                case userBId = "user_b_id"
+                case initiatedBy = "initiated_by"
+            }
+        }
+        let rows: [Row] = try await supabase
+            .from("friendships")
+            .select("id,user_a_id,user_b_id,initiated_by")
+            .or("user_a_id.eq.\(myId),user_b_id.eq.\(myId)")
+            .eq("status", value: "pending")
+            .eq("initiated_by", value: myId.uuidString)
+            .execute()
+            .value
+        guard !rows.isEmpty else { return [] }
+        let addresseeIds = rows.map { row -> String in
+            (row.initiatedBy == row.userAId ? row.userBId : row.userAId).uuidString
+        }
+        let profiles: [Profile] = try await supabase
+            .from("profiles")
+            .select()
+            .in("id", values: addresseeIds)
+            .execute()
+            .value
+        let profileMap = Dictionary(uniqueKeysWithValues: profiles.map { ($0.id, $0) })
+        return rows.compactMap { row -> PendingOutgoingRequest? in
+            let addresseeId = row.initiatedBy == row.userAId ? row.userBId : row.userAId
+            guard let profile = profileMap[addresseeId] else { return nil }
+            return PendingOutgoingRequest(id: row.id, addressee: profile)
+        }
+    }
+
+    func acceptFriendRequest(friendshipId: UUID) async throws {
+        try await supabase
+            .from("friendships")
+            .update(["status": "accepted"])
+            .eq("id", value: friendshipId.uuidString)
+            .execute()
+    }
+
+    func declineFriendRequest(friendshipId: UUID) async throws {
+        try await supabase
+            .from("friendships")
+            .delete()
+            .eq("id", value: friendshipId.uuidString)
+            .execute()
     }
 
     func getPeopleFromMeetups() async throws -> [Profile] {
@@ -285,24 +374,60 @@ final class MeetupService {
     func addFriend(userId: UUID) async throws {
         guard let myId = supabase.auth.currentUser?.id else { throw MeetupError.notSignedIn }
 
+        // Canonical ordering required by DB check constraint: user_a_id < user_b_id
+        let (userAId, userBId) = myId.uuidString < userId.uuidString
+            ? (myId, userId)
+            : (userId, myId)
+
+        struct ExistingRow: Codable {
+            let id: UUID
+            let initiatedBy: UUID
+            let status: String
+            enum CodingKeys: String, CodingKey {
+                case id
+                case initiatedBy = "initiated_by"
+                case status
+            }
+        }
+        let existing: [ExistingRow] = try await supabase
+            .from("friendships")
+            .select("id,initiated_by,status")
+            .eq("user_a_id", value: userAId.uuidString)
+            .eq("user_b_id", value: userBId.uuidString)
+            .execute()
+            .value
+
+        if let row = existing.first {
+            if row.status == "accepted" { return }
+            if row.initiatedBy != myId {
+                // The other person already sent us a request — accept it
+                try await acceptFriendRequest(friendshipId: row.id)
+            }
+            // If we're already the initiator and it's pending, nothing to do
+            return
+        }
+
         struct FriendshipInsert: Encodable {
             let userAId: UUID
             let userBId: UUID
             let status: String
+            let initiatedBy: UUID
             enum CodingKeys: String, CodingKey {
                 case userAId = "user_a_id"
                 case userBId = "user_b_id"
                 case status
+                case initiatedBy = "initiated_by"
             }
         }
 
         try await supabase
             .from("friendships")
-            .upsert(
-                FriendshipInsert(userAId: myId, userBId: userId, status: "pending"),
-                onConflict: "user_a_id,user_b_id",
-                ignoreDuplicates: true
-            )
+            .insert(FriendshipInsert(
+                userAId: userAId,
+                userBId: userBId,
+                status: "pending",
+                initiatedBy: myId
+            ))
             .execute()
     }
 
