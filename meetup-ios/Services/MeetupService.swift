@@ -126,7 +126,7 @@ final class MeetupService {
         var participants = [ParticipantInsert(
             meetupId: meetupId,
             userId: hostId,
-            status: "accepted",
+            status: "yes",
             joinedAt: iso.string(from: Date())
         )]
         for invitee in invitees {
@@ -165,7 +165,7 @@ final class MeetupService {
         let iso = ISO8601DateFormatter()
         try await supabase
             .from("meetup_participants")
-            .update(["status": "accepted", "joined_at": iso.string(from: Date())])
+            .update(["status": "yes", "joined_at": iso.string(from: Date())])
             .eq("meetup_id", value: meetupId)
             .eq("user_id", value: userId)
             .execute()
@@ -175,7 +175,17 @@ final class MeetupService {
         guard let userId = supabase.auth.currentUser?.id else { return }
         try await supabase
             .from("meetup_participants")
-            .update(["status": "declined"])
+            .update(["status": "no"])
+            .eq("meetup_id", value: meetupId)
+            .eq("user_id", value: userId)
+            .execute()
+    }
+
+    func maybe(meetupId: UUID) async throws {
+        guard let userId = supabase.auth.currentUser?.id else { return }
+        try await supabase
+            .from("meetup_participants")
+            .update(["status": "maybe"])
             .eq("meetup_id", value: meetupId)
             .eq("user_id", value: userId)
             .execute()
