@@ -133,4 +133,52 @@ struct ReceiptParserTests {
         #expect(receipt.tip == 5.25)
         #expect(receipt.items.count == 1)
     }
+
+    @Test("dollar-sign whole-dollar prices are parsed")
+    func dollarSignWholePrice() {
+        let lines = [
+            "Mimosa  $8",
+            "Tax     $0.64",
+            "Total   $8.64",
+        ]
+        let receipt = ReceiptParser.parseText(lines)
+        #expect(receipt.items.count == 1)
+        #expect(receipt.items[0].price == 8.0)
+        #expect(receipt.tax == 0.64)
+        #expect(receipt.total == 8.64)
+    }
+
+    @Test("one-decimal prices without dollar sign are parsed")
+    func oneDecimalPrice() {
+        let lines = [
+            "Juice   7.5",
+            "Tax     0.6",
+            "Total   8.1",
+        ]
+        let receipt = ReceiptParser.parseText(lines)
+        #expect(receipt.items.count == 1)
+        #expect(receipt.items[0].price == 7.5)
+    }
+
+    @Test("dollar-sign decimal prices are parsed")
+    func dollarSignDecimalPrice() {
+        let lines = [
+            "Burger  $12.50",
+            "Total   $12.50",
+        ]
+        let receipt = ReceiptParser.parseText(lines)
+        #expect(receipt.items.count == 1)
+        #expect(receipt.items[0].price == 12.50)
+    }
+
+    @Test("bare integers without dollar sign are not parsed as prices")
+    func bareIntegersExcluded() {
+        let lines = [
+            "Table 2",
+            "Espresso  3.50",
+        ]
+        let receipt = ReceiptParser.parseText(lines)
+        #expect(receipt.items.count == 1)
+        #expect(receipt.items[0].price == 3.50)
+    }
 }
