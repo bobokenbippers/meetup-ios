@@ -11,6 +11,7 @@ struct PeopleListView: View {
     @State private var isSearching = false
     @State private var contactsManager = ContactsManager()
     @State private var contactSuggestions: [DeviceContact] = []
+    @State private var contactNameOverrides: [UUID: String] = [:]
 
     private var isSearchEnabled: Bool {
         let raw = phoneSearch.hasPrefix("+1") ? String(phoneSearch.dropFirst(2)) : phoneSearch
@@ -82,7 +83,10 @@ struct PeopleListView: View {
 
                         LazyVStack(spacing: 8) {
                             ForEach(people) { person in
-                                PersonCard(person: person) {
+                                PersonCard(
+                                    person: person,
+                                    contactName: contactNameOverrides[person.id]
+                                ) {
                                     Task { await removePerson(person) }
                                 }
                             }
@@ -115,6 +119,7 @@ struct PeopleListView: View {
             .task {
                 await load()
                 await contactsManager.load()
+                enrichWithContactNames()
                 refreshSuggestions()
             }
             .alert("Error", isPresented: Binding(get: { error != nil }, set: { if !$0 { error = nil } })) {
@@ -213,6 +218,23 @@ struct PeopleListView: View {
 
     // MARK: - Logic
 
+    private func isPlaceholderName(_ name: String) -> Bool {
+        let lower = name.lowercased().trimmingCharacters(in: .whitespaces)
+        return lower.isEmpty || lower == "unknown" || lower == "new user"
+    }
+
+    private func enrichWithContactNames() {
+        var overrides: [UUID: String] = [:]
+        for person in people {
+            let needsEnrichment = person.displayName.map { isPlaceholderName($0) } ?? true
+            if needsEnrichment, let phone = person.phoneE164,
+               let name = contactsManager.name(forPhone: phone) {
+                overrides[person.id] = name
+            }
+        }
+        contactNameOverrides = overrides
+    }
+
     private func refreshSuggestions() {
         guard !phoneSearch.isEmpty else { contactSuggestions = []; return }
         if phoneSearch.contains(where: { $0.isLetter }) {
@@ -255,7 +277,12 @@ struct PeopleListView: View {
         do {
             if let user = try await MeetupService.shared.findUserByPhone(e164) {
                 if user.id == myId { error = "That's you!" }
-                else { foundUser = user }
+                else {
+                    let resolvedName = isPlaceholderName(user.displayName)
+                        ? (contactsManager.name(forPhone: e164) ?? user.displayName)
+                        : user.displayName
+                    foundUser = FoundUser(id: user.id, displayName: resolvedName, phone: user.phone)
+                }
             } else {
                 error = "No user found with that number"
             }
@@ -283,7 +310,12 @@ struct PeopleListView: View {
         }
         if let user = found {
             if user.id == myId { error = "That's you!" }
-            else { foundUser = user }
+            else {
+                let resolvedName = isPlaceholderName(user.displayName)
+                    ? contact.displayName
+                    : user.displayName
+                foundUser = FoundUser(id: user.id, displayName: resolvedName, phone: user.phone)
+            }
         } else {
             error = "\(contact.displayName) isn't on the app yet"
         }
@@ -294,6 +326,7 @@ struct PeopleListView: View {
         do {
             try await MeetupService.shared.removeFriend(userId: person.id)
             people.removeAll { $0.id == person.id }
+            contactNameOverrides.removeValue(forKey: person.id)
         } catch {
             self.error = error.localizedDescription
         }
@@ -317,7 +350,12 @@ struct PeopleListView: View {
 
 private struct PersonCard: View {
     let person: Profile
+    let contactName: String?
     let onRemove: () -> Void
+
+    private var displayedName: String {
+        contactName ?? person.displayName ?? "Unknown"
+    }
 
     var body: some View {
         HStack(spacing: 12) {
@@ -325,13 +363,13 @@ private struct PersonCard: View {
                 .fill(personColor(for: person.id).opacity(0.7))
                 .frame(width: 38, height: 38)
                 .overlay {
-                    Text(String((person.displayName ?? "?").prefix(1)).uppercased())
+                    Text(String(displayedName.prefix(1)).uppercased())
                         .font(.system(size: 15, weight: .bold))
                         .foregroundStyle(.white)
                 }
 
             VStack(alignment: .leading, spacing: 2) {
-                Text(person.displayName ?? "Unknown")
+                Text(displayedName)
                     .font(.system(size: 13, weight: .semibold))
                 if let phone = person.phoneE164 {
                     Text(phone)
@@ -342,9 +380,13 @@ private struct PersonCard: View {
 
             Spacer()
 
-            Image(systemName: "chevron.right")
-                .font(.system(size: 11, weight: .semibold))
-                .foregroundStyle(.tertiary)
+            Button(action: onRemove) {
+                Image(systemName: "person.badge.minus")
+                    .font(.system(size: 15))
+                    .foregroundStyle(.red.opacity(0.75))
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Remove \(displayedName)")
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 12)
