@@ -426,8 +426,8 @@ struct DashboardParticipantPin: View {
     }
 }
 
-private func pinColor(for userId: UUID) -> Color {
-    let palette: [Color] = [
+private enum ParticipantPalette {
+    private static let colors: [Color] = [
         Color(red: 0.910, green: 0.361, blue: 0.016),
         Color(red: 0.482, green: 0.361, blue: 0.749),
         Color(red: 0.118, green: 0.565, blue: 1.000),
@@ -435,8 +435,12 @@ private func pinColor(for userId: UUID) -> Color {
         Color(red: 0.910, green: 0.212, blue: 0.278),
         Color(red: 0.000, green: 0.780, blue: 0.941),
     ]
-    return palette[abs(userId.hashValue) % palette.count]
+    static func color(for userId: UUID) -> Color {
+        colors[abs(userId.hashValue) % colors.count]
+    }
 }
+
+private func pinColor(for userId: UUID) -> Color { ParticipantPalette.color(for: userId) }
 
 // MARK: - Participant Row (in bottom panel)
 

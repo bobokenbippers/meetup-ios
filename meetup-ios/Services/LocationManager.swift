@@ -53,6 +53,13 @@ final class LocationManager: NSObject {
 
     private let clManager = CLLocationManager()
     private let motionManager = CMMotionActivityManager()
+    private let motionQueue: OperationQueue = {
+        let q = OperationQueue()
+        q.name = "com.squadbrunch.motionqueue"
+        q.maxConcurrentOperationCount = 1
+        q.qualityOfService = .utility
+        return q
+    }()
     private var trackingMeetup: Meetup?
     private var uploadTask: Task<Void, Never>?
     private(set) var location: CLLocation?
@@ -90,14 +97,17 @@ final class LocationManager: NSObject {
 
     private func startMotionUpdates() {
         guard CMMotionActivityManager.isActivityAvailable() else { return }
-        motionManager.startActivityUpdates(to: .main) { [weak self] activity in
-            guard let activity else { return }
-            if activity.automotive      { self?.motionMode = .driving }
-            else if activity.walking    { self?.motionMode = .walking }
-            else if activity.running    { self?.motionMode = .walking }
-            else if activity.cycling    { self?.motionMode = .cycling }
-            else if activity.stationary { self?.motionMode = .stationary }
-            else                        { self?.motionMode = .unknown }
+        // Deliver on a background queue so classifying motion doesn't block UI.
+        motionManager.startActivityUpdates(to: motionQueue) { [weak self] activity in
+            guard let self, let activity else { return }
+            let mode: MotionMode
+            if activity.automotive      { mode = .driving }
+            else if activity.walking    { mode = .walking }
+            else if activity.running    { mode = .walking }
+            else if activity.cycling    { mode = .cycling }
+            else if activity.stationary { mode = .stationary }
+            else                        { mode = .unknown }
+            DispatchQueue.main.async { self.motionMode = mode }
         }
     }
 

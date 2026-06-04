@@ -80,7 +80,7 @@ struct PeopleListView: View {
                             .padding(.top, 16)
                             .padding(.bottom, 6)
 
-                        VStack(spacing: 8) {
+                        LazyVStack(spacing: 8) {
                             ForEach(people) { person in
                                 PersonCard(person: person) {
                                     Task { await removePerson(person) }

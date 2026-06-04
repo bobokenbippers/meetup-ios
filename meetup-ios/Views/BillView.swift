@@ -13,6 +13,7 @@ struct BillView: View {
     @State private var bill: Bill?
     @State private var items: [BillItem] = []
     @State private var claims: [BillItemClaim] = []
+    @State private var billTotals: [BillService.PersonTotal] = []
     @State private var hasLoaded = false
     @State private var isProcessing = false
     @State private var error: String?
@@ -265,15 +266,9 @@ struct BillView: View {
     private var summarySheet: some View {
         NavigationStack {
             Group {
-                if let bill {
-                    let totals = BillService.computeTotals(
-                        bill: bill,
-                        items: items,
-                        claims: claims,
-                        participants: participants
-                    )
+                if bill != nil {
                     List {
-                        ForEach(totals, id: \.userId) { t in
+                        ForEach(billTotals, id: \.userId) { t in
                             HStack {
                                 VStack(alignment: .leading, spacing: 2) {
                                     Text(t.displayName)
@@ -354,6 +349,7 @@ struct BillView: View {
             bill = newBill
             items = newItems
             claims = []
+            refreshTotals()
             parsedReceipt = nil
             startRealtime()
         } catch {
@@ -368,6 +364,7 @@ struct BillView: View {
             if let b = bill {
                 items = try await BillService.shared.fetchItems(billId: b.id)
                 claims = try await BillService.shared.fetchClaims(billId: b.id)
+                refreshTotals()
                 startRealtime()
             }
         } catch {
@@ -378,8 +375,15 @@ struct BillView: View {
 
     private func loadClaims() async {
         guard let b = bill else { return }
-        do { claims = try await BillService.shared.fetchClaims(billId: b.id) }
-        catch { self.error = error.localizedDescription }
+        do {
+            claims = try await BillService.shared.fetchClaims(billId: b.id)
+            refreshTotals()
+        } catch { self.error = error.localizedDescription }
+    }
+
+    private func refreshTotals() {
+        guard let b = bill else { return }
+        billTotals = BillService.computeTotals(bill: b, items: items, claims: claims, participants: participants)
     }
 
     private func startRealtime() {
