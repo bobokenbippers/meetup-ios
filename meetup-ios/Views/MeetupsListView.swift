@@ -48,6 +48,7 @@ struct MeetupsListView: View {
     @State private var error: String?
     @State private var showCreate = false
     @State private var selectedMeetup: Meetup?
+    @State private var selectedRecap: MyParticipation?
     @State private var deletedMeetupIds: Set<UUID> = []
     @State private var permanentlyHiddenIds: Set<UUID> = []
     // Memoized: dictionary-group + sort runs only when participations/hidden sets change.
@@ -126,6 +127,10 @@ struct MeetupsListView: View {
             .sheet(item: $selectedMeetup) { meetup in
                 MeetupDashboardView(meetup: meetup)
             }
+            .sheet(item: $selectedRecap) { p in
+                RecapView(meetup: p.meetup)
+                    .environment(auth)
+            }
             .task {
                 loadHiddenIds()
                 await load()
@@ -200,7 +205,13 @@ struct MeetupsListView: View {
             ForEach(cachedPastByCategory, id: \.key) { group in
                 Section {
                     ForEach(group.value, id: \.meetup.id) { p in
-                        Button { selectedMeetup = p.meetup } label: {
+                        Button {
+                            if p.meetup.isRecap {
+                                selectedRecap = p
+                            } else {
+                                selectedMeetup = p.meetup
+                            }
+                        } label: {
                             MeetupRowCard(participation: p)
                         }
                         .buttonStyle(.plain)
