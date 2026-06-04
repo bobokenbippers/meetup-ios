@@ -131,7 +131,11 @@ struct MeetupsListView: View {
                 RecapView(meetup: p.meetup)
                     .environment(auth)
             }
-            .task { loadHiddenIds(); if participations.isEmpty { await load() } }
+            .task {
+                loadHiddenIds()
+                await load()
+                await subscribeToInviteChanges()
+            }
             .refreshable { await load() }
             .onChange(of: deletedMeetupIds) { _, _ in saveHiddenIds(); cachedPastByCategory = buildPastByCategory() }
             .onChange(of: permanentlyHiddenIds) { _, _ in saveHiddenIds(); cachedPastByCategory = buildPastByCategory() }
@@ -153,18 +157,28 @@ struct MeetupsListView: View {
             if !invited.isEmpty {
                 Section {
                     ForEach(invited, id: \.meetup.id) { p in
-                        Button { selectedMeetup = p.meetup } label: {
-                            MeetupRowCard(participation: p)
-                        }
-                        .buttonStyle(.plain)
-                        .accessibilityLabel("Open \(p.meetup.destinationName)")
+                        RSVPInviteCard(
+                            participation: p,
+                            onOpen: { selectedMeetup = p.meetup },
+                            onRespond: { status in await rsvp(p, status: status) }
+                        )
+                        .accessibilityLabel("RSVP to \(p.meetup.destinationName)")
                         .listRowBackground(Color.clear)
                         .listRowSeparator(.hidden)
                         .listRowInsets(EdgeInsets(top: 5, leading: 16, bottom: 5, trailing: 16))
                     }
                     .onDelete { indices in Task { await deleteParticipations(invited, at: indices) } }
                 } header: {
-                    sectionHeader("Invited")
+                    HStack(spacing: 6) {
+                        sectionHeader("Invited")
+                        Text("\(invited.count)")
+                            .font(.system(size: 10, weight: .bold))
+                            .foregroundStyle(.white)
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(Color.coral)
+                            .clipShape(Capsule())
+                    }
                 }
                 .listSectionSeparator(.hidden)
             }
@@ -274,6 +288,38 @@ struct MeetupsListView: View {
             self.error = error.localizedDescription
             hasLoaded = true
         }
+    }
+
+    private func rsvp(_ participation: MyParticipation, status: String) async {
+        do {
+            switch status {
+            case "yes":   try await MeetupService.shared.accept(meetupId: participation.meetup.id)
+            case "no":    try await MeetupService.shared.decline(meetupId: participation.meetup.id)
+            case "maybe": try await MeetupService.shared.maybe(meetupId: participation.meetup.id)
+            default: break
+            }
+            await load()
+        } catch is CancellationError {
+            return
+        } catch {
+            self.error = error.localizedDescription
+        }
+    }
+
+    private func subscribeToInviteChanges() async {
+        guard let userId = SupabaseManager.shared.client.auth.currentUser?.id else { return }
+        let channel = SupabaseManager.shared.client.realtimeV2.channel("my-participations-\(userId)")
+        let changes = channel.postgresChange(AnyAction.self, schema: "public", table: "meetup_participants")
+        do {
+            try await channel.subscribeWithError()
+        } catch {
+            return
+        }
+        for await _ in changes {
+            guard !Task.isCancelled else { break }
+            await load()
+        }
+        await SupabaseManager.shared.client.realtimeV2.removeChannel(channel)
     }
 
     private func deleteParticipations(_ array: [MyParticipation], at indices: IndexSet) async {
@@ -428,6 +474,14 @@ private struct MeetupStatusPill: View {
         if participation.status == "invited" {
             let c = Color.statusPending
             return ("Invited", c, c.opacity(0.2))
+        }
+        if participation.status == "maybe" {
+            let c = Color.statusPending
+            return ("Maybe", c, c.opacity(0.2))
+        }
+        if participation.status == "no" || participation.status == "declined" {
+            let c = Color.statusLate
+            return ("No", c, c.opacity(0.2))
         }
         if let target = participation.meetup.targetArrivalAt, Date() > target {
             let c = Color.statusLate

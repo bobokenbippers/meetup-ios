@@ -23,7 +23,7 @@ struct MeetupDashboardView: View {
         CLLocationCoordinate2D(latitude: meetup.destinationLat, longitude: meetup.destinationLng)
     }
     private var acceptedCount: Int {
-        participants.filter { $0.status == "accepted" || $0.status == "arrived" }.count
+        participants.filter { $0.isEnRoute || $0.status == "maybe" || $0.status == "arrived" }.count
     }
     private var greeting: String {
         let h = Calendar.current.component(.hour, from: Date())
@@ -225,14 +225,17 @@ struct MeetupDashboardView: View {
                 ProgressView().padding()
             }
 
-            // Accept / Decline
+            // RSVP buttons for invited participants
             if myStatus == "invited" {
-                GlassEffectContainer(spacing: 12) {
-                    HStack(spacing: 12) {
-                        Button("Decline") { Task { await respond(accept: false) } }
+                GlassEffectContainer(spacing: 8) {
+                    HStack(spacing: 8) {
+                        Button("No") { Task { await respond(status: "no") } }
                             .buttonStyle(.glass)
                             .disabled(isActing)
-                        Button("Accept") { Task { await respond(accept: true) } }
+                        Button("Maybe") { Task { await respond(status: "maybe") } }
+                            .buttonStyle(.glass)
+                            .disabled(isActing)
+                        Button("Yes") { Task { await respond(status: "yes") } }
                             .buttonStyle(.glassProminent)
                             .disabled(isActing)
                     }
@@ -304,7 +307,7 @@ struct MeetupDashboardView: View {
                 if fresh != participants { participants = fresh }
                 hasLoaded = true
             }
-            if myStatus == "accepted" && meetup.status == "active" {
+            if myParticipant?.isEnRoute == true && meetup.status == "active" {
                 LocationManager.shared.requestPermission()
                 LocationManager.shared.startTracking(meetup: meetup)
             }
@@ -316,17 +319,24 @@ struct MeetupDashboardView: View {
         }
     }
 
-    private func respond(accept: Bool) async {
+    private var myParticipant: MeetupParticipant? {
+        participants.first(where: { $0.userId == myUserId })
+    }
+
+    private func respond(status: String) async {
         isActing = true
         do {
-            if accept {
+            switch status {
+            case "yes":
                 try await MeetupService.shared.accept(meetupId: meetup.id)
                 withAnimation { showConfetti = true }
                 Task {
                     do { try await Task.sleep(for: .seconds(2.5)) } catch { return }
                     showConfetti = false
                 }
-            } else {
+            case "maybe":
+                try await MeetupService.shared.maybe(meetupId: meetup.id)
+            default:
                 try await MeetupService.shared.decline(meetupId: meetup.id)
             }
             await load()
@@ -363,12 +373,16 @@ struct DashboardParticipantPin: View {
 
     private var etaText: String {
         if participant.status == "arrived" { return "✓ Here" }
+        if participant.status == "no" || participant.status == "declined" { return "Not coming" }
+        if participant.status == "maybe" { return "Maybe" }
         if let late = participant.lateLabel(target: targetArrivalAt) { return late }
-        return participant.etaLabel() ?? participant.status.capitalized
+        return participant.etaLabel() ?? "On the way"
     }
 
     private var etaColor: Color {
         if participant.status == "arrived" { return .secondary }
+        if participant.status == "no" || participant.status == "declined" { return .statusLate.opacity(0.7) }
+        if participant.status == "maybe" { return .statusPending }
         if participant.lateLabel(target: targetArrivalAt) != nil { return .statusLate }
         return .statusLive
     }
@@ -442,16 +456,20 @@ private struct DashboardParticipantRow: View {
     let targetArrivalAt: Date?
 
     private var etaText: String {
-        if participant.status == "arrived" { return "✓ Here" }
+        if participant.status == "arrived"  { return "✓ Here" }
+        if participant.status == "no" || participant.status == "declined" { return "Not coming" }
+        if participant.status == "maybe"    { return "Maybe coming" }
+        if participant.status == "invited"  { return "Invited" }
         if let late = participant.lateLabel(target: targetArrivalAt) { return late }
-        return participant.etaLabel() ?? participant.status.capitalized
+        return participant.etaLabel() ?? "On the way"
     }
 
     private var etaColor: Color {
         if participant.status == "arrived" { return .secondary }
+        if participant.status == "no" || participant.status == "declined" { return .statusLate.opacity(0.7) }
+        if participant.status == "maybe"   { return .statusPending }
+        if participant.status == "invited" { return .statusPending }
         if participant.lateLabel(target: targetArrivalAt) != nil { return .statusLate }
-        if participant.status == "invited"  { return .statusPending }
-        if participant.status == "declined" { return .secondary }
         return .statusLive
     }
 
@@ -482,9 +500,40 @@ private struct DashboardParticipantRow: View {
             }
 
             Spacer()
+
+            RSVPStatusBadge(status: participant.status)
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 8)
+    }
+}
+
+// MARK: - RSVP Status Badge
+
+private struct RSVPStatusBadge: View {
+    let status: String
+
+    private var config: (text: String, color: Color)? {
+        switch status {
+        case "yes", "accepted": return ("Yes", .statusLive)
+        case "maybe":           return ("Maybe", .statusPending)
+        case "no", "declined":  return ("No", .statusLate)
+        case "arrived":         return ("Here", .statusLive)
+        default:                return nil
+        }
+    }
+
+    var body: some View {
+        if let c = config {
+            Text(c.text)
+                .font(.system(size: 9, weight: .bold))
+                .foregroundStyle(c.color)
+                .padding(.vertical, 3)
+                .padding(.horizontal, 7)
+                .background(c.color.opacity(0.15))
+                .clipShape(Capsule())
+                .overlay(Capsule().strokeBorder(c.color.opacity(0.3), lineWidth: 1))
+        }
     }
 }
 
