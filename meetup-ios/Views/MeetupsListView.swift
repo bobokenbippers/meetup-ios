@@ -1,12 +1,6 @@
 import SwiftUI
 import Supabase
 
-// MARK: - Shared design tokens (internal — accessible across the app target)
-
-extension Color {
-    static let coral = Color(red: 1.0, green: 0.416, blue: 0.278) // #FF6B47
-}
-
 func meetupCategoryGradient(category: String?, meetupStatus: String, participantStatus: String) -> AnyShapeStyle {
     let isActive = meetupStatus == "active"
     let isInvited = participantStatus == "invited"
@@ -16,8 +10,8 @@ func meetupCategoryGradient(category: String?, meetupStatus: String, participant
     let c = (category ?? "").lowercased()
     if c.contains("brunch") || c.contains("dinner") || c.contains("food") || c.contains("lunch") {
         return AnyShapeStyle(LinearGradient(
-            colors: [Color(red: 0.788, green: 0.251, blue: 0.063),
-                     Color(red: 0.549, green: 0.145, blue: 0.031)],
+            colors: [Color.categoryGradientFoodStart,
+                     Color.categoryGradientFoodEnd],
             startPoint: .topLeading, endPoint: .bottomTrailing))
     }
     if c.contains("happy hour") || c.contains("cocktail") || c.contains("drink") {
@@ -421,14 +415,14 @@ private struct MeetupStatusPill: View {
         guard participation.status != "arrived" else { return nil }
 
         if participation.status == "invited" {
-            let c = Color(red: 1, green: 0.839, blue: 0)
+            let c = Color.statusPending
             return ("Invited", c, c.opacity(0.2))
         }
         if let target = participation.meetup.targetArrivalAt, Date() > target {
-            let c = Color(red: 1, green: 0.294, blue: 0.294)
+            let c = Color.statusLate
             return ("Late", c, c.opacity(0.2))
         }
-        let c = Color(red: 0.180, green: 0.835, blue: 0.451)
+        let c = Color.statusLive
         return ("Live", c, c.opacity(0.2))
     }
 

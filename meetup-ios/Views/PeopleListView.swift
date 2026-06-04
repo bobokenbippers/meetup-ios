@@ -404,14 +404,6 @@ private struct PersonCard: View {
     }
 
     private func personColor(for id: UUID) -> Color {
-        let palette: [Color] = [
-            Color(red: 0.910, green: 0.361, blue: 0.016),
-            Color(red: 0.482, green: 0.361, blue: 0.749),
-            Color(red: 0.118, green: 0.565, blue: 1.000),
-            Color(red: 0.180, green: 0.800, blue: 0.443),
-            Color(red: 0.910, green: 0.212, blue: 0.278),
-            Color(red: 0.000, green: 0.780, blue: 0.941),
-        ]
-        return palette[abs(id.hashValue) % palette.count]
+        Color.participantPalette[abs(id.hashValue) % Color.participantPalette.count]
     }
 }

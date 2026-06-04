@@ -8,7 +8,7 @@ struct CategoryOption: Identifiable {
     var id: String { title }
 
     static let presets: [CategoryOption] = [
-        CategoryOption(title: "Squad Brunch", color: .orange),
+        CategoryOption(title: "Squad Brunch", color: .coral),
         CategoryOption(title: "Squad Happy Hour", color: .pink),
         CategoryOption(title: "Squad Kickback", color: .teal),
     ]
