@@ -1,4 +1,5 @@
 import SwiftUI
+import Auth
 
 struct RecapView: View {
     let meetup: Meetup
