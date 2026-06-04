@@ -1,0 +1,14 @@
+node_modules/
+.superpowers/
+.DS_Store
+*.xcuserdata
+.env
+*.p8
+venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.build/
+*.xcworkspace/xcuserdata
+.claude/
+supabase-swift/

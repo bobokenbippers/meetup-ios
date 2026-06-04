@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Squad Brunch — App Icon</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { background: #111; color: #fff; font-family: -apple-system, sans-serif; padding: 40px; }
+    h1 { font-size: 22px; font-weight: 600; margin-bottom: 6px; }
+    .philosophy { color: #999; font-size: 13px; max-width: 600px; line-height: 1.6; margin-bottom: 40px; }
+    .master { display: flex; align-items: flex-start; gap: 48px; margin-bottom: 48px; }
+    .master-icon { flex-shrink: 0; }
+    .master-info h2 { font-size: 16px; margin-bottom: 12px; color: #ccc; }
+    .master-info p { font-size: 13px; color: #777; line-height: 1.7; max-width: 360px; }
+    .btn {
+      display: inline-block; margin-top: 16px; padding: 10px 20px;
+      background: #e8601a; color: #fff; border: none; border-radius: 8px;
+      font-size: 13px; cursor: pointer; font-weight: 600; letter-spacing: 0.3px;
+    }
+    .btn:hover { background: #d4551a; }
+    h3 { font-size: 14px; color: #888; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 20px; }
+    .grid { display: flex; flex-wrap: wrap; gap: 24px; align-items: flex-end; margin-bottom: 48px; }
+    .size-item { display: flex; flex-direction: column; align-items: center; gap: 8px; }
+    .size-label { font-size: 11px; color: #666; text-align: center; }
+    .size-label span { display: block; color: #888; }
+    .dl-btn {
+      font-size: 10px; color: #e8601a; background: none; border: 1px solid #e8601a33;
+      border-radius: 4px; padding: 3px 8px; cursor: pointer; margin-top: 4px;
+    }
+    .dl-btn:hover { background: #e8601a22; }
+    canvas { display: none; }
+  </style>
+</head>
+<body>
+
+<h1>Squad Brunch — App Icon</h1>
+<p class="philosophy">
+  Three converging paths rendered as fork tines — capturing both the squad arriving at a destination
+  and the brunch they're arriving for. Coral-to-amber warmth on a deep background.
+  Reads as a fork at 20px; reveals the motion lines at full size.
+</p>
+
+<!-- MASTER SVG (1024×1024) -->
+<div class="master">
+  <div class="master-icon">
+    <svg id="master-svg" xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 1024 1024">
+      <defs>
+        <!-- iOS squircle mask (superellipse approximation) -->
+        <clipPath id="squircle">
+          <path d="
+            M512 0
+            C220 0 0 220 0 512
+            C0 804 220 1024 512 1024
+            C804 1024 1024 804 1024 512
+            C1024 220 804 0 512 0Z
+          "/>
+        </clipPath>
+        <!-- Background gradient: deep coral → warm amber -->
+        <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%" stop-color="#1a0a04"/>
+          <stop offset="50%" stop-color="#7a1e08"/>
+          <stop offset="100%" stop-color="#c84a0a"/>
+        </linearGradient>
+        <!-- Subtle radial glow behind icon mark -->
+        <radialGradient id="glow" cx="50%" cy="58%" r="42%">
+          <stop offset="0%" stop-color="#ff7a2a" stop-opacity="0.25"/>
+          <stop offset="100%" stop-color="#ff7a2a" stop-opacity="0"/>
+        </radialGradient>
+        <!-- Fork/arrow mark gradient (white to warm white) -->
+        <linearGradient id="mark" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="#ffffff"/>
+          <stop offset="100%" stop-color="#ffe8d6"/>
+        </linearGradient>
+        <filter id="softshadow" x="-20%" y="-20%" width="140%" height="140%">
+          <feDropShadow dx="0" dy="12" stdDeviation="28" flood-color="#000" flood-opacity="0.4"/>
+        </filter>
+      </defs>
+
+      <!-- Background -->
+      <g clip-path="url(#squircle)">
+        <rect width="1024" height="1024" fill="url(#bg)"/>
+        <!-- Subtle texture: dark radial vignette edges -->
+        <radialGradient id="vignette" cx="50%" cy="50%" r="70%">
+          <stop offset="60%" stop-color="#000" stop-opacity="0"/>
+          <stop offset="100%" stop-color="#000" stop-opacity="0.45"/>
+        </radialGradient>
+        <rect width="1024" height="1024" fill="url(#vignette)"/>
+        <!-- Glow behind mark -->
+        <ellipse cx="512" cy="580" rx="300" ry="260" fill="url(#glow)"/>
+      </g>
+
+      <!-- Icon mark: fork with converging motion lines, clipped to squircle -->
+      <g clip-path="url(#squircle)" filter="url(#softshadow)">
+
+        <!-- FORK HANDLE — thick centered stem -->
+        <rect x="472" y="620" width="80" height="240" rx="40" fill="url(#mark)"/>
+
+        <!-- LEFT TINE with inward curve (motion line from upper-left) -->
+        <path d="
+          M 340 180
+          Q 360 340 472 500
+          L 472 620
+          Q 420 580 390 520
+          Q 330 420 310 300
+          Q 295 240 340 180Z
+        " fill="url(#mark)" opacity="0.95"/>
+
+        <!-- CENTER TINE — straight, bold -->
+        <path d="
+          M 472 180
+          L 512 180
+          L 552 180
+          Q 560 320 552 500
+          L 512 530
+          L 472 500
+          Q 464 320 472 180Z
+        " fill="url(#mark)"/>
+
+        <!-- RIGHT TINE with inward curve (motion line from upper-right) -->
+        <path d="
+          M 684 180
+          Q 729 240 714 300
+          Q 694 420 634 520
+          Q 604 580 552 620
+          L 552 500
+          Q 664 340 684 180Z
+        " fill="url(#mark)" opacity="0.95"/>
+
+        <!-- Connector bar between tines (fork crossbar) -->
+        <rect x="340" y="460" width="344" height="52" rx="26" fill="url(#mark)" opacity="0.55"/>
+
+        <!-- Small dot accent above tines — the "destination" pin -->
+        <circle cx="512" cy="130" r="38" fill="url(#mark)" opacity="0.9"/>
+        <circle cx="512" cy="130" r="22" fill="#c84a0a" opacity="0.8"/>
+
+      </g>
+    </svg>
+  </div>
+
+  <div class="master-info">
+    <h2>Master — 1024×1024</h2>
+    <p>
+      Fork tines rendered as converging motion paths — the squad arriving at brunch.
+      Deep coral gradient, iOS squircle mask, white mark with warm undertones.
+      The center pin dot references the destination pin from the map view.
+    </p>
+    <button class="btn" onclick="downloadSize(1024, 'squad-brunch-1024')">Download 1024×1024</button>
+  </div>
+</div>
+
+<!-- SIZE GRID -->
+<h3>All Sizes — Preview</h3>
+<div class="grid" id="preview-grid"></div>
+
+<canvas id="export-canvas"></canvas>
+
+<script>
+  const sizes = [
+    { size: 1024, label: "App Store",         purpose: "1024×1024" },
+    { size: 180,  label: "iPhone @3x",        purpose: "180×180" },
+    { size: 167,  label: "iPad Pro @2x",      purpose: "167×167" },
+    { size: 152,  label: "iPad @2x",          purpose: "152×152" },
+    { size: 120,  label: "iPhone @2x",        purpose: "120×120" },
+    { size: 87,   label: "Spotlight @3x",     purpose: "87×87" },
+    { size: 80,   label: "Spotlight @2x",     purpose: "80×80" },
+    { size: 76,   label: "iPad @1x",          purpose: "76×76" },
+    { size: 60,   label: "iPhone @1x",        purpose: "60×60" },
+    { size: 58,   label: "Settings @2x",      purpose: "58×58" },
+    { size: 40,   label: "Spotlight @1x",     purpose: "40×40" },
+    { size: 29,   label: "Settings @1x",      purpose: "29×29" },
+    { size: 20,   label: "Notification @1x",  purpose: "20×20" },
+  ];
+
+  const svgSource = document.getElementById('master-svg');
+
+  function svgToDataURL(size) {
+    const clone = svgSource.cloneNode(true);
+    clone.setAttribute('width', size);
+    clone.setAttribute('height', size);
+    const xml = new XMLSerializer().serializeToString(clone);
+    return 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(xml)));
+  }
+
+  function downloadSize(size, filename) {
+    const canvas = document.getElementById('export-canvas');
+    canvas.width = size;
+    canvas.height = size;
+    const ctx = canvas.getContext('2d');
+    const img = new Image();
+    img.onload = () => {
+      ctx.clearRect(0, 0, size, size);
+      ctx.drawImage(img, 0, 0, size, size);
+      const a = document.createElement('a');
+      a.download = filename + '.png';
+      a.href = canvas.toDataURL('image/png');
+      a.click();
+    };
+    img.src = svgToDataURL(size);
+  }
+
+  // Build preview grid (skip 1024 — already shown as master)
+  const grid = document.getElementById('preview-grid');
+  sizes.filter(s => s.size < 1024).forEach(({ size, label, purpose }) => {
+    const displaySize = Math.min(size, 80);
+    const item = document.createElement('div');
+    item.className = 'size-item';
+
+    const img = document.createElement('img');
+    img.width = displaySize;
+    img.height = displaySize;
+    img.style.borderRadius = (displaySize * 0.22) + 'px';
+    img.style.display = 'block';
+    img.src = svgToDataURL(size);
+
+    const lbl = document.createElement('div');
+    lbl.className = 'size-label';
+    lbl.innerHTML = `${label}<span>${purpose}</span>`;
+
+    const btn = document.createElement('button');
+    btn.className = 'dl-btn';
+    btn.textContent = '↓ PNG';
+    btn.onclick = () => downloadSize(size, `squad-brunch-${size}`);
+
+    item.appendChild(img);
+    item.appendChild(lbl);
+    item.appendChild(btn);
+    grid.appendChild(item);
+  });
+</script>
+
+</body>
+</html>

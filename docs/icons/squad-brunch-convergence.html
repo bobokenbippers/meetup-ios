@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Squad Brunch — Convergence Icon</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { background: #0e0e0e; color: #fff; font-family: -apple-system, sans-serif; padding: 40px; }
+    h1 { font-size: 22px; font-weight: 600; margin-bottom: 6px; }
+    .sub { color: #666; font-size: 13px; margin-bottom: 36px; }
+    .master { display: flex; gap: 48px; align-items: flex-start; margin-bottom: 48px; }
+    .info h2 { font-size: 15px; color: #bbb; margin-bottom: 10px; }
+    .info p { font-size: 13px; color: #666; line-height: 1.7; max-width: 340px; }
+    .btn { display: inline-block; margin-top: 18px; padding: 10px 22px; background: #e8601a; color: #fff; border: none; border-radius: 8px; font-size: 13px; cursor: pointer; font-weight: 600; }
+    .btn:hover { background: #d05518; }
+    h3 { font-size: 12px; color: #555; text-transform: uppercase; letter-spacing: 1.2px; margin-bottom: 20px; }
+    .grid { display: flex; flex-wrap: wrap; gap: 20px; align-items: flex-end; }
+    .item { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+    .lbl { font-size: 11px; color: #555; text-align: center; }
+    .lbl span { display: block; color: #444; }
+    .dlbtn { font-size: 10px; color: #e8601a; background: none; border: 1px solid #e8601a44; border-radius: 4px; padding: 3px 8px; cursor: pointer; margin-top: 3px; }
+    canvas { display: none; }
+  </style>
+</head>
+<body>
+
+<h1>Squad Brunch — Convergence</h1>
+<p class="sub">Three bold paths meeting at a glowing point. Squad arriving together.</p>
+
+<div class="master">
+  <svg id="master" xmlns="http://www.w3.org/2000/svg" width="280" height="280" viewBox="0 0 1024 1024">
+    <defs>
+      <clipPath id="sq">
+        <path d="M512,0 C229,0 0,229 0,512 C0,795 229,1024 512,1024 C795,1024 1024,795 1024,512 C1024,229 795,0 512,0Z"/>
+      </clipPath>
+
+      <!-- Deep warm background -->
+      <linearGradient id="bg" x1="0.2" y1="0" x2="0.8" y2="1">
+        <stop offset="0%" stop-color="#120804"/>
+        <stop offset="45%" stop-color="#2d1008"/>
+        <stop offset="100%" stop-color="#0e0604"/>
+      </linearGradient>
+
+      <!-- Center glow -->
+      <radialGradient id="cglow" cx="50%" cy="62%" r="30%">
+        <stop offset="0%" stop-color="#ff6820" stop-opacity="0.9"/>
+        <stop offset="60%" stop-color="#cc4010" stop-opacity="0.3"/>
+        <stop offset="100%" stop-color="#cc4010" stop-opacity="0"/>
+      </radialGradient>
+
+      <!-- Outer warm haze -->
+      <radialGradient id="haze" cx="50%" cy="50%" r="55%">
+        <stop offset="0%" stop-color="#ff6820" stop-opacity="0.07"/>
+        <stop offset="100%" stop-color="#000" stop-opacity="0"/>
+      </radialGradient>
+
+      <!-- Path gradients — each arm fades from dim to bright at convergence -->
+      <linearGradient id="leftGrad" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0%" stop-color="#ff8844" stop-opacity="0.4"/>
+        <stop offset="100%" stop-color="#ff7733" stop-opacity="1"/>
+      </linearGradient>
+      <linearGradient id="rightGrad" x1="1" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="#ff8844" stop-opacity="0.4"/>
+        <stop offset="100%" stop-color="#ff7733" stop-opacity="1"/>
+      </linearGradient>
+      <linearGradient id="topGrad" x1="0.5" y1="0" x2="0.5" y2="1">
+        <stop offset="0%" stop-color="#ffaa66" stop-opacity="0.35"/>
+        <stop offset="100%" stop-color="#ff7733" stop-opacity="1"/>
+      </linearGradient>
+
+      <!-- Dot glow filter -->
+      <filter id="dotglow" x="-80%" y="-80%" width="260%" height="260%">
+        <feGaussianBlur stdDeviation="18" result="blur"/>
+        <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+      </filter>
+      <filter id="pathglow" x="-30%" y="-30%" width="160%" height="160%">
+        <feGaussianBlur stdDeviation="6" result="blur"/>
+        <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+      </filter>
+    </defs>
+
+    <g clip-path="url(#sq)">
+      <!-- Background -->
+      <rect width="1024" height="1024" fill="url(#bg)"/>
+      <rect width="1024" height="1024" fill="url(#haze)"/>
+      <!-- Center glow bloom -->
+      <ellipse cx="512" cy="636" rx="220" ry="200" fill="url(#cglow)"/>
+
+      <!-- THREE CONVERGENCE ARMS -->
+      <!-- Each is a tapered stroke path, wide at origin, narrowing to the convergence point -->
+
+      <!-- LEFT ARM: from upper-left corner area -->
+      <path d="M 148 168 Q 200 280 320 460 Q 390 545 468 620 L 512 636 L 490 610 Q 340 510 270 380 Q 195 260 162 148 Z"
+            fill="url(#leftGrad)" filter="url(#pathglow)" opacity="0.92"/>
+
+      <!-- RIGHT ARM: from upper-right corner area -->
+      <path d="M 876 168 Q 824 280 704 460 Q 634 545 556 620 L 512 636 L 534 610 Q 684 510 754 380 Q 829 260 862 148 Z"
+            fill="url(#rightGrad)" filter="url(#pathglow)" opacity="0.92"/>
+
+      <!-- TOP ARM: from top center -->
+      <path d="M 464 92 L 560 92 Q 558 220 548 380 Q 540 510 520 620 L 512 636 L 504 620 Q 484 510 476 380 Q 466 220 464 92 Z"
+            fill="url(#topGrad)" filter="url(#pathglow)" opacity="0.88"/>
+
+      <!-- CONVERGENCE POINT — bright hot dot -->
+      <circle cx="512" cy="636" r="52" fill="#ff8833" filter="url(#dotglow)" opacity="0.95"/>
+      <circle cx="512" cy="636" r="34" fill="#ffcc88" opacity="1"/>
+      <circle cx="512" cy="636" r="18" fill="#ffffff" opacity="1"/>
+
+      <!-- Subtle speed lines behind arms for motion feel -->
+      <line x1="148" y1="148" x2="420" y2="520" stroke="#ff6622" stroke-width="2" opacity="0.12"/>
+      <line x1="876" y1="148" x2="604" y2="520" stroke="#ff6622" stroke-width="2" opacity="0.12"/>
+      <line x1="512" y1="80" x2="512" y2="560" stroke="#ff9944" stroke-width="2" opacity="0.12"/>
+
+      <!-- Vignette -->
+      <radialGradient id="vig" cx="50%" cy="50%" r="70%">
+        <stop offset="55%" stop-color="#000" stop-opacity="0"/>
+        <stop offset="100%" stop-color="#000" stop-opacity="0.55"/>
+      </radialGradient>
+      <rect width="1024" height="1024" fill="url(#vig)"/>
+    </g>
+  </svg>
+
+  <div class="info">
+    <h2>Convergence — Master 1024×1024</h2>
+    <p>
+      Three tapered arms sweeping in from the corners of the frame, collapsing to a single
+      hot white point at center-bottom. The squad converging on the destination.
+      Dark amber warmth, speed-line motion, glowing arrival dot.
+      Reads as three arrows at small sizes; reveals the motion detail at full size.
+    </p>
+    <button class="btn" onclick="dl(1024,'squad-brunch-convergence-1024')">Download 1024×1024</button>
+  </div>
+</div>
+
+<h3>All sizes</h3>
+<div class="grid" id="grid"></div>
+<canvas id="c"></canvas>
+
+<script>
+const sizes = [
+  {s:1024,l:"App Store"},{s:180,l:"iPhone @3x"},{s:167,l:"iPad Pro @2x"},
+  {s:152,l:"iPad @2x"},{s:120,l:"iPhone @2x"},{s:87,l:"Spotlight @3x"},
+  {s:80,l:"Spotlight @2x"},{s:76,l:"iPad @1x"},{s:60,l:"iPhone @1x"},
+  {s:58,l:"Settings @2x"},{s:40,l:"Spotlight @1x"},{s:29,l:"Settings @1x"},
+  {s:20,l:"Notification"}
+];
+
+const src = document.getElementById('master');
+
+function svgURL(size) {
+  const c = src.cloneNode(true);
+  c.setAttribute('width', size); c.setAttribute('height', size);
+  return 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(new XMLSerializer().serializeToString(c))));
+}
+
+function dl(size, name) {
+  const canvas = document.getElementById('c');
+  canvas.width = size; canvas.height = size;
+  const img = new Image();
+  img.onload = () => { canvas.getContext('2d').drawImage(img,0,0,size,size); const a=document.createElement('a'); a.download=name+'.png'; a.href=canvas.toDataURL('image/png'); a.click(); };
+  img.src = svgURL(size);
+}
+
+const grid = document.getElementById('grid');
+sizes.filter(x=>x.s<1024).forEach(({s,l}) => {
+  const d=Math.min(s,80), item=document.createElement('div'); item.className='item';
+  const img=document.createElement('img'); img.width=d; img.height=d;
+  img.style.borderRadius=(d*0.22)+'px'; img.src=svgURL(s);
+  const lbl=document.createElement('div'); lbl.className='lbl'; lbl.innerHTML=`${l}<span>${s}×${s}</span>`;
+  const btn=document.createElement('button'); btn.className='dlbtn'; btn.textContent='↓ PNG';
+  btn.onclick=()=>dl(s,`squad-brunch-convergence-${s}`);
+  item.append(img,lbl,btn); grid.appendChild(item);
+});
+</script>
+</body>
+</html>
