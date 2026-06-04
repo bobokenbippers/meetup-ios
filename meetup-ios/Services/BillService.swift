@@ -5,7 +5,7 @@ final class BillService {
     static let shared = BillService()
     private var supabase: SupabaseClient { SupabaseManager.shared.client }
 
-    // MARK: - Bill CRUD
+    // MARK: - Bill CRUD (legacy single-bill)
 
     func fetchBill(meetupId: UUID) async throws -> Bill? {
         let rows: [Bill] = try await supabase
@@ -75,6 +75,125 @@ final class BillService {
             .update(ItemUpdate(name: item.name, price: item.price))
             .eq("id", value: item.id)
             .execute()
+    }
+
+    // MARK: - Receipts
+
+    func fetchReceipts(meetupId: UUID) async throws -> [Receipt] {
+        try await supabase
+            .from("receipts")
+            .select()
+            .eq("meetup_id", value: meetupId)
+            .order("created_at")
+            .execute()
+            .value
+    }
+
+    func createReceipt(meetupId: UUID, placeName: String, payerUserId: UUID) async throws -> Receipt {
+        struct ReceiptInsert: Encodable {
+            let meetupId: UUID
+            let placeName: String
+            let payerUserId: UUID
+            let totalAmount: Double
+            enum CodingKeys: String, CodingKey {
+                case meetupId    = "meetup_id"
+                case placeName   = "place_name"
+                case payerUserId = "payer_user_id"
+                case totalAmount = "total_amount"
+            }
+        }
+        let insert = ReceiptInsert(meetupId: meetupId, placeName: placeName, payerUserId: payerUserId, totalAmount: 0)
+        let result: [Receipt] = try await supabase
+            .from("receipts")
+            .insert(insert)
+            .select()
+            .execute()
+            .value
+        guard let receipt = result.first else { throw BillError.createFailed }
+        return receipt
+    }
+
+    func updateReceiptTotal(_ receiptId: UUID, total: Double) async throws {
+        struct TotalUpdate: Encodable {
+            let totalAmount: Double
+            enum CodingKeys: String, CodingKey { case totalAmount = "total_amount" }
+        }
+        try await supabase
+            .from("receipts")
+            .update(TotalUpdate(totalAmount: total))
+            .eq("id", value: receiptId)
+            .execute()
+    }
+
+    func uploadReceiptPhoto(receiptId: UUID, imageData: Data) async throws -> String {
+        let path = "\(receiptId.uuidString)/photo.jpg"
+        try await supabase.storage
+            .from("receipts")
+            .upload(path: path, file: imageData, options: FileOptions(contentType: "image/jpeg", upsert: true))
+        let publicURL = try supabase.storage.from("receipts").getPublicURL(path: path)
+        return publicURL.absoluteString
+    }
+
+    func updateReceiptPhotoUrl(_ receiptId: UUID, photoUrl: String) async throws {
+        struct PhotoUpdate: Encodable {
+            let photoUrl: String
+            enum CodingKeys: String, CodingKey { case photoUrl = "photo_url" }
+        }
+        try await supabase
+            .from("receipts")
+            .update(PhotoUpdate(photoUrl: photoUrl))
+            .eq("id", value: receiptId)
+            .execute()
+    }
+
+    func fetchReceiptItems(receiptId: UUID) async throws -> [BillItem] {
+        try await supabase
+            .from("bill_items")
+            .select()
+            .eq("receipt_id", value: receiptId)
+            .order("position")
+            .execute()
+            .value
+    }
+
+    func insertReceiptItems(receiptId: UUID, parsedItems: [(name: String, price: Double)]) async throws -> [BillItem] {
+        struct ItemInsert: Encodable {
+            let receiptId: UUID
+            let name: String
+            let price: Double
+            let position: Int
+            enum CodingKeys: String, CodingKey {
+                case name, price, position
+                case receiptId = "receipt_id"
+            }
+        }
+        let inserts = parsedItems.enumerated().map { idx, item in
+            ItemInsert(receiptId: receiptId, name: item.name, price: item.price, position: idx)
+        }
+        return try await supabase
+            .from("bill_items")
+            .insert(inserts)
+            .select()
+            .order("position")
+            .execute()
+            .value
+    }
+
+    func fetchAllReceiptClaims(receiptIds: [UUID]) async throws -> [BillItemClaim] {
+        guard !receiptIds.isEmpty else { return [] }
+        let allItems: [BillItem] = try await supabase
+            .from("bill_items")
+            .select()
+            .in("receipt_id", values: receiptIds.map { $0.uuidString })
+            .execute()
+            .value
+        guard !allItems.isEmpty else { return [] }
+        return try await supabase
+            .from("bill_item_claims")
+            .select()
+            .in("bill_item_id", values: allItems.map { $0.id.uuidString })
+            .execute()
+            .value
     }
 
     // MARK: - Claims
@@ -157,6 +276,41 @@ final class BillService {
                 )
             }
             .sorted { $0.total > $1.total }
+    }
+
+    // Per-receipt totals — no tax/tip split (receipt total_amount is the full amount).
+    static func computeReceiptTotals(
+        receipts: [Receipt],
+        items: [UUID: [BillItem]],
+        claims: [BillItemClaim],
+        participants: [MeetupParticipant]
+    ) -> [UUID: [PersonTotal]] {
+        var result: [UUID: [PersonTotal]] = [:]
+        for receipt in receipts {
+            let receiptItems = items[receipt.id] ?? []
+            var subtotals: [UUID: Double] = [:]
+            for item in receiptItems {
+                let claimants = claims.filter { $0.billItemId == item.id }.map { $0.userId }
+                guard !claimants.isEmpty else { continue }
+                let share = item.price / Double(claimants.count)
+                for uid in claimants {
+                    subtotals[uid, default: 0] += share
+                }
+            }
+            let totals = participants.map { p in
+                let sub = subtotals[p.userId] ?? 0
+                return PersonTotal(
+                    userId: p.userId,
+                    displayName: p.displayName ?? "Unknown",
+                    subtotal: sub,
+                    taxShare: 0,
+                    tipShare: 0,
+                    total: sub
+                )
+            }.sorted { $0.total > $1.total }
+            result[receipt.id] = totals
+        }
+        return result
     }
 
     // MARK: - Private

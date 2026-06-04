@@ -20,14 +20,25 @@ struct Bill: Codable, Identifiable {
 
 struct BillItem: Codable, Identifiable {
     let id: UUID
-    let billId: UUID
+    let billId: UUID?
+    let receiptId: UUID?
     var name: String
     var price: Double
     let position: Int
 
+    init(id: UUID, billId: UUID? = nil, receiptId: UUID? = nil, name: String, price: Double, position: Int) {
+        self.id = id
+        self.billId = billId
+        self.receiptId = receiptId
+        self.name = name
+        self.price = price
+        self.position = position
+    }
+
     enum CodingKeys: String, CodingKey {
         case id, name, price, position
-        case billId = "bill_id"
+        case billId    = "bill_id"
+        case receiptId = "receipt_id"
     }
 }
 

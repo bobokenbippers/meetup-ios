@@ -7,6 +7,9 @@ struct RecapView: View {
     @Environment(AuthViewModel.self) private var auth
 
     @State private var participants: [MeetupParticipant] = []
+    @State private var receipts: [Receipt] = []
+    @State private var receiptItems: [UUID: [BillItem]] = [:]
+    @State private var claims: [BillItemClaim] = []
     @State private var hasLoaded = false
     @State private var error: String?
 
@@ -222,32 +225,116 @@ struct RecapView: View {
         )
     }
 
-    // MARK: - Bill Placeholder
+    // MARK: - Bill Summary Card
 
+    @ViewBuilder
     private var billPlaceholderCard: some View {
-        HStack(spacing: 12) {
-            ZStack {
-                Circle()
-                    .fill(Color.coral.opacity(0.15))
-                    .frame(width: 40, height: 40)
-                Image(systemName: "dollarsign.circle")
-                    .font(.system(size: 18))
-                    .foregroundStyle(Color.coral.opacity(0.8))
+        if receipts.isEmpty {
+            HStack(spacing: 12) {
+                ZStack {
+                    Circle()
+                        .fill(Color.coral.opacity(0.15))
+                        .frame(width: 40, height: 40)
+                    Image(systemName: "dollarsign.circle")
+                        .font(.system(size: 18))
+                        .foregroundStyle(Color.coral.opacity(0.8))
+                }
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("No receipts")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(.white.opacity(0.8))
+                    Text("Bill splitting not started")
+                        .font(.system(size: 12))
+                        .foregroundStyle(.white.opacity(0.4))
+                }
+                Spacer()
             }
-            VStack(alignment: .leading, spacing: 2) {
+            .padding(14)
+            .background(Color.white.opacity(0.04))
+            .clipShape(RoundedRectangle(cornerRadius: 16))
+            .overlay(
+                RoundedRectangle(cornerRadius: 16)
+                    .strokeBorder(Color.white.opacity(0.06), lineWidth: 1)
+            )
+        } else {
+            billBreakdownCard
+        }
+    }
+
+    private var billBreakdownCard: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(spacing: 8) {
+                ZStack {
+                    Circle()
+                        .fill(Color.coral.opacity(0.15))
+                        .frame(width: 32, height: 32)
+                    Image(systemName: "dollarsign.circle")
+                        .font(.system(size: 15))
+                        .foregroundStyle(Color.coral.opacity(0.8))
+                }
                 Text("Bill Summary")
                     .font(.system(size: 14, weight: .semibold))
                     .foregroundStyle(.white.opacity(0.8))
-                Text("See who owes what")
-                    .font(.system(size: 12))
-                    .foregroundStyle(.white.opacity(0.4))
+                Spacer()
+                Text("\(receipts.count) place\(receipts.count == 1 ? "" : "s")")
+                    .font(.system(size: 11))
+                    .foregroundStyle(.white.opacity(0.35))
             }
-            Spacer()
-            Image(systemName: "chevron.right")
-                .font(.system(size: 12, weight: .medium))
-                .foregroundStyle(.white.opacity(0.2))
+            .padding(.horizontal, 14)
+            .padding(.top, 14)
+            .padding(.bottom, 10)
+
+            Divider().background(Color.white.opacity(0.06))
+
+            ForEach(receipts) { receipt in
+                let payerName = participants.first(where: { $0.userId == receipt.payerUserId })?.displayName ?? "Unknown"
+                let myOwed = myOwedInRecap(receipt)
+                HStack(spacing: 8) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(receipt.placeName)
+                            .font(.system(size: 13, weight: .medium))
+                            .foregroundStyle(.white.opacity(0.75))
+                        Text("Paid by \(payerName)")
+                            .font(.system(size: 11))
+                            .foregroundStyle(.white.opacity(0.35))
+                    }
+                    Spacer()
+                    if myOwed > 0 {
+                        Text("You owe \(myOwed, format: .currency(code: "USD"))")
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundStyle(Color.coral.opacity(0.9))
+                    } else {
+                        Text(receipt.totalAmount, format: .currency(code: "USD"))
+                            .font(.system(size: 12))
+                            .foregroundStyle(.white.opacity(0.4))
+                    }
+                }
+                .padding(.horizontal, 14)
+                .padding(.vertical, 9)
+
+                if receipt.id != receipts.last?.id {
+                    Divider()
+                        .background(Color.white.opacity(0.04))
+                        .padding(.leading, 14)
+                }
+            }
+
+            let crossTotal = crossReceiptMyTotalRecap
+            if crossTotal > 0 {
+                Divider().background(Color.white.opacity(0.06))
+                HStack {
+                    Text("Total you owe")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(.white.opacity(0.55))
+                    Spacer()
+                    Text(crossTotal, format: .currency(code: "USD"))
+                        .font(.system(size: 14, weight: .bold))
+                        .foregroundStyle(Color.coral)
+                }
+                .padding(.horizontal, 14)
+                .padding(.vertical, 10)
+            }
         }
-        .padding(14)
         .background(Color.white.opacity(0.04))
         .clipShape(RoundedRectangle(cornerRadius: 16))
         .overlay(
@@ -256,12 +343,42 @@ struct RecapView: View {
         )
     }
 
+    private func myOwedInRecap(_ receipt: Receipt) -> Double {
+        guard let me = myUserId else { return 0 }
+        let totals = BillService.computeReceiptTotals(
+            receipts: [receipt], items: receiptItems, claims: claims, participants: participants
+        )
+        return totals[receipt.id]?.first(where: { $0.userId == me })?.total ?? 0
+    }
+
+    private var crossReceiptMyTotalRecap: Double {
+        guard let me = myUserId else { return 0 }
+        var total = 0.0
+        let allTotals = BillService.computeReceiptTotals(
+            receipts: receipts, items: receiptItems, claims: claims, participants: participants
+        )
+        for (_, personTotals) in allTotals {
+            total += personTotals.first(where: { $0.userId == me })?.total ?? 0
+        }
+        return total
+    }
+
     // MARK: - Data
 
     private func load() async {
         do {
-            let result = try await MeetupService.shared.listParticipants(meetupId: meetup.id)
-            if result != participants { participants = result }
+            async let participantsFetch = MeetupService.shared.listParticipants(meetupId: meetup.id)
+            async let receiptsFetch = BillService.shared.fetchReceipts(meetupId: meetup.id)
+
+            let (fetchedParticipants, fetchedReceipts) = try await (participantsFetch, receiptsFetch)
+            if fetchedParticipants != participants { participants = fetchedParticipants }
+            receipts = fetchedReceipts
+
+            for receipt in fetchedReceipts {
+                receiptItems[receipt.id] = try await BillService.shared.fetchReceiptItems(receiptId: receipt.id)
+            }
+            claims = try await BillService.shared.fetchAllReceiptClaims(receiptIds: fetchedReceipts.map { $0.id })
+
             hasLoaded = true
         } catch is CancellationError {
             return
