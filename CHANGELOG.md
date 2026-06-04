@@ -60,3 +60,4 @@
 - Meetup categories: create meetups with Squad Brunch, Squad Happy Hour, Squad Kickback, or custom category
 - Past meetups grouped by category on the list view
 - Category badge shown on meetup rows and dashboard
+# CI triggered 2026-06-04T12:59:58Z
