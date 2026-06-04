@@ -65,8 +65,10 @@ struct MeetupParticipant: Codable, Identifiable, Equatable {
 }
 
 extension MeetupParticipant {
+    var isEnRoute: Bool { status == "yes" || status == "accepted" }
+
     func etaLabel() -> String? {
-        guard let seconds = etaSeconds, status == "accepted" else { return nil }
+        guard let seconds = etaSeconds, isEnRoute else { return nil }
         let minutes = seconds / 60
         if minutes < 1 { return "Almost there" }
         if minutes < 60 { return "\(minutes) min away" }
@@ -74,7 +76,7 @@ extension MeetupParticipant {
     }
 
     func lateLabel(target: Date?) -> String? {
-        guard let target, let seconds = etaSeconds, status == "accepted" else { return nil }
+        guard let target, let seconds = etaSeconds, isEnRoute else { return nil }
         let arrivalETA = Date().addingTimeInterval(TimeInterval(seconds))
         guard arrivalETA > target else { return nil }
         let lateBy = Int(arrivalETA.timeIntervalSince(target)) / 60
