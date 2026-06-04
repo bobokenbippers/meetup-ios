@@ -21,9 +21,10 @@ jobs:
       - name: Install Fastlane
         run: gem install fastlane
 
-      - name: Configure Git for Match
+      - name: Configure Git for Match and SPM
         run: |
           git config --global url."https://x-access-token:${{ secrets.MATCH_GIT_TOKEN }}@github.com/".insteadOf "https://github.com/"
+          git config --global url."https://github.com/".insteadOf "git@github.com:"
 
       - name: Run Fastlane beta
         env:
