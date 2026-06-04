@@ -4,6 +4,8 @@ This document is the precise, exhaustive build plan. It assumes the reader is th
 
 For the conceptual overview, read `GUIDE.md` first.
 
+> **Migration history:** `supabase/migrations/` contains the canonical SQL migration files for this project. Apply them in filename order against your Supabase project using the SQL editor or the Supabase CLI (`supabase db push`). Do not apply schema changes outside of this directory.
+
 ---
 
 ## 0. Pre-Build Setup
