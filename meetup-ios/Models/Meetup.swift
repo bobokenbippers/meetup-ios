@@ -28,6 +28,15 @@ struct Meetup: Codable, Identifiable, Equatable {
         case shareToken = "share_token"
         case createdAt = "created_at"
     }
+
+    var isRecap: Bool {
+        if status != "active" { return true }
+        let window: TimeInterval = 1.5 * 3600
+        if let target = targetArrivalAt {
+            return Date() > target.addingTimeInterval(window)
+        }
+        return Date() > createdAt.addingTimeInterval(6 * 3600)
+    }
 }
 
 struct MeetupParticipant: Codable, Identifiable, Equatable {
@@ -82,9 +91,11 @@ extension MeetupParticipant {
     }
 }
 
-struct MyParticipation: Codable, Equatable {
+struct MyParticipation: Codable, Identifiable, Equatable {
     let status: String
     let meetup: Meetup
+
+    var id: UUID { meetup.id }
 
     enum CodingKeys: String, CodingKey {
         case status
