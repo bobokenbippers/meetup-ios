@@ -136,8 +136,8 @@ struct BillComputeTotalsTests {
         #expect(totals[0].subtotal == 20)
     }
 
-    @Test("participant with no claims is omitted from totals")
-    func participantWithNoClaimsOmitted() {
+    @Test("participant with no claims appears with zero total")
+    func participantWithNoClaimsIncluded() throws {
         let aliceId = UUID()
         let bobId = UUID()
         let bill = makeBill(subtotal: 15, tax: 1.20, tip: 3)
@@ -152,12 +152,16 @@ struct BillComputeTotalsTests {
             bill: bill, items: [item], claims: [claim], participants: participants
         )
 
-        #expect(totals.count == 1)
-        #expect(totals[0].displayName == "Alice")
+        #expect(totals.count == 2)
+        let alice = try #require(totals.first(where: { $0.displayName == "Alice" }))
+        let bob = try #require(totals.first(where: { $0.displayName == "Bob" }))
+        #expect(alice.total == 19.20)
+        #expect(bob.total == 0)
+        #expect(bob.subtotal == 0)
     }
 
-    @Test("empty items and claims produce empty totals")
-    func emptyInputs() {
+    @Test("all participants included even with no items or claims")
+    func emptyInputsIncludesParticipants() {
         let bill = makeBill(subtotal: 0, tax: 0, tip: 0)
         let participant = makeParticipant(userId: UUID(), name: "Alice")
 
@@ -165,6 +169,8 @@ struct BillComputeTotalsTests {
             bill: bill, items: [], claims: [], participants: [participant]
         )
 
-        #expect(totals.isEmpty)
+        #expect(totals.count == 1)
+        #expect(totals[0].displayName == "Alice")
+        #expect(totals[0].total == 0)
     }
 }

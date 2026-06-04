@@ -24,6 +24,7 @@ struct BillView: View {
     @State private var showFilePicker = false
     @State private var parsedReceipt: ParsedReceipt?
     @State private var editableItems: [BillItem] = []
+    @FocusState private var focusedItemId: UUID?
 
     private var myUserId: UUID? { auth.session?.user.id }
 
@@ -150,6 +151,7 @@ struct BillView: View {
                     ForEach(editableItems.indices, id: \.self) { idx in
                         HStack {
                             TextField("Item name", text: $editableItems[idx].name)
+                                .focused($focusedItemId, equals: editableItems[idx].id)
                             Spacer()
                             TextField("0.00", value: $editableItems[idx].price, format: .currency(code: "USD"))
                                 .multilineTextAlignment(.trailing)
@@ -163,12 +165,11 @@ struct BillView: View {
                     }
                     .onDelete { editableItems.remove(atOffsets: $0) }
                     Button {
-                        editableItems.append(
-                            BillItem(id: UUID(), billId: UUID(), name: "", price: 0, position: editableItems.count)
-                        )
+                        let newItem = BillItem(id: UUID(), billId: UUID(), name: "", price: 0, position: editableItems.count)
+                        editableItems.append(newItem)
+                        focusedItemId = newItem.id
                     } label: {
-                        Label("Add Item", systemImage: "plus.circle")
-                            .foregroundStyle(Color.accentColor)
+                        Label("Add Item", systemImage: "plus")
                     }
                 }
                 if let parsed = parsedReceipt {
@@ -273,9 +274,10 @@ struct BillView: View {
                     )
                     List {
                         ForEach(totals, id: \.userId) { t in
-                            HStack(alignment: .top) {
+                            HStack {
                                 VStack(alignment: .leading, spacing: 2) {
                                     Text(t.displayName)
+                                        .foregroundStyle(t.total == 0 ? .secondary : .primary)
                                     if t.total == 0 {
                                         Text("Hasn't claimed yet")
                                             .font(.caption)
