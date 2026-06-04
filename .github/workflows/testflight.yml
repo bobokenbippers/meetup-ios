@@ -18,8 +18,8 @@ jobs:
           ruby-version: '3.2'
           bundler-cache: true
 
-      - name: Install Fastlane
-        run: gem install fastlane
+      - name: Install dependencies
+        run: bundle install
 
       - name: Configure Git for Match and SPM
         run: |
@@ -34,4 +34,4 @@ jobs:
           APP_STORE_CONNECT_API_KEY_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}
           APP_STORE_CONNECT_API_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_API_ISSUER_ID }}
           APP_STORE_CONNECT_API_KEY_CONTENT: ${{ secrets.APP_STORE_CONNECT_API_KEY_CONTENT }}
-        run: fastlane beta
+        run: bundle exec fastlane beta
