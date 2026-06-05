@@ -165,14 +165,15 @@ struct MeetupsListView: View {
             .onChange(of: navState.pendingMeetupId) { _, meetupId in
                 guard let meetupId else { return }
                 navState.pendingMeetupId = nil
-                let match = participations.first(where: { $0.meetup.id == meetupId })
+                let mid = meetupId
+                let match = participations.first(where: { (p: MyParticipation) in p.meetup.id == mid })
                 if let p = match {
                     selectedMeetup = p.meetup
                 } else {
                     // Data not yet loaded — load then open
                     Task {
                         await load()
-                        let delayed = participations.first(where: { $0.meetup.id == meetupId })
+                        let delayed = participations.first(where: { (p: MyParticipation) in p.meetup.id == mid })
                         if let p = delayed {
                             selectedMeetup = p.meetup
                         }
