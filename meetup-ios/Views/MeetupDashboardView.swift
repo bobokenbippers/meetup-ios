@@ -16,6 +16,8 @@ struct MeetupDashboardView: View {
     @State private var showCancelConfirm = false
     @State private var showBill = false
     @State private var showConfetti = false
+    @State private var shareURL: URL?
+    @State private var isGeneratingShareLink = false
 
     private var myUserId: UUID? { auth.session?.user.id }
     private var myStatus: String? { participants.first(where: { $0.userId == myUserId })?.status }
@@ -81,6 +83,18 @@ struct MeetupDashboardView: View {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Close") { dismiss() }
                 }
+                ToolbarItem(placement: .primaryAction) {
+                    Button {
+                        Task { await generateAndShare() }
+                    } label: {
+                        if isGeneratingShareLink {
+                            ProgressView().frame(width: 24, height: 24)
+                        } else {
+                            Image(systemName: "square.and.arrow.up")
+                        }
+                    }
+                    .disabled(isGeneratingShareLink)
+                }
                 if myUserId == meetup.hostId {
                     ToolbarItem(placement: .destructiveAction) {
                         Button("Cancel", role: .destructive) { showCancelConfirm = true }
@@ -91,6 +105,10 @@ struct MeetupDashboardView: View {
                 BillView(meetup: meetup, participants: participants)
                     .environment(auth)
                     .environment(settings)
+            }
+            .sheet(item: $shareURL) { url in
+                ShareSheet(url: url)
+                    .ignoresSafeArea()
             }
             .confirmationDialog("Cancel this meetup?", isPresented: $showCancelConfirm, titleVisibility: .visible) {
                 Button("Cancel Meetup", role: .destructive) {
@@ -323,6 +341,22 @@ struct MeetupDashboardView: View {
         participants.first(where: { $0.userId == myUserId })
     }
 
+    private func generateAndShare() async {
+        isGeneratingShareLink = true
+        do {
+            let token = try await MeetupService.shared.ensureShareToken(for: meetup)
+            let urlString = "https://squadbrunch.app/join/\(token)"
+            if let url = URL(string: urlString) {
+                shareURL = url
+            }
+        } catch is CancellationError {
+            // nothing
+        } catch {
+            self.error = error.localizedDescription
+        }
+        isGeneratingShareLink = false
+    }
+
     private func respond(status: String) async {
         isActing = true
         do {
@@ -345,6 +379,24 @@ struct MeetupDashboardView: View {
         }
         isActing = false
     }
+}
+
+// MARK: - URL Identifiable (for sheet(item:))
+
+extension URL: @retroactive Identifiable {
+    public var id: String { absoluteString }
+}
+
+// MARK: - Share Sheet (UIActivityViewController wrapper)
+
+private struct ShareSheet: UIViewControllerRepresentable {
+    let url: URL
+
+    func makeUIViewController(context: Context) -> UIActivityViewController {
+        UIActivityViewController(activityItems: [url], applicationActivities: nil)
+    }
+
+    func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {}
 }
 
 // MARK: - Destination Marker
