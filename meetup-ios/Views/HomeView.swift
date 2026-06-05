@@ -2,6 +2,7 @@ import SwiftUI
 
 struct HomeView: View {
     @Environment(NavigationState.self) private var navState
+    private var locationManager: LocationManager { LocationManager.shared }
 
     var body: some View {
         @Bindable var nav = navState
@@ -17,6 +18,16 @@ struct HomeView: View {
                 .tag(NavigationState.Tab.settings)
         }
         .tint(Color.coral)
+        .safeAreaInset(edge: .top, spacing: 0) {
+            if locationManager.isTracking, let meetup = locationManager.trackingMeetup {
+                LocationSharingBanner(meetup: meetup) {
+                    nav.selectedTab = .meetups
+                    nav.pendingMeetupId = meetup.id
+                }
+                .transition(.move(edge: .top).combined(with: .opacity))
+            }
+        }
+        .animation(.spring(response: 0.35, dampingFraction: 0.8), value: locationManager.isTracking)
     }
 }
 

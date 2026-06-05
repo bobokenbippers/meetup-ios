@@ -2,6 +2,7 @@ import Foundation
 import CoreLocation
 import CoreMotion
 import MapKit
+import Observation
 
 enum MotionMode {
     case stationary, walking, cycling, driving, unknown
@@ -48,6 +49,7 @@ enum LocationTier: Equatable {
     }
 }
 
+@Observable
 final class LocationManager: NSObject {
     static let shared = LocationManager()
 
@@ -60,11 +62,13 @@ final class LocationManager: NSObject {
         q.qualityOfService = .utility
         return q
     }()
-    private var trackingMeetup: Meetup?
+    private(set) var trackingMeetup: Meetup?
     private var uploadTask: Task<Void, Never>?
     private(set) var location: CLLocation?
     private var motionMode: MotionMode = .unknown
     private(set) var currentTier: LocationTier = .stationary
+
+    var isTracking: Bool { trackingMeetup != nil }
 
     override private init() {
         super.init()
