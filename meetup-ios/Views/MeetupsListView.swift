@@ -163,22 +163,7 @@ struct MeetupsListView: View {
             }
             .preferredColorScheme(.dark)
             .onChange(of: navState.pendingMeetupId) { _, meetupId in
-                guard let meetupId else { return }
-                navState.pendingMeetupId = nil
-                let mid = meetupId
-                let match = participations.first(where: { (p: MyParticipation) in p.meetup.id == mid })
-                if let p = match {
-                    selectedMeetup = p.meetup
-                } else {
-                    // Data not yet loaded — load then open
-                    Task {
-                        await load()
-                        let delayed = participations.first(where: { (p: MyParticipation) in p.meetup.id == mid })
-                        if let p = delayed {
-                            selectedMeetup = p.meetup
-                        }
-                    }
-                }
+                handlePendingMeetupId(meetupId)
             }
         }
     }
@@ -315,6 +300,24 @@ struct MeetupsListView: View {
         }
         .padding(.leading, 4)
         .padding(.top, 8)
+    }
+
+    private func handlePendingMeetupId(_ meetupId: UUID?) {
+        guard let meetupId else { return }
+        navState.pendingMeetupId = nil
+        var found: MyParticipation?
+        for p in participations where p.meetup.id == meetupId { found = p; break }
+        if let p = found {
+            selectedMeetup = p.meetup
+        } else {
+            Task {
+                await load()
+                for p in participations where p.meetup.id == meetupId {
+                    selectedMeetup = p.meetup
+                    break
+                }
+            }
+        }
     }
 
     // MARK: - Data
