@@ -2,6 +2,55 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Quick Context (read this first)
+
+**App name**: Squad Brunch (bundle ID `gautamlgtm.meetup-ios`)
+**Owner**: Gautam Pappu / Jayko (@dorontheruler on Telegram)
+**Repo**: `https://github.com/bobokenbippers/meetup-ios` (private, org: bobokenbippers)
+**Local path on server**: `/home/gautampappu/meetup-ios`
+
+**Supabase project ref**: `boyrqhbdkqzffvfokpri`
+**Supabase URL**: `https://boyrqhbdkqzffvfokpri.supabase.co`
+
+**Color system** (dark mode only — no adaptive colors):
+- `Color.coral` = deep indigo-violet `#6C57C5` (app accent, defined in `AppColors.swift`)
+- Background: `Color(red: 0.06, green: 0.06, blue: 0.10)`
+- Cards: `Color(red: 0.10, green: 0.10, blue: 0.16)`
+- All views use `.preferredColorScheme(.dark)`
+
+**CI/CD**: Push to `main` → GitHub Actions → Fastlane → TestFlight
+**Build number**: `GITHUB_RUN_NUMBER` (stamped by build phase script)
+**Code signing**: Fastlane Match, `MATCH_GIT_TOKEN` secret in GitHub Actions
+
+**Push notifications**: APNs key ID `N93BWZYWAG`, Team ID `KLT4S6K9X8`
+**Storage buckets**: `receipts` (bill photos), `meetup-photos` (event photos)
+
+**Meetup lifecycle**: `active` → `completed` at `targetArrivalAt + 90 min` via pg_cron `expire-meetups` edge function. Location data (lat/lng/bearing/eta) is wiped from DB on expiry. `Meetup.isRecap` drives UI transitions.
+
+**gh CLI**: installed at `/home/gautampappu/.npm-global/bin/gh`, authenticated as `gautamlgtm`
+
+## Current feature set (as of June 2026)
+- Sign in with Apple + phone number capture
+- Create meetups with venue search (Google Places), category, target arrival time
+- Invite friends (phone number lookup), RSVP flow (Yes/No/Maybe)
+- Live location sharing on map during active meetup
+- Punctuality tiles (color-coded ETA vs target)
+- Location sharing banner across all tabs while tracking
+- Shareable invite links (`squadbrunch://join/<token>`)
+- Auto-expiry + recap mode after event ends
+- Bill splitting: multi-receipt upload, scan payer, claim items
+- Photo gallery in Recap
+- Friend suggestions in invite flow
+- Push notifications: meetup invite, friend request, status updates, leave-now (30 min before)
+- 4-screen onboarding flow
+- Dark UI redesign throughout
+
+## Key tables
+`meetups`, `meetup_participants`, `profiles`, `friendships`, `receipts`, `bill_items`, `bill_item_claims`, `device_tokens`, `meetup_photos`
+
+## Edge functions
+`push-meetup-invite`, `push-friend-request`, `push-meetup-status`, `push-leave-now`, `expire-meetups`
+
 ## Project
 
 iOS app ("Squad Brunch" / Meetup Tracker) — friends share live location and ETA toward a chosen destination for the duration of a single meetup. SwiftUI app talking directly to Supabase (Postgres + Auth + Realtime). No custom backend yet — the Python/FastAPI service described in `GUIDE.md` / `IMPLEMENTATION.md` has not been built; the iOS client talks to Supabase directly and uses Apple's `MKDirections` for ETA.
