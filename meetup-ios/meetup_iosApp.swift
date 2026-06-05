@@ -55,18 +55,12 @@ extension AppDelegate: UNUserNotificationCenterDelegate {
     ) {
         let info = response.notification.request.content.userInfo
         guard let event = info["event"] as? String else { completionHandler(); return }
-
-        NotificationCenter.default.post(
-            name: .pushNotificationReceived,
-            object: nil,
-            userInfo: ["event": event, "meetupId": info["meetupId"] as? String ?? ""]
-        )
+        let meetupId = info["meetupId"] as? String
+        Task { @MainActor in
+            NavigationState.shared.handle(event: event, meetupId: meetupId)
+        }
         completionHandler()
     }
-}
-
-extension Notification.Name {
-    static let pushNotificationReceived = Notification.Name("pushNotificationReceived")
 }
 
 @main
@@ -74,6 +68,7 @@ struct meetup_iosApp: App {
     @UIApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
     @State private var auth = AuthViewModel()
     @State private var settings = AppSettings()
+    private let navState = NavigationState.shared
 
     var body: some Scene {
         WindowGroup {
@@ -92,6 +87,29 @@ struct meetup_iosApp: App {
             }
             .environment(auth)
             .environment(settings)
+            .environment(navState)
+            .onOpenURL { url in
+                handleDeepLink(url)
+            }
+        }
+    }
+
+    private func handleDeepLink(_ url: URL) {
+        guard url.scheme == "squadbrunch" else { return }
+        let host = url.host ?? ""
+        let pathComponents = url.pathComponents.filter { $0 != "/" }
+        switch host {
+        case "meetup":
+            let meetupId = pathComponents.first
+            Task { @MainActor in
+                NavigationState.shared.handle(event: "meetup_invite", meetupId: meetupId)
+            }
+        case "people":
+            Task { @MainActor in
+                NavigationState.shared.handle(event: "friend_request", meetupId: nil)
+            }
+        default:
+            break
         }
     }
 

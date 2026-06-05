@@ -1,14 +1,20 @@
 import SwiftUI
 
 struct HomeView: View {
+    @Environment(NavigationState.self) private var navState
+
     var body: some View {
-        TabView {
+        @Bindable var nav = navState
+        TabView(selection: $nav.selectedTab) {
             MeetupsListView()
                 .tabItem { Label("Meetups", systemImage: "person.2.circle") }
+                .tag(NavigationState.Tab.meetups)
             PeopleListView()
                 .tabItem { Label("People", systemImage: "person.crop.circle") }
+                .tag(NavigationState.Tab.people)
             SettingsView()
                 .tabItem { Label("Settings", systemImage: "gear") }
+                .tag(NavigationState.Tab.settings)
         }
         .tint(Color.coral)
     }
