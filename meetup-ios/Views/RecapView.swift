@@ -1,5 +1,6 @@
 import SwiftUI
 import Auth
+import PhotosUI
 
 struct RecapView: View {
     let meetup: Meetup
@@ -14,6 +15,12 @@ struct RecapView: View {
     @State private var hasLoaded = false
     @State private var error: String?
     @State private var showBillView = false
+
+    @State private var photos: [URL] = []
+    @State private var isUploadingPhoto = false
+    @State private var showPhotoPicker = false
+    @State private var selectedPhotoItem: PhotosPickerItem?
+    @State private var fullscreenPhoto: URL?
 
     private var myUserId: UUID? { auth.session?.user.id }
     private var isHost: Bool { myUserId == meetup.hostId }
@@ -40,6 +47,7 @@ struct RecapView: View {
                     if isHost { hostSummaryCard }
                     attendeeSection
                     billPlaceholderCard
+                    photoGalleryCard
                     Spacer(minLength: 32)
                 }
                 .padding(.horizontal, 16)
@@ -57,6 +65,14 @@ struct RecapView: View {
             .task { await load() }
             .sheet(isPresented: $showBillView) {
                 BillView(meetup: meetup, participants: participants)
+            }
+            .photosPicker(isPresented: $showPhotoPicker, selection: $selectedPhotoItem, matching: .images)
+            .onChange(of: selectedPhotoItem) { _, item in
+                guard let item else { return }
+                Task { await uploadPickedPhoto(item) }
+            }
+            .sheet(item: $fullscreenPhoto) { url in
+                FullscreenPhotoView(url: url)
             }
             .alert("Error", isPresented: Binding(get: { error != nil }, set: { if !$0 { error = nil } })) {
                 Button("OK") { error = nil }
@@ -384,6 +400,116 @@ struct RecapView: View {
         return total
     }
 
+    // MARK: - Photo Gallery
+
+    private var photoGalleryCard: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(spacing: 8) {
+                ZStack {
+                    Circle()
+                        .fill(Color.coral.opacity(0.15))
+                        .frame(width: 32, height: 32)
+                    Image(systemName: "camera.fill")
+                        .font(.system(size: 14))
+                        .foregroundStyle(Color.coral.opacity(0.8))
+                }
+                Text("Photos")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(Color(.label))
+                Spacer()
+                if isUploadingPhoto {
+                    ProgressView()
+                        .scaleEffect(0.8)
+                } else {
+                    Button {
+                        showPhotoPicker = true
+                    } label: {
+                        Image(systemName: "plus")
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundStyle(Color.coral)
+                    }
+                }
+            }
+            .padding(.horizontal, 14)
+            .padding(.top, 14)
+            .padding(.bottom, 10)
+
+            Divider()
+
+            if photos.isEmpty {
+                Button {
+                    showPhotoPicker = true
+                } label: {
+                    HStack(spacing: 8) {
+                        Image(systemName: "camera")
+                            .font(.system(size: 16))
+                            .foregroundStyle(Color.coral.opacity(0.7))
+                        Text("Add Photos")
+                            .font(.system(size: 14, weight: .medium))
+                            .foregroundStyle(Color.coral.opacity(0.9))
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 20)
+                }
+                .buttonStyle(.plain)
+            } else {
+                let columns = [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())]
+                LazyVGrid(columns: columns, spacing: 2) {
+                    ForEach(photos, id: \.absoluteString) { url in
+                        AsyncImage(url: url) { phase in
+                            switch phase {
+                            case .success(let image):
+                                image
+                                    .resizable()
+                                    .scaledToFill()
+                            case .failure:
+                                Color(.tertiarySystemBackground)
+                                    .overlay(
+                                        Image(systemName: "photo")
+                                            .foregroundStyle(.secondary)
+                                    )
+                            default:
+                                Color(.tertiarySystemBackground)
+                                    .overlay(ProgressView().scaleEffect(0.7))
+                            }
+                        }
+                        .frame(height: 100)
+                        .clipped()
+                        .contentShape(Rectangle())
+                        .onTapGesture { fullscreenPhoto = url }
+                    }
+                }
+                .padding(.top, 2)
+            }
+        }
+        .background(Color(.secondarySystemBackground))
+        .clipShape(RoundedRectangle(cornerRadius: 16))
+        .overlay(
+            RoundedRectangle(cornerRadius: 16)
+                .strokeBorder(Color(.separator).opacity(0.5), lineWidth: 1)
+        )
+    }
+
+    private func uploadPickedPhoto(_ item: PhotosPickerItem) async {
+        guard let data = try? await item.loadTransferable(type: Data.self),
+              let uiImage = UIImage(data: data),
+              let jpeg = uiImage.jpegData(compressionQuality: 0.8) else {
+            selectedPhotoItem = nil
+            return
+        }
+        isUploadingPhoto = true
+        defer {
+            isUploadingPhoto = false
+            selectedPhotoItem = nil
+        }
+        do {
+            let url = try await MeetupPhotoService.shared.uploadPhoto(meetupId: meetup.id, imageData: jpeg)
+            photos.append(url)
+        } catch {
+            self.error = error.localizedDescription
+        }
+    }
+
     // MARK: - Data
 
     private func load() async {
@@ -399,6 +525,7 @@ struct RecapView: View {
                 receiptItems[receipt.id] = try await BillService.shared.fetchReceiptItems(receiptId: receipt.id)
             }
             claims = try await BillService.shared.fetchAllReceiptClaims(receiptIds: fetchedReceipts.map { $0.id })
+            photos = (try? await MeetupPhotoService.shared.listPhotos(meetupId: meetup.id)) ?? []
 
             hasLoaded = true
         } catch is CancellationError {
@@ -408,4 +535,44 @@ struct RecapView: View {
             hasLoaded = true
         }
     }
+}
+
+// MARK: - Fullscreen Photo Viewer
+
+private struct FullscreenPhotoView: View {
+    let url: URL
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        ZStack(alignment: .topTrailing) {
+            Color.black.ignoresSafeArea()
+            AsyncImage(url: url) { phase in
+                switch phase {
+                case .success(let image):
+                    image
+                        .resizable()
+                        .scaledToFit()
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                case .failure:
+                    Image(systemName: "photo")
+                        .font(.system(size: 48))
+                        .foregroundStyle(.secondary)
+                default:
+                    ProgressView()
+                }
+            }
+            Button {
+                dismiss()
+            } label: {
+                Image(systemName: "xmark.circle.fill")
+                    .font(.system(size: 28))
+                    .foregroundStyle(.white.opacity(0.8))
+                    .padding(20)
+            }
+        }
+    }
+}
+
+extension URL: @retroactive Identifiable {
+    public var id: String { absoluteString }
 }
