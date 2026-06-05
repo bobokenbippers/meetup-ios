@@ -3,45 +3,107 @@ import AuthenticationServices
 
 struct SignInView: View {
     @Environment(AuthViewModel.self) private var auth
+    @State private var glowPulse = false
 
     var body: some View {
-        VStack(spacing: 32) {
-            Spacer()
+        ZStack {
+            Color.appBackground.ignoresSafeArea()
 
-            VStack(spacing: 8) {
-                Image(systemName: "location.circle.fill")
-                    .font(.system(size: 80))
-                    .foregroundStyle(.tint)
-                Text("Squad Brunch")
-                    .font(.largeTitle.bold())
-                Text("Know who's on their way.")
-                    .font(.title3)
-                    .foregroundStyle(.secondary)
-            }
+            VStack(spacing: 0) {
+                Spacer()
 
-            Spacer()
+                // Logo glow area
+                ZStack {
+                    // Outer soft radial glow
+                    RadialGradient(
+                        colors: [Color.coral.opacity(glowPulse ? 0.30 : 0.18), Color.clear],
+                        center: .center,
+                        startRadius: 0,
+                        endRadius: 120
+                    )
+                    .frame(width: 240, height: 240)
+                    .blur(radius: 20)
+                    .animation(.easeInOut(duration: 3).repeatForever(autoreverses: true), value: glowPulse)
 
-            SignInWithAppleButton(.signIn) { request in
-                request.requestedScopes = [.fullName, .email]
-            } onCompletion: { result in
-                Task {
-                    switch result {
-                    case .success(let authorization):
-                        await auth.signInWithApple(authorization: authorization)
-                    case .failure(let error):
-                        auth.error = error.localizedDescription
-                    }
+                    // Icon ring
+                    Circle()
+                        .fill(Color.appSurface)
+                        .overlay(
+                            Circle()
+                                .strokeBorder(
+                                    LinearGradient(
+                                        colors: [Color.coral.opacity(0.7), Color.coral.opacity(0.2)],
+                                        startPoint: .topLeading,
+                                        endPoint: .bottomTrailing
+                                    ),
+                                    lineWidth: 1.5
+                                )
+                        )
+                        .frame(width: 100, height: 100)
+                        .shadow(color: Color.coral.opacity(0.4), radius: 24)
+
+                    Image(systemName: "fork.knife.circle.fill")
+                        .font(.system(size: 52))
+                        .foregroundStyle(
+                            LinearGradient(
+                                colors: [Color.coral, Color.coral.opacity(0.6)],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
                 }
-            }
-            .signInWithAppleButtonStyle(.black)
-            .frame(height: 50)
-            .padding(.horizontal, 40)
+                .padding(.bottom, 32)
 
-            if let error = auth.error {
-                Text(error).font(.caption).foregroundStyle(.red)
-            }
+                // Title
+                Text("Squad Brunch")
+                    .font(.system(size: 42, weight: .black, design: .default))
+                    .foregroundStyle(.white)
+                    .tracking(-0.5)
 
-            Spacer().frame(height: 40)
+                Text("Know who's on their way.")
+                    .font(.system(size: 17, weight: .regular))
+                    .foregroundStyle(Color(white: 0.55))
+                    .padding(.top, 6)
+                    .padding(.bottom, 56)
+
+                Spacer()
+
+                // Sign in button area
+                VStack(spacing: 16) {
+                    SignInWithAppleButton(.signIn) { request in
+                        request.requestedScopes = [.fullName, .email]
+                    } onCompletion: { result in
+                        Task {
+                            switch result {
+                            case .success(let authorization):
+                                await auth.signInWithApple(authorization: authorization)
+                            case .failure(let error):
+                                auth.error = error.localizedDescription
+                            }
+                        }
+                    }
+                    .signInWithAppleButtonStyle(.white)
+                    .frame(height: 54)
+                    .clipShape(RoundedRectangle(cornerRadius: 16))
+                    .shadow(color: Color.coral.opacity(0.25), radius: 16, y: 6)
+
+                    if let error = auth.error {
+                        Text(error)
+                            .font(.caption)
+                            .foregroundStyle(Color.statusLate)
+                            .multilineTextAlignment(.center)
+                            .padding(.horizontal, 24)
+                    }
+
+                    Text("By signing in you agree to our terms")
+                        .font(.system(size: 11))
+                        .foregroundStyle(Color(white: 0.35))
+                }
+                .padding(.horizontal, 32)
+                .padding(.bottom, 52)
+            }
         }
+        .preferredColorScheme(.dark)
+        .onAppear { glowPulse = true }
     }
 }

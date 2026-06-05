@@ -5,7 +5,7 @@ func meetupCategoryGradient(category: String?, meetupStatus: String, participant
     let isActive = meetupStatus == "active"
     let isInvited = participantStatus == "invited"
     guard isActive && !isInvited else {
-        return AnyShapeStyle(Color(.secondarySystemBackground))
+        return AnyShapeStyle(Color.appSurface)
     }
     let c = (category ?? "").lowercased()
     if c.contains("brunch") || c.contains("dinner") || c.contains("food") || c.contains("lunch") {
@@ -26,7 +26,7 @@ func meetupCategoryGradient(category: String?, meetupStatus: String, participant
                      Color(red: 0.047, green: 0.239, blue: 0.125)],
             startPoint: .topLeading, endPoint: .bottomTrailing))
     }
-    return AnyShapeStyle(Color(.secondarySystemBackground))
+    return AnyShapeStyle(Color.appSurface)
 }
 
 func meetupHasDarkBackground(category: String?, meetupStatus: String, participantStatus: String) -> Bool {
@@ -111,14 +111,20 @@ struct MeetupsListView: View {
             Group {
                 if !hasLoaded {
                     ProgressView()
+                        .tint(Color.coral)
                 } else if invited.isEmpty && active.isEmpty && past.isEmpty && deleted.isEmpty {
                     MeetupsEmptyState { showCreate = true }
                 } else {
                     meetupsList
                 }
             }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .background(Color.appBackground)
             .animation(.easeOut(duration: 0.3), value: hasLoaded)
             .navigationTitle("Meetups")
+            .toolbarBackground(Color.appBackground.opacity(0.95), for: .navigationBar)
+            .toolbarBackground(.visible, for: .navigationBar)
+            .toolbarColorScheme(.dark, for: .navigationBar)
             .toolbar {
                 Button(action: { showCreate = true }) {
                     Image(systemName: "plus")
@@ -155,6 +161,7 @@ struct MeetupsListView: View {
             } message: {
                 Text(error ?? "")
             }
+            .preferredColorScheme(.dark)
             .onChange(of: navState.pendingMeetupId) { _, meetupId in
                 guard let meetupId else { return }
                 navState.pendingMeetupId = nil
@@ -287,15 +294,24 @@ struct MeetupsListView: View {
         }
         .listStyle(.plain)
         .scrollContentBackground(.hidden)
+        .background(Color.appBackground)
     }
 
     private func sectionHeader(_ title: String) -> some View {
-        Text(title.uppercased())
-            .font(.system(size: 10, weight: .semibold))
-            .foregroundStyle(.secondary)
-            .textCase(nil)
-            .padding(.leading, 4)
-            .padding(.top, 8)
+        HStack(spacing: 6) {
+            if title == "Active" || title == "Invited" {
+                Circle()
+                    .fill(title == "Active" ? Color.statusLive : Color.statusPending)
+                    .frame(width: 6, height: 6)
+                    .shadow(color: (title == "Active" ? Color.statusLive : Color.statusPending).opacity(0.8), radius: 4)
+            }
+            Text(title.uppercased())
+                .font(.system(size: 10, weight: .bold))
+                .foregroundStyle(Color(white: 0.45))
+                .textCase(nil)
+        }
+        .padding(.leading, 4)
+        .padding(.top, 8)
     }
 
     // MARK: - Data
@@ -425,6 +441,7 @@ private struct MeetupsEmptyState: View {
         }
         .padding(32)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Color.appBackground)
     }
 }
 
@@ -445,12 +462,10 @@ struct MeetupRowCard: View {
         )
     }
 
-    private var primaryTextColor: Color {
-        hasDarkBackground ? .white : Color(.label)
-    }
+    private var primaryTextColor: Color { .white }
 
     private var secondaryTextColor: Color {
-        hasDarkBackground ? .white.opacity(0.5) : Color(.secondaryLabel)
+        hasDarkBackground ? .white.opacity(0.5) : Color(white: 0.55)
     }
 
     var body: some View {
@@ -492,12 +507,20 @@ struct MeetupRowCard: View {
                     meetupStatus: participation.meetup.status,
                     participantStatus: participation.status
                 ))
-            if needsBorder {
+            if !needsBorder && participation.meetup.status == "active" {
+                // Glowing accent border for active meetups
                 RoundedRectangle(cornerRadius: 18)
-                    .strokeBorder(Color(.separator), lineWidth: 1)
+                    .strokeBorder(Color.coral.opacity(0.45), lineWidth: 1.5)
+            } else {
+                RoundedRectangle(cornerRadius: 18)
+                    .strokeBorder(Color(white: 0.15), lineWidth: 1)
             }
         }
-        .opacity(participation.meetup.status != "active" ? 0.55 : 1.0)
+        .shadow(
+            color: participation.meetup.status == "active" ? Color.coral.opacity(0.12) : Color.clear,
+            radius: 10, y: 4
+        )
+        .opacity(participation.meetup.status != "active" ? 0.50 : 1.0)
     }
 }
 

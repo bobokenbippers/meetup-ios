@@ -2,6 +2,10 @@ import SwiftUI
 
 // Centralized app color palette — edit here, change propagates everywhere.
 extension Color {
+    // Dark-mode-only backgrounds
+    static let appBackground = Color(red: 0.06, green: 0.06, blue: 0.10)   // near-black with purple tint
+    static let appSurface    = Color(red: 0.10, green: 0.10, blue: 0.16)   // dark elevated surface
+
     // Primary accent: soft indigo replacing the old coral/orange (#FF6B47)
     static let coral = Color(red: 0.424, green: 0.341, blue: 0.773)  // #6C57C5 deep indigo-violet
 

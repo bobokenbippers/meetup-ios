@@ -188,6 +188,7 @@ struct MeetupDashboardView: View {
             .overlay {
                 if showConfetti { ConfettiView() }
             }
+            .preferredColorScheme(.dark)
         }
     }
 
@@ -197,13 +198,14 @@ struct MeetupDashboardView: View {
         VStack(alignment: .leading, spacing: 2) {
             Text("\(greeting), \(auth.profile?.displayName ?? "there") 👋")
                 .font(.system(size: 12))
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Color(white: 0.55))
             Text(meetup.destinationName)
                 .font(.system(size: 24, weight: .black))
+                .foregroundStyle(.white)
                 .lineLimit(1)
             Text("You're meeting \(acceptedCount) \(acceptedCount == 1 ? "person" : "people")")
                 .font(.system(size: 12))
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Color(white: 0.55))
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
@@ -248,12 +250,13 @@ struct MeetupDashboardView: View {
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 12)
-        .background(.regularMaterial)
+        .background(Color.appSurface)
         .clipShape(RoundedRectangle(cornerRadius: 14))
         .overlay(
             RoundedRectangle(cornerRadius: 14)
-                .strokeBorder(Color(.separator).opacity(0.5), lineWidth: 1)
+                .strokeBorder(Color.coral.opacity(0.25), lineWidth: 1)
         )
+        .shadow(color: Color.coral.opacity(0.08), radius: 8, y: 2)
     }
 
     // MARK: - Photo strip
@@ -269,13 +272,13 @@ struct MeetupDashboardView: View {
                                 .resizable()
                                 .scaledToFill()
                         case .failure:
-                            Color(.tertiarySystemBackground)
+                            Color.appSurface
                                 .overlay(
                                     Image(systemName: "photo")
                                         .foregroundStyle(.secondary)
                                 )
                         default:
-                            Color(.tertiarySystemBackground)
+                            Color.appSurface
                                 .overlay(ProgressView().scaleEffect(0.7))
                         }
                     }
@@ -289,14 +292,14 @@ struct MeetupDashboardView: View {
             .padding(.horizontal, 16)
             .padding(.vertical, 10)
         }
-        .background(.regularMaterial)
+        .background(Color.appSurface)
     }
 
     private var bottomPanel: some View {
         VStack(spacing: 0) {
             // Drag handle
             RoundedRectangle(cornerRadius: 2)
-                .fill(Color(.tertiaryLabel))
+                .fill(Color(white: 0.30))
                 .frame(width: 32, height: 3)
                 .padding(.top, 10)
                 .padding(.bottom, 6)
@@ -304,6 +307,7 @@ struct MeetupDashboardView: View {
             // "Everyone" label
             Text("Everyone")
                 .font(.system(size: 13, weight: .bold))
+                .foregroundStyle(.white)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.horizontal, 16)
                 .padding(.bottom, 8)
@@ -370,12 +374,13 @@ struct MeetupDashboardView: View {
             .padding(.horizontal, 16)
             .padding(.vertical, 12)
         }
-        .background(.regularMaterial)
+        .background(Color.appSurface)
         .clipShape(UnevenRoundedRectangle(cornerRadii: .init(topLeading: 22, topTrailing: 22)))
         .overlay(
             UnevenRoundedRectangle(cornerRadii: .init(topLeading: 22, topTrailing: 22))
-                .strokeBorder(Color(.separator).opacity(0.5), lineWidth: 1)
+                .strokeBorder(Color.coral.opacity(0.20), lineWidth: 1)
         )
+        .shadow(color: Color.coral.opacity(0.08), radius: 16, y: -4)
         .animation(.spring(response: 0.45, dampingFraction: 0.75), value: myStatus)
     }
 
@@ -618,18 +623,18 @@ struct DashboardParticipantPin: View {
                 VStack(alignment: .leading, spacing: 1) {
                     Text(participant.displayName ?? "?")
                         .font(.system(size: 10, weight: .bold))
-                        .foregroundStyle(.primary)
+                        .foregroundStyle(.white)
                     Text(etaText)
                         .font(.system(size: 9, weight: .semibold))
                         .foregroundStyle(etaColor)
                 }
                 .padding(.horizontal, 7)
                 .padding(.vertical, 5)
-                .background(.regularMaterial)
+                .background(Color.appSurface)
                 .clipShape(RoundedRectangle(cornerRadius: 10))
                 .overlay(
                     RoundedRectangle(cornerRadius: 10)
-                        .strokeBorder(Color(.separator).opacity(0.5), lineWidth: 1)
+                        .strokeBorder(Color(white: 0.20), lineWidth: 1)
                 )
             }
         }
@@ -718,10 +723,11 @@ private struct DashboardParticipantRow: View {
                 HStack(spacing: 4) {
                     Text(participant.displayName ?? "Unknown")
                         .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(.white)
                     if isMe {
                         Text("(you)")
                             .font(.system(size: 11))
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Color(white: 0.5))
                     }
                 }
                 Text(etaText)

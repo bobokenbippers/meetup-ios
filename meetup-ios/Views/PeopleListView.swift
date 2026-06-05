@@ -62,11 +62,11 @@ struct PeopleListView: View {
                                 }
                             }
                         }
-                        .background(.regularMaterial)
+                        .background(Color.appSurface)
                         .clipShape(RoundedRectangle(cornerRadius: 14))
                         .overlay(
                             RoundedRectangle(cornerRadius: 14)
-                                .strokeBorder(.white.opacity(0.08), lineWidth: 1)
+                                .strokeBorder(Color(white: 0.15), lineWidth: 1)
                         )
                         .padding(.horizontal, 16)
                         .padding(.bottom, 8)
@@ -123,9 +123,10 @@ struct PeopleListView: View {
                                 .padding(.top, 48)
                             Text("No connections yet")
                                 .font(.system(size: 16, weight: .bold))
+                                .foregroundStyle(.white)
                             Text("People you've had meetups with will appear here.")
                                 .font(.system(size: 13))
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(Color(white: 0.5))
                                 .multilineTextAlignment(.center)
                                 .padding(.horizontal, 40)
                         }
@@ -156,7 +157,13 @@ struct PeopleListView: View {
                 }
                 .padding(.bottom, 32)
             }
+            .scrollContentBackground(.hidden)
+            .background(Color.appBackground)
             .navigationTitle("People")
+            .toolbarBackground(Color.appBackground.opacity(0.95), for: .navigationBar)
+            .toolbarBackground(.visible, for: .navigationBar)
+            .toolbarColorScheme(.dark, for: .navigationBar)
+            .preferredColorScheme(.dark)
             .task {
                 await load()
                 await contactsManager.load()
@@ -265,12 +272,13 @@ struct PeopleListView: View {
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 12)
-        .background(.regularMaterial)
+        .background(Color.appSurface)
         .clipShape(RoundedRectangle(cornerRadius: 14))
         .overlay(
             RoundedRectangle(cornerRadius: 14)
-                .strokeBorder(Color.coral.opacity(0.3), lineWidth: 1)
+                .strokeBorder(Color.coral.opacity(0.35), lineWidth: 1)
         )
+        .shadow(color: Color.coral.opacity(0.08), radius: 8, y: 2)
     }
 
     private func incomingRequestCard(_ request: IncomingFriendRequest) -> some View {
@@ -320,18 +328,19 @@ struct PeopleListView: View {
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 12)
-        .background(.regularMaterial)
+        .background(Color.appSurface)
         .clipShape(RoundedRectangle(cornerRadius: 14))
         .overlay(
             RoundedRectangle(cornerRadius: 14)
                 .strokeBorder(Color.coral.opacity(0.4), lineWidth: 1)
         )
+        .shadow(color: Color.coral.opacity(0.08), radius: 8, y: 2)
     }
 
     private func sectionLabel(_ title: String) -> some View {
         Text(title.uppercased())
-            .font(.system(size: 10, weight: .semibold))
-            .foregroundStyle(.secondary)
+            .font(.system(size: 10, weight: .bold))
+            .foregroundStyle(Color(white: 0.45))
     }
 
     // MARK: - Logic
@@ -702,7 +711,7 @@ private struct SuggestionProfileSheet: View {
                 .padding(.bottom, 32)
         }
         .frame(maxWidth: .infinity)
-        .background(.ultraThinMaterial)
+        .background(Color.appSurface)
         .presentationDetents([.medium])
         .presentationDragIndicator(.hidden)
     }

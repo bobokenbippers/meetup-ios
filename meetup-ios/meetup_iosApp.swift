@@ -91,6 +91,7 @@ struct meetup_iosApp: App {
             .environment(auth)
             .environment(settings)
             .environment(navState)
+            .preferredColorScheme(.dark)
             .onOpenURL { url in
                 handleDeepLink(url)
             }
