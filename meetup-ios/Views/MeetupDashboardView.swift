@@ -339,6 +339,12 @@ struct MeetupDashboardView: View {
                 LocationManager.shared.requestPermission()
                 LocationManager.shared.startTracking(meetup: meetup)
             }
+            // Stop tracking when the view is open and the event window has expired.
+            if let target = meetup.targetArrivalAt,
+               Date() > target.addingTimeInterval(5400),
+               LocationManager.shared.isTracking {
+                LocationManager.shared.stopTracking()
+            }
         } catch is CancellationError {
             return
         } catch {

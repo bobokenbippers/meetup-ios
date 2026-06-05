@@ -64,6 +64,7 @@ final class LocationManager: NSObject {
     }()
     private(set) var trackingMeetup: Meetup?
     private var uploadTask: Task<Void, Never>?
+    private var expiryTimer: Timer?
     private(set) var location: CLLocation?
     private var motionMode: MotionMode = .unknown
     private(set) var currentTier: LocationTier = .stationary
@@ -80,21 +81,16 @@ final class LocationManager: NSObject {
         clManager.requestWhenInUseAuthorization()
     }
 
-    private var expiryTimer: Timer?
-
     func startTracking(meetup: Meetup) {
         if trackingMeetup?.id == meetup.id { return }
         trackingMeetup = meetup
+        if isExpired(meetup: meetup) { stopTracking(); return }
         clManager.allowsBackgroundLocationUpdates = true
         clManager.pausesLocationUpdatesAutomatically = false
         clManager.startUpdatingLocation()
         startMotionUpdates()
         startUploadLoop()
-        if meetup.isRecap { stopTracking(); return }
-        expiryTimer = Timer.scheduledTimer(withTimeInterval: 60, repeats: true) { [weak self] _ in
-            guard let self, let m = self.trackingMeetup else { return }
-            if m.isRecap { self.stopTracking() }
-        }
+        scheduleExpiryTimer()
     }
 
     func stopTracking() {
@@ -106,6 +102,19 @@ final class LocationManager: NSObject {
         motionManager.stopActivityUpdates()
         uploadTask?.cancel()
         uploadTask = nil
+    }
+
+    private func isExpired(meetup: Meetup) -> Bool {
+        guard let target = meetup.targetArrivalAt else { return false }
+        return Date() > target.addingTimeInterval(5400)
+    }
+
+    private func scheduleExpiryTimer() {
+        expiryTimer?.invalidate()
+        expiryTimer = Timer.scheduledTimer(withTimeInterval: 60, repeats: true) { [weak self] _ in
+            guard let self, let meetup = self.trackingMeetup else { return }
+            if self.isExpired(meetup: meetup) { self.stopTracking() }
+        }
     }
 
     private func startMotionUpdates() {
