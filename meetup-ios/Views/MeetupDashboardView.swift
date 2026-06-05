@@ -18,6 +18,7 @@ struct MeetupDashboardView: View {
     @State private var showConfetti = false
     @State private var shareURL: URL?
     @State private var isGeneratingShareLink = false
+    @State private var showRecap = false
 
     private var myUserId: UUID? { auth.session?.user.id }
     private var myStatus: String? { participants.first(where: { $0.userId == myUserId })?.status }
@@ -56,7 +57,7 @@ struct MeetupDashboardView: View {
                     Annotation("", coordinate: destinationCoord) {
                         DestinationMarker()
                     }
-                    if meetup.status == "active" {
+                    if meetup.status == "active" && !meetup.isRecap {
                         ForEach(participants) { p in
                             if let lat = p.lat, let lng = p.lng {
                                 Annotation("", coordinate: CLLocationCoordinate2D(latitude: lat, longitude: lng)) {
@@ -106,6 +107,9 @@ struct MeetupDashboardView: View {
                     .environment(auth)
                     .environment(settings)
             }
+            .sheet(isPresented: $showRecap, onDismiss: { dismiss() }) {
+                RecapView(meetup: meetup).environment(auth)
+            }
             .sheet(item: $shareURL) { url in
                 ShareSheet(url: url)
                     .ignoresSafeArea()
@@ -122,6 +126,12 @@ struct MeetupDashboardView: View {
             .task {
                 await load()
                 await startRealtime()
+            }
+            .onAppear {
+                if meetup.isRecap { showRecap = true }
+            }
+            .onReceive(Timer.publish(every: 60, on: .main, in: .common).autoconnect()) { _ in
+                if meetup.isRecap && !showRecap { showRecap = true }
             }
             .onDisappear {
                 LocationManager.shared.stopTracking()

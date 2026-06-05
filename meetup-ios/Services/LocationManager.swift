@@ -80,6 +80,8 @@ final class LocationManager: NSObject {
         clManager.requestWhenInUseAuthorization()
     }
 
+    private var expiryTimer: Timer?
+
     func startTracking(meetup: Meetup) {
         if trackingMeetup?.id == meetup.id { return }
         trackingMeetup = meetup
@@ -88,9 +90,16 @@ final class LocationManager: NSObject {
         clManager.startUpdatingLocation()
         startMotionUpdates()
         startUploadLoop()
+        if meetup.isRecap { stopTracking(); return }
+        expiryTimer = Timer.scheduledTimer(withTimeInterval: 60, repeats: true) { [weak self] _ in
+            guard let self, let m = self.trackingMeetup else { return }
+            if m.isRecap { self.stopTracking() }
+        }
     }
 
     func stopTracking() {
+        expiryTimer?.invalidate()
+        expiryTimer = nil
         trackingMeetup = nil
         clManager.stopUpdatingLocation()
         clManager.allowsBackgroundLocationUpdates = false
