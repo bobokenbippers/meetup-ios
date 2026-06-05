@@ -14,6 +14,8 @@ struct PeopleListView: View {
     @State private var contactsManager = ContactsManager()
     @State private var contactSuggestions: [DeviceContact] = []
     @State private var contactNameOverrides: [UUID: String] = [:]
+    @State private var smartSuggestions: [ProfileSuggestion] = []
+    @State private var selectedSuggestion: ProfileSuggestion?
     @Environment(NavigationState.self) private var navState
 
     private var isSearchEnabled: Bool {
@@ -112,7 +114,8 @@ struct PeopleListView: View {
                         }
                         .padding(.horizontal, 16)
                     } else if hasLoaded && people.isEmpty && incomingRequests.isEmpty
-                                && contactSuggestions.isEmpty && foundUser == nil {
+                                && contactSuggestions.isEmpty && foundUser == nil
+                                && smartSuggestions.isEmpty {
                         VStack(spacing: 12) {
                             Image(systemName: "person.2.circle")
                                 .font(.system(size: 48))
@@ -132,6 +135,24 @@ struct PeopleListView: View {
                             .frame(maxWidth: .infinity)
                             .padding(.top, 48)
                     }
+
+                    // "People you may know" — shown when friends list is small (<3)
+                    if hasLoaded && people.filter({ !pendingOutgoingIds.contains($0.id) }).count < 3
+                        && !smartSuggestions.isEmpty {
+                        sectionLabel("People You May Know")
+                            .padding(.horizontal, 20)
+                            .padding(.top, 16)
+                            .padding(.bottom, 6)
+
+                        LazyVStack(spacing: 8) {
+                            ForEach(smartSuggestions) { suggestion in
+                                SuggestionCard(suggestion: suggestion) {
+                                    selectedSuggestion = suggestion
+                                }
+                            }
+                        }
+                        .padding(.horizontal, 16)
+                    }
                 }
                 .padding(.bottom, 32)
             }
@@ -141,7 +162,18 @@ struct PeopleListView: View {
                 await contactsManager.load()
                 enrichWithContactNames()
                 refreshSuggestions()
+                await loadSmartSuggestions()
                 await startFriendRequestRealtime()
+            }
+            .sheet(item: $selectedSuggestion) { suggestion in
+                SuggestionProfileSheet(
+                    suggestion: suggestion,
+                    onAddFriend: {
+                        Task { await addSuggestion(suggestion) }
+                        selectedSuggestion = nil
+                    },
+                    onDismiss: { selectedSuggestion = nil }
+                )
             }
             .onChange(of: navState.showFriendRequests) { _, show in
                 guard show else { return }
@@ -485,6 +517,194 @@ struct PeopleListView: View {
                 self.error = error.localizedDescription
             }
         }
+    }
+
+    private func loadSmartSuggestions() async {
+        let existingIds = Set(people.map { $0.id })
+        do {
+            let results = try await SuggestionsService.shared.fetchSuggestions(
+                contactsManager: contactsManager,
+                existingFriendIds: existingIds
+            )
+            smartSuggestions = results
+        } catch is CancellationError {
+            return
+        } catch {
+            // Non-fatal: silently swallow suggestion errors
+        }
+    }
+
+    private func addSuggestion(_ suggestion: ProfileSuggestion) async {
+        do {
+            try await MeetupService.shared.addFriend(userId: suggestion.profile.id)
+            smartSuggestions.removeAll { $0.id == suggestion.id }
+            await load()
+            enrichWithContactNames()
+        } catch {
+            self.error = error.localizedDescription
+        }
+    }
+}
+
+// MARK: - Suggestion Card
+
+private struct SuggestionCard: View {
+    let suggestion: ProfileSuggestion
+    let onTap: () -> Void
+
+    private var displayedName: String {
+        suggestion.profile.displayName ?? "Unknown"
+    }
+
+    private var subtitleText: String {
+        switch suggestion.reason {
+        case .inContacts:
+            return "In your contacts"
+        case .mutualFriends(let count):
+            return count == 1 ? "1 mutual friend" : "\(count) mutual friends"
+        }
+    }
+
+    private func avatarColor(for id: UUID) -> Color {
+        Color.participantPalette[abs(id.hashValue) % Color.participantPalette.count]
+    }
+
+    var body: some View {
+        Button(action: onTap) {
+            HStack(spacing: 12) {
+                Circle()
+                    .fill(avatarColor(for: suggestion.profile.id).opacity(0.7))
+                    .frame(width: 42, height: 42)
+                    .overlay {
+                        Text(String(displayedName.prefix(1)).uppercased())
+                            .font(.system(size: 17, weight: .bold))
+                            .foregroundStyle(.white)
+                    }
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(displayedName)
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(.primary)
+                    Text(subtitleText)
+                        .font(.system(size: 12))
+                        .foregroundStyle(Color.coral.opacity(0.85))
+                }
+
+                Spacer()
+
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(.secondary)
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 12)
+            .background(Color.white.opacity(0.05))
+            .clipShape(RoundedRectangle(cornerRadius: 14))
+            .overlay(
+                RoundedRectangle(cornerRadius: 14)
+                    .strokeBorder(Color.coral.opacity(0.2), lineWidth: 1)
+            )
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+// MARK: - Suggestion Profile Sheet
+
+private struct SuggestionProfileSheet: View {
+    let suggestion: ProfileSuggestion
+    let onAddFriend: () -> Void
+    let onDismiss: () -> Void
+
+    private var displayedName: String {
+        suggestion.profile.displayName ?? "Unknown"
+    }
+
+    private var subtitleText: String {
+        switch suggestion.reason {
+        case .inContacts:
+            return "In your contacts"
+        case .mutualFriends(let count):
+            return count == 1 ? "1 mutual friend" : "\(count) mutual friends"
+        }
+    }
+
+    private func avatarColor(for id: UUID) -> Color {
+        Color.participantPalette[abs(id.hashValue) % Color.participantPalette.count]
+    }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            // Drag indicator
+            Capsule()
+                .fill(Color.white.opacity(0.25))
+                .frame(width: 36, height: 4)
+                .padding(.top, 12)
+                .padding(.bottom, 24)
+
+            // Avatar
+            Circle()
+                .fill(avatarColor(for: suggestion.profile.id).opacity(0.7))
+                .frame(width: 80, height: 80)
+                .overlay {
+                    Text(String(displayedName.prefix(1)).uppercased())
+                        .font(.system(size: 32, weight: .bold))
+                        .foregroundStyle(.white)
+                }
+                .padding(.bottom, 16)
+
+            // Name
+            Text(displayedName)
+                .font(.system(size: 22, weight: .bold))
+                .padding(.bottom, 4)
+
+            // Reason badge
+            HStack(spacing: 4) {
+                Image(systemName: suggestion.reason == .inContacts ? "person.crop.circle" : "person.2")
+                    .font(.system(size: 12))
+                Text(subtitleText)
+                    .font(.system(size: 13, weight: .semibold))
+            }
+            .foregroundStyle(Color.coral)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 6)
+            .background(Color.coral.opacity(0.12))
+            .clipShape(Capsule())
+            .padding(.bottom, 8)
+
+            // Phone
+            if let phone = suggestion.profile.phoneE164 {
+                Text(phone)
+                    .font(.system(size: 14))
+                    .foregroundStyle(.secondary)
+                    .padding(.bottom, 32)
+            } else {
+                Spacer().frame(height: 32)
+            }
+
+            // Add Friend button
+            Button(action: onAddFriend) {
+                Label("Add Friend", systemImage: "person.badge.plus")
+                    .font(.system(size: 16, weight: .bold))
+                    .foregroundStyle(.white)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 14)
+                    .background(Color.coral)
+                    .clipShape(RoundedRectangle(cornerRadius: 14))
+            }
+            .padding(.horizontal, 24)
+            .padding(.bottom, 12)
+
+            // Dismiss button
+            Button("Not Now", action: onDismiss)
+                .font(.system(size: 15))
+                .foregroundStyle(.secondary)
+                .padding(.bottom, 32)
+        }
+        .frame(maxWidth: .infinity)
+        .background(.ultraThinMaterial)
+        .presentationDetents([.medium])
+        .presentationDragIndicator(.hidden)
     }
 }
 
