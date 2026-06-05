@@ -284,6 +284,7 @@ private struct InviteSection: View {
 
     var body: some View {
         Section("Invite people") {
+            FriendSuggestionsRow(invitees: $invitees)
             HStack {
                 TextField("Name or +1 (646) 946-6861", text: $inviteePhone)
                     .keyboardType(.default)
@@ -395,5 +396,100 @@ private struct InviteSection: View {
             error = "\(contact.displayName) isn't on the app yet"
         }
         isSearchingUser = false
+    }
+}
+
+// MARK: - Friend Suggestions Row
+
+private struct FriendSuggestionsRow: View {
+    @Binding var invitees: [FoundUser]
+    @State private var friends: [Profile] = []
+
+    var body: some View {
+        Group {
+            if !friends.isEmpty {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("From your squad")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .textCase(.uppercase)
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 12) {
+                            ForEach(friends) { friend in
+                                FriendChip(
+                                    friend: friend,
+                                    isInvited: invitees.contains(where: { $0.id == friend.id }),
+                                    onTap: { toggle(friend) }
+                                )
+                            }
+                        }
+                        .padding(.vertical, 2)
+                    }
+                }
+                .padding(.vertical, 4)
+            }
+        }
+        .task {
+            friends = (try? await MeetupService.shared.getFriends()) ?? []
+        }
+    }
+
+    private func toggle(_ friend: Profile) {
+        let user = FoundUser(
+            id: friend.id,
+            displayName: friend.displayName ?? "Unknown",
+            phone: friend.phoneE164 ?? ""
+        )
+        if let idx = invitees.firstIndex(where: { $0.id == friend.id }) {
+            invitees.remove(at: idx)
+        } else {
+            invitees.append(user)
+        }
+    }
+}
+
+// MARK: - Friend Chip
+
+private struct FriendChip: View {
+    let friend: Profile
+    let isInvited: Bool
+    let onTap: () -> Void
+
+    private var initial: String {
+        String((friend.displayName ?? "?").prefix(1)).uppercased()
+    }
+
+    private var shortName: String {
+        let name = friend.displayName ?? "Unknown"
+        let first = name.split(separator: " ").first.map(String.init) ?? name
+        return String(first.prefix(9))
+    }
+
+    var body: some View {
+        Button(action: onTap) {
+            VStack(spacing: 5) {
+                ZStack {
+                    Circle()
+                        .fill(isInvited ? Color.coral : Color.coral.opacity(0.12))
+                        .frame(width: 44, height: 44)
+                    if isInvited {
+                        Image(systemName: "checkmark")
+                            .font(.system(size: 14, weight: .bold))
+                            .foregroundStyle(.white)
+                    } else {
+                        Text(initial)
+                            .font(.system(size: 16, weight: .bold))
+                            .foregroundStyle(Color.coral)
+                    }
+                }
+                Text(shortName)
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(isInvited ? Color.coral : .primary)
+                    .lineLimit(1)
+            }
+            .frame(width: 56)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(isInvited ? "Remove \(shortName)" : "Invite \(shortName)")
     }
 }

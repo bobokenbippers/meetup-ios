@@ -34,6 +34,7 @@ class AppDelegate: NSObject, UIApplicationDelegate {
                 .eq("id", value: userId)
                 .execute()
         }
+        Task { await NotificationService.shared.registerDeviceToken(deviceToken) }
     }
 }
 
