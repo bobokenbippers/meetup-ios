@@ -11,7 +11,7 @@ struct Meetup: Codable, Identifiable, Equatable {
     let startsAt: Date
     let endsAt: Date
     let status: String
-    let shareToken: String
+    let shareToken: String?
     let createdAt: Date
     let category: String?
 

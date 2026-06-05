@@ -69,6 +69,8 @@ struct meetup_iosApp: App {
     @State private var auth = AuthViewModel()
     @State private var settings = AppSettings()
     private let navState = NavigationState.shared
+    @State private var pendingShareToken: String?
+    @State private var showJoinSheet = false
 
     var body: some Scene {
         WindowGroup {
@@ -91,14 +93,35 @@ struct meetup_iosApp: App {
             .onOpenURL { url in
                 handleDeepLink(url)
             }
+            .sheet(isPresented: $showJoinSheet, onDismiss: { pendingShareToken = nil }) {
+                if let token = pendingShareToken {
+                    JoinMeetupSheet(shareToken: token)
+                }
+            }
         }
     }
 
     private func handleDeepLink(_ url: URL) {
+        // Universal link: https://squadbrunch.app/join/<token>
+        if let host = url.host, host == "squadbrunch.app" {
+            let path = url.pathComponents.filter { $0 != "/" }
+            if path.count >= 2, path[0] == "join" {
+                pendingShareToken = path[1]
+                showJoinSheet = true
+                return
+            }
+        }
+
         guard url.scheme == "squadbrunch" else { return }
         let host = url.host ?? ""
         let pathComponents = url.pathComponents.filter { $0 != "/" }
         switch host {
+        case "join":
+            // squadbrunch://join/<token>
+            if let token = pathComponents.first {
+                pendingShareToken = token
+                showJoinSheet = true
+            }
         case "meetup":
             let meetupId = pathComponents.first
             Task { @MainActor in

@@ -10,11 +10,13 @@ struct FoundUser {
 enum MeetupError: LocalizedError {
     case notSignedIn
     case createFailed
+    case meetupNotFound
 
     var errorDescription: String? {
         switch self {
         case .notSignedIn: return "You must be signed in"
         case .createFailed: return "Failed to create meetup"
+        case .meetupNotFound: return "Invite link is invalid or expired"
         }
     }
 }
@@ -472,6 +474,68 @@ final class MeetupService {
             .update(["status": "invited"])
             .eq("meetup_id", value: meetupId)
             .eq("user_id", value: userId)
+            .execute()
+    }
+
+    // MARK: - Share token
+
+    func fetchMeetupByShareToken(_ token: String) async throws -> Meetup {
+        let rows: [Meetup] = try await supabase
+            .from("meetups")
+            .select()
+            .eq("share_token", value: token)
+            .limit(1)
+            .execute()
+            .value
+        guard let meetup = rows.first else { throw MeetupError.meetupNotFound }
+        return meetup
+    }
+
+    /// Returns the existing share token or generates, persists, and returns a new one.
+    func ensureShareToken(for meetup: Meetup) async throws -> String {
+        if let token = meetup.shareToken, !token.isEmpty { return token }
+        let newToken = UUID().uuidString
+        struct TokenUpdate: Encodable {
+            let shareToken: String
+            enum CodingKeys: String, CodingKey {
+                case shareToken = "share_token"
+            }
+        }
+        try await supabase
+            .from("meetups")
+            .update(TokenUpdate(shareToken: newToken))
+            .eq("id", value: meetup.id)
+            .execute()
+        return newToken
+    }
+
+    /// Join a meetup via share link — inserts an "invited" participant row if not already present.
+    func joinByShareToken(meetupId: UUID) async throws {
+        guard let userId = supabase.auth.currentUser?.id else { throw MeetupError.notSignedIn }
+
+        // Check if already a participant
+        let existing: [MeetupParticipant] = try await supabase
+            .from("meetup_participants")
+            .select()
+            .eq("meetup_id", value: meetupId)
+            .eq("user_id", value: userId)
+            .execute()
+            .value
+        if !existing.isEmpty { return }
+
+        struct ParticipantInsert: Encodable {
+            let meetupId: UUID
+            let userId: UUID
+            let status: String
+            enum CodingKeys: String, CodingKey {
+                case meetupId = "meetup_id"
+                case userId   = "user_id"
+                case status
+            }
+        }
+        try await supabase
+            .from("meetup_participants")
+            .insert(ParticipantInsert(meetupId: meetupId, userId: userId, status: "invited"))
             .execute()
     }
 }
