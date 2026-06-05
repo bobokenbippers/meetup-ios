@@ -73,8 +73,24 @@ struct MeetupParticipant: Codable, Identifiable, Equatable {
     }
 }
 
+enum PunctualityState {
+    case early, onTime, cuttingClose, late, veryLate
+}
+
 extension MeetupParticipant {
     var isEnRoute: Bool { status == "yes" || status == "accepted" }
+
+    func punctualityState(target: Date) -> PunctualityState? {
+        guard isEnRoute, let seconds = etaSeconds else { return nil }
+        let delta = Date().addingTimeInterval(TimeInterval(seconds)).timeIntervalSince(target)
+        switch delta {
+        case ..<(-300):  return .early
+        case -300..<300: return .onTime
+        case 300..<900:  return .cuttingClose
+        case 900..<1800: return .late
+        default:         return .veryLate
+        }
+    }
 
     func etaLabel() -> String? {
         guard let seconds = etaSeconds, isEnRoute else { return nil }

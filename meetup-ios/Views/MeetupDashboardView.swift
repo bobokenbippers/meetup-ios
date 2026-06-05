@@ -473,15 +473,49 @@ private struct DashboardParticipantRow: View {
         return .statusLive
     }
 
+    private var punctualityTint: Color? {
+        guard let target = targetArrivalAt,
+              participant.status != "arrived"
+        else { return nil }
+        switch participant.punctualityState(target: target) {
+        case .early:        return Color.statusLive.opacity(0.12)
+        case .onTime:       return nil
+        case .cuttingClose: return Color(red: 1.0, green: 0.85, blue: 0.2).opacity(0.18)
+        case .late:         return Color.orange.opacity(0.18)
+        case .veryLate:     return Color.statusLate.opacity(0.15)
+        case .none:         return nil
+        }
+    }
+
+    private var punctualityAccent: Color? {
+        guard let target = targetArrivalAt,
+              participant.status != "arrived"
+        else { return nil }
+        switch participant.punctualityState(target: target) {
+        case .early:        return Color.statusLive
+        case .onTime:       return nil
+        case .cuttingClose: return Color(red: 1.0, green: 0.75, blue: 0.0)
+        case .late:         return Color.orange
+        case .veryLate:     return Color.statusLate
+        case .none:         return nil
+        }
+    }
+
     var body: some View {
         HStack(spacing: 12) {
             Circle()
                 .fill(pinColor(for: participant.userId).opacity(0.8))
                 .frame(width: 30, height: 30)
                 .overlay {
-                    Text(String((participant.displayName ?? "?").prefix(1)).uppercased())
-                        .font(.system(size: 12, weight: .bold))
-                        .foregroundStyle(.white)
+                    if participant.status == "arrived" {
+                        Image(systemName: "checkmark")
+                            .font(.system(size: 12, weight: .bold))
+                            .foregroundStyle(.white)
+                    } else {
+                        Text(String((participant.displayName ?? "?").prefix(1)).uppercased())
+                            .font(.system(size: 12, weight: .bold))
+                            .foregroundStyle(.white)
+                    }
                 }
 
             VStack(alignment: .leading, spacing: 1) {
@@ -505,6 +539,15 @@ private struct DashboardParticipantRow: View {
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 8)
+        .background(punctualityTint)
+        .overlay(alignment: .leading) {
+            if let accent = punctualityAccent {
+                Rectangle()
+                    .fill(accent)
+                    .frame(width: 3)
+            }
+        }
+        .animation(.easeInOut(duration: 0.3), value: participant.etaSeconds)
     }
 }
 
