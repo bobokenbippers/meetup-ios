@@ -165,7 +165,8 @@ struct MeetupsListView: View {
             .onChange(of: navState.pendingMeetupId) { _, meetupId in
                 guard let meetupId else { return }
                 navState.pendingMeetupId = nil
-                if let p = participations.first(where: { $0.meetup.id == meetupId }) {
+                let match = participations.first(where: { $0.meetup.id == meetupId })
+                if let p = match {
                     selectedMeetup = p.meetup
                 } else {
                     // Data not yet loaded — load then open
