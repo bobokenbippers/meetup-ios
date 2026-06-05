@@ -72,6 +72,7 @@ struct meetup_iosApp: App {
     private let navState = NavigationState.shared
     @State private var pendingShareToken: String?
     @State private var showJoinSheet = false
+    @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding = false
 
     var body: some Scene {
         WindowGroup {
@@ -84,6 +85,8 @@ struct meetup_iosApp: App {
                     ProgressView("Loading...")
                 } else if auth.profile?.phoneE164 == nil {
                     ProfileSetupView()
+                } else if !hasCompletedOnboarding {
+                    OnboardingView()
                 } else {
                     HomeView()
                 }
