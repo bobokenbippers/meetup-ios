@@ -78,7 +78,7 @@ enum PunctualityState {
 }
 
 extension MeetupParticipant {
-    var isEnRoute: Bool { status == "yes" || status == "accepted" }
+    var isEnRoute: Bool { status == "yes" }
 
     func punctualityState(target: Date) -> PunctualityState? {
         guard isEnRoute, let seconds = etaSeconds else { return nil }
