@@ -172,7 +172,8 @@ struct MeetupsListView: View {
                     // Data not yet loaded — load then open
                     Task {
                         await load()
-                        if let p = participations.first(where: { $0.meetup.id == meetupId }) {
+                        let delayed = participations.first(where: { $0.meetup.id == meetupId })
+                        if let p = delayed {
                             selectedMeetup = p.meetup
                         }
                     }
