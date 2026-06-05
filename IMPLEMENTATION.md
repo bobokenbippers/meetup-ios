@@ -2152,7 +2152,7 @@ CREATE POLICY "participants can read receipt item claims"
 
 -- Storage buckets (create via Supabase dashboard: Storage → New bucket)
 -- Bucket name: receipts   — private, RLS-protected
--- Bucket name: meetup-photos — private, for future use
+-- Bucket name: meetup-photos — private, signed-URL access (see 20260605_meetup_photos.sql)
 
 -- Storage RLS for receipts bucket
 -- In Supabase dashboard: Storage → Policies → receipts bucket

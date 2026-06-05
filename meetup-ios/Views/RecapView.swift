@@ -16,11 +16,12 @@ struct RecapView: View {
     @State private var error: String?
     @State private var showBillView = false
 
-    @State private var photos: [URL] = []
+    @State private var meetupPhotos: [MeetupPhoto] = []
     @State private var isUploadingPhoto = false
     @State private var showPhotoPicker = false
     @State private var selectedPhotoItem: PhotosPickerItem?
-    @State private var fullscreenPhoto: URL?
+    @State private var fullscreenPhoto: MeetupPhoto?
+    @State private var sharePhoto: MeetupPhoto?
 
     private var myUserId: UUID? { auth.session?.user.id }
     private var isHost: Bool { myUserId == meetup.hostId }
@@ -71,8 +72,13 @@ struct RecapView: View {
                 guard let item else { return }
                 Task { await uploadPickedPhoto(item) }
             }
-            .sheet(item: $fullscreenPhoto) { url in
-                FullscreenPhotoView(url: url)
+            .sheet(item: $fullscreenPhoto) { photo in
+                RecapFullscreenPhotoView(photo: photo, uploaderName: photo.uploaderDisplayName)
+            }
+            .sheet(item: $sharePhoto) { photo in
+                if let url = URL(string: photo.photoUrl) {
+                    ShareSheet(url: url).ignoresSafeArea()
+                }
             }
             .alert("Error", isPresented: Binding(get: { error != nil }, set: { if !$0 { error = nil } })) {
                 Button("OK") { error = nil }
@@ -436,7 +442,7 @@ struct RecapView: View {
 
             Divider()
 
-            if photos.isEmpty {
+            if meetupPhotos.isEmpty {
                 Button {
                     showPhotoPicker = true
                 } label: {
@@ -453,10 +459,10 @@ struct RecapView: View {
                 }
                 .buttonStyle(.plain)
             } else {
-                let columns = [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())]
+                let columns = [GridItem(.flexible(), spacing: 2), GridItem(.flexible(), spacing: 2)]
                 LazyVGrid(columns: columns, spacing: 2) {
-                    ForEach(photos, id: \.absoluteString) { url in
-                        AsyncImage(url: url) { phase in
+                    ForEach(meetupPhotos) { photo in
+                        AsyncImage(url: URL(string: photo.photoUrl)) { phase in
                             switch phase {
                             case .success(let image):
                                 image
@@ -473,10 +479,11 @@ struct RecapView: View {
                                     .overlay(ProgressView().scaleEffect(0.7))
                             }
                         }
-                        .frame(height: 100)
+                        .frame(height: 140)
                         .clipped()
                         .contentShape(Rectangle())
-                        .onTapGesture { fullscreenPhoto = url }
+                        .onTapGesture { fullscreenPhoto = photo }
+                        .onLongPressGesture { sharePhoto = photo }
                     }
                 }
                 .padding(.top, 2)
@@ -491,20 +498,19 @@ struct RecapView: View {
     }
 
     private func uploadPickedPhoto(_ item: PhotosPickerItem) async {
-        guard let data = try? await item.loadTransferable(type: Data.self),
-              let uiImage = UIImage(data: data),
-              let jpeg = uiImage.jpegData(compressionQuality: 0.8) else {
-            selectedPhotoItem = nil
-            return
-        }
         isUploadingPhoto = true
         defer {
             isUploadingPhoto = false
             selectedPhotoItem = nil
         }
         do {
-            let url = try await MeetupPhotoService.shared.uploadPhoto(meetupId: meetup.id, imageData: jpeg)
-            photos.append(url)
+            guard let data = try await item.loadTransferable(type: Data.self),
+                  let uiImage = UIImage(data: data) else { return }
+            let urlString = try await MeetupPhotoService.shared.uploadPhoto(image: uiImage, meetupId: meetup.id)
+            try await MeetupPhotoService.shared.insertPhoto(meetupId: meetup.id, url: urlString, caption: nil)
+            meetupPhotos = (try? await MeetupPhotoService.shared.fetchPhotos(meetupId: meetup.id)) ?? meetupPhotos
+        } catch is CancellationError {
+            return
         } catch {
             self.error = error.localizedDescription
         }
@@ -525,7 +531,7 @@ struct RecapView: View {
                 receiptItems[receipt.id] = try await BillService.shared.fetchReceiptItems(receiptId: receipt.id)
             }
             claims = try await BillService.shared.fetchAllReceiptClaims(receiptIds: fetchedReceipts.map { $0.id })
-            photos = (try? await MeetupPhotoService.shared.listPhotos(meetupId: meetup.id)) ?? []
+            meetupPhotos = (try? await MeetupPhotoService.shared.fetchPhotos(meetupId: meetup.id)) ?? []
 
             hasLoaded = true
         } catch is CancellationError {
@@ -537,30 +543,61 @@ struct RecapView: View {
     }
 }
 
-// MARK: - Fullscreen Photo Viewer
+// MARK: - Fullscreen Photo Viewer (RecapView)
 
-private struct FullscreenPhotoView: View {
-    let url: URL
+private struct RecapFullscreenPhotoView: View {
+    let photo: MeetupPhoto
+    let uploaderName: String?
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
         ZStack(alignment: .topTrailing) {
             Color.black.ignoresSafeArea()
-            AsyncImage(url: url) { phase in
-                switch phase {
-                case .success(let image):
-                    image
-                        .resizable()
-                        .scaledToFit()
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                case .failure:
-                    Image(systemName: "photo")
-                        .font(.system(size: 48))
-                        .foregroundStyle(.secondary)
-                default:
-                    ProgressView()
+
+            VStack(spacing: 0) {
+                AsyncImage(url: URL(string: photo.photoUrl)) { phase in
+                    switch phase {
+                    case .success(let image):
+                        image
+                            .resizable()
+                            .scaledToFit()
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    case .failure:
+                        Image(systemName: "photo")
+                            .font(.system(size: 48))
+                            .foregroundStyle(.secondary)
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    default:
+                        ProgressView()
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    }
                 }
+
+                // Caption + uploader info
+                VStack(alignment: .leading, spacing: 4) {
+                    if let caption = photo.caption, !caption.isEmpty {
+                        Text(caption)
+                            .font(.system(size: 15))
+                            .foregroundStyle(.white)
+                    }
+                    if let name = uploaderName {
+                        Text("Shared by \(name)")
+                            .font(.system(size: 12))
+                            .foregroundStyle(.white.opacity(0.7))
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 20)
+                .padding(.vertical, 16)
+                .background(
+                    LinearGradient(
+                        colors: [.black.opacity(0), .black.opacity(0.7)],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                )
             }
+
             Button {
                 dismiss()
             } label: {
@@ -573,6 +610,14 @@ private struct FullscreenPhotoView: View {
     }
 }
 
-extension URL: @retroactive Identifiable {
-    public var id: String { absoluteString }
+// MARK: - Share Sheet
+
+private struct ShareSheet: UIViewControllerRepresentable {
+    let url: URL
+
+    func makeUIViewController(context: Context) -> UIActivityViewController {
+        UIActivityViewController(activityItems: [url], applicationActivities: nil)
+    }
+
+    func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {}
 }

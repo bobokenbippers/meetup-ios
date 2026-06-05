@@ -1,5 +1,6 @@
 import SwiftUI
 import MapKit
+import PhotosUI
 import Supabase
 
 struct MeetupDashboardView: View {
@@ -19,6 +20,13 @@ struct MeetupDashboardView: View {
     @State private var shareURL: URL?
     @State private var isGeneratingShareLink = false
     @State private var showRecap = false
+
+    // Photo state
+    @State private var recentPhotos: [MeetupPhoto] = []
+    @State private var selectedPhotoItems: [PhotosPickerItem] = []
+    @State private var showPhotoPicker = false
+    @State private var isUploadingPhotos = false
+    @State private var fullscreenPhoto: MeetupPhoto?
 
     private var myUserId: UUID? { auth.session?.user.id }
     private var myStatus: String? { participants.first(where: { $0.userId == myUserId })?.status }
@@ -74,6 +82,12 @@ struct MeetupDashboardView: View {
                 .frame(maxHeight: .infinity)
                 .disabled(true)
 
+                // Photo thumbnail strip (shown when photos exist)
+                if !recentPhotos.isEmpty {
+                    photoStrip
+                        .padding(.bottom, 0)
+                }
+
                 // Bottom panel
                 bottomPanel
             }
@@ -85,22 +99,46 @@ struct MeetupDashboardView: View {
                     Button("Close") { dismiss() }
                 }
                 ToolbarItem(placement: .primaryAction) {
-                    Button {
-                        Task { await generateAndShare() }
-                    } label: {
-                        if isGeneratingShareLink {
-                            ProgressView().frame(width: 24, height: 24)
-                        } else {
-                            Image(systemName: "square.and.arrow.up")
+                    HStack(spacing: 4) {
+                        // Photo upload button
+                        Button {
+                            showPhotoPicker = true
+                        } label: {
+                            if isUploadingPhotos {
+                                ProgressView().frame(width: 24, height: 24)
+                            } else {
+                                Image(systemName: "camera")
+                            }
                         }
+                        .disabled(isUploadingPhotos)
+
+                        Button {
+                            Task { await generateAndShare() }
+                        } label: {
+                            if isGeneratingShareLink {
+                                ProgressView().frame(width: 24, height: 24)
+                            } else {
+                                Image(systemName: "square.and.arrow.up")
+                            }
+                        }
+                        .disabled(isGeneratingShareLink)
                     }
-                    .disabled(isGeneratingShareLink)
                 }
                 if myUserId == meetup.hostId {
                     ToolbarItem(placement: .destructiveAction) {
                         Button("Cancel", role: .destructive) { showCancelConfirm = true }
                     }
                 }
+            }
+            .photosPicker(
+                isPresented: $showPhotoPicker,
+                selection: $selectedPhotoItems,
+                maxSelectionCount: 4,
+                matching: .images
+            )
+            .onChange(of: selectedPhotoItems) { _, items in
+                guard !items.isEmpty else { return }
+                Task { await uploadPickedPhotos(items) }
             }
             .sheet(isPresented: $showBill) {
                 BillView(meetup: meetup, participants: participants)
@@ -114,6 +152,9 @@ struct MeetupDashboardView: View {
                 ShareSheet(url: url)
                     .ignoresSafeArea()
             }
+            .sheet(item: $fullscreenPhoto) { photo in
+                DashboardFullscreenPhotoView(photo: photo)
+            }
             .confirmationDialog("Cancel this meetup?", isPresented: $showCancelConfirm, titleVisibility: .visible) {
                 Button("Cancel Meetup", role: .destructive) {
                     Task {
@@ -125,7 +166,9 @@ struct MeetupDashboardView: View {
             }
             .task {
                 await load()
+                await loadPhotos()
                 await startRealtime()
+                await startPhotoRealtime()
             }
             .onAppear {
                 if meetup.isRecap { showRecap = true }
@@ -210,6 +253,42 @@ struct MeetupDashboardView: View {
             RoundedRectangle(cornerRadius: 14)
                 .strokeBorder(Color(.separator).opacity(0.5), lineWidth: 1)
         )
+    }
+
+    // MARK: - Photo strip
+
+    private var photoStrip: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                ForEach(recentPhotos.prefix(6)) { photo in
+                    AsyncImage(url: URL(string: photo.photoUrl)) { phase in
+                        switch phase {
+                        case .success(let image):
+                            image
+                                .resizable()
+                                .scaledToFill()
+                        case .failure:
+                            Color(.tertiarySystemBackground)
+                                .overlay(
+                                    Image(systemName: "photo")
+                                        .foregroundStyle(.secondary)
+                                )
+                        default:
+                            Color(.tertiarySystemBackground)
+                                .overlay(ProgressView().scaleEffect(0.7))
+                        }
+                    }
+                    .frame(width: 72, height: 72)
+                    .clipped()
+                    .clipShape(RoundedRectangle(cornerRadius: 10))
+                    .contentShape(Rectangle())
+                    .onTapGesture { fullscreenPhoto = photo }
+                }
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 10)
+        }
+        .background(.regularMaterial)
     }
 
     private var bottomPanel: some View {
@@ -311,6 +390,54 @@ struct MeetupDashboardView: View {
             let gmWeb = URL(string: "https://www.google.com/maps/dir/?api=1&destination=\(lat),\(lng)&travelmode=driving")!
             UIApplication.shared.open(gmWeb)
         }
+    }
+
+    private func loadPhotos() async {
+        do {
+            let photos = try await MeetupPhotoService.shared.fetchPhotos(meetupId: meetup.id)
+            recentPhotos = photos
+        } catch is CancellationError {
+            return
+        } catch {
+            // Non-fatal: photos are supplemental
+        }
+    }
+
+    private func startPhotoRealtime() async {
+        let channel = SupabaseManager.shared.client.realtimeV2.channel("meetup-photos-\(meetup.id)")
+        let changes = channel.postgresChange(AnyAction.self, schema: "public", table: "meetup_photos")
+        do {
+            try await channel.subscribeWithError()
+        } catch {
+            return
+        }
+        for await _ in changes {
+            guard !Task.isCancelled else { break }
+            await loadPhotos()
+        }
+        await SupabaseManager.shared.client.realtimeV2.removeChannel(channel)
+    }
+
+    private func uploadPickedPhotos(_ items: [PhotosPickerItem]) async {
+        isUploadingPhotos = true
+        defer {
+            isUploadingPhotos = false
+            selectedPhotoItems = []
+        }
+        for item in items {
+            guard !Task.isCancelled else { break }
+            do {
+                guard let data = try await item.loadTransferable(type: Data.self),
+                      let uiImage = UIImage(data: data) else { continue }
+                let urlString = try await MeetupPhotoService.shared.uploadPhoto(image: uiImage, meetupId: meetup.id)
+                try await MeetupPhotoService.shared.insertPhoto(meetupId: meetup.id, url: urlString, caption: nil)
+            } catch is CancellationError {
+                break
+            } catch {
+                self.error = error.localizedDescription
+            }
+        }
+        await loadPhotos()
     }
 
     private func startRealtime() async {
@@ -714,6 +841,56 @@ private struct ConfettiView: View {
             .allowsHitTesting(false)
             .ignoresSafeArea()
             .onAppear { drop = true }
+        }
+    }
+}
+
+// MARK: - Dashboard Fullscreen Photo
+
+private struct DashboardFullscreenPhotoView: View {
+    let photo: MeetupPhoto
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        ZStack(alignment: .topTrailing) {
+            Color.black.ignoresSafeArea()
+            VStack(spacing: 0) {
+                AsyncImage(url: URL(string: photo.photoUrl)) { phase in
+                    switch phase {
+                    case .success(let image):
+                        image
+                            .resizable()
+                            .scaledToFit()
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    case .failure:
+                        Image(systemName: "photo")
+                            .font(.system(size: 48))
+                            .foregroundStyle(.secondary)
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    default:
+                        ProgressView()
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    }
+                }
+
+                if let caption = photo.caption, !caption.isEmpty {
+                    Text(caption)
+                        .font(.system(size: 14))
+                        .foregroundStyle(.white.opacity(0.9))
+                        .padding(.horizontal, 20)
+                        .padding(.bottom, 24)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+            }
+
+            Button {
+                dismiss()
+            } label: {
+                Image(systemName: "xmark.circle.fill")
+                    .font(.system(size: 28))
+                    .foregroundStyle(.white.opacity(0.8))
+                    .padding(20)
+            }
         }
     }
 }
