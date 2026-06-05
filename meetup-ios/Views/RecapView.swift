@@ -13,6 +13,7 @@ struct RecapView: View {
     @State private var claims: [BillItemClaim] = []
     @State private var hasLoaded = false
     @State private var error: String?
+    @State private var showBillView = false
 
     private var myUserId: UUID? { auth.session?.user.id }
     private var isHost: Bool { myUserId == meetup.hostId }
@@ -54,6 +55,9 @@ struct RecapView: View {
                 }
             }
             .task { await load() }
+            .sheet(isPresented: $showBillView) {
+                BillView(meetup: meetup, participants: participants)
+            }
             .alert("Error", isPresented: Binding(get: { error != nil }, set: { if !$0 { error = nil } })) {
                 Button("OK") { error = nil }
             } message: {
@@ -230,38 +234,51 @@ struct RecapView: View {
     @ViewBuilder
     private var billPlaceholderCard: some View {
         if receipts.isEmpty {
-            HStack(spacing: 12) {
-                ZStack {
-                    Circle()
-                        .fill(Color.coral.opacity(0.15))
-                        .frame(width: 40, height: 40)
-                    Image(systemName: "dollarsign.circle")
-                        .font(.system(size: 18))
-                        .foregroundStyle(Color.coral.opacity(0.8))
+            Button { showBillView = true } label: {
+                HStack(spacing: 12) {
+                    ZStack {
+                        Circle()
+                            .fill(Color.coral.opacity(0.15))
+                            .frame(width: 40, height: 40)
+                        Image(systemName: "dollarsign.circle")
+                            .font(.system(size: 18))
+                            .foregroundStyle(Color.coral.opacity(0.8))
+                    }
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("No receipts")
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundStyle(Color(.label))
+                        Text("Bill splitting not started")
+                            .font(.system(size: 12))
+                            .foregroundStyle(.secondary)
+                    }
+                    Spacer()
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(Color(.tertiaryLabel))
                 }
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("No receipts")
-                        .font(.system(size: 14, weight: .semibold))
-                        .foregroundStyle(Color(.label))
-                    Text("Bill splitting not started")
-                        .font(.system(size: 12))
-                        .foregroundStyle(.secondary)
-                }
-                Spacer()
+                .padding(14)
+                .background(Color(.secondarySystemBackground))
+                .clipShape(RoundedRectangle(cornerRadius: 16))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 16)
+                        .strokeBorder(Color(.separator).opacity(0.5), lineWidth: 1)
+                )
             }
-            .padding(14)
-            .background(Color(.secondarySystemBackground))
-            .clipShape(RoundedRectangle(cornerRadius: 16))
-            .overlay(
-                RoundedRectangle(cornerRadius: 16)
-                    .strokeBorder(Color(.separator).opacity(0.5), lineWidth: 1)
-            )
+            .buttonStyle(.plain)
         } else {
             billBreakdownCard
         }
     }
 
     private var billBreakdownCard: some View {
+        Button { showBillView = true } label: {
+        billBreakdownCardContent
+        }
+        .buttonStyle(.plain)
+    }
+
+    private var billBreakdownCardContent: some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack(spacing: 8) {
                 ZStack {
@@ -276,9 +293,14 @@ struct RecapView: View {
                     .font(.system(size: 14, weight: .semibold))
                     .foregroundStyle(Color(.label))
                 Spacer()
-                Text("\(receipts.count) place\(receipts.count == 1 ? "" : "s")")
-                    .font(.system(size: 11))
-                    .foregroundStyle(.secondary)
+                HStack(spacing: 4) {
+                    Text("View details")
+                        .font(.system(size: 11))
+                        .foregroundStyle(.secondary)
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundStyle(Color(.tertiaryLabel))
+                }
             }
             .padding(.horizontal, 14)
             .padding(.top, 14)
