@@ -6,11 +6,14 @@ struct Receipt: Codable, Identifiable, Equatable {
     let placeName: String
     let payerUserId: UUID
     var totalAmount: Double
+    let tax: Double
+    let tip: Double
+    let surcharge: Double
     let photoUrl: String?
     let createdAt: Date
 
     enum CodingKeys: String, CodingKey {
-        case id
+        case id, tax, tip, surcharge
         case meetupId    = "meetup_id"
         case placeName   = "place_name"
         case payerUserId = "payer_user_id"

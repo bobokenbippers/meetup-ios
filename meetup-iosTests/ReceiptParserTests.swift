@@ -89,6 +89,19 @@ struct ReceiptParserTests {
         #expect(receipt.items[0].name == "Eggs Benedict")
     }
 
+    @Test("credit card fee is parsed as surcharge, not an item")
+    func creditCardFeeAsSurcharge() {
+        let lines = [
+            "Salad          12.00",
+            "Credit Card Fee 0.48",
+            "Total          12.48",
+        ]
+        let receipt = ReceiptParser.parseText(lines)
+        #expect(receipt.surcharge == 0.48)
+        #expect(receipt.items.count == 1)
+        #expect(receipt.items[0].name == "Salad")
+    }
+
     @Test("empty input produces zero receipt")
     func emptyInput() {
         let receipt = ReceiptParser.parseText([])
@@ -96,6 +109,7 @@ struct ReceiptParserTests {
         #expect(receipt.subtotal == 0)
         #expect(receipt.tax == 0)
         #expect(receipt.tip == 0)
+        #expect(receipt.surcharge == 0)
         #expect(receipt.total == 0)
     }
 

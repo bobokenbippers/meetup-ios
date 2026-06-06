@@ -95,14 +95,18 @@ final class BillService {
             let placeName: String
             let payerUserId: UUID
             let totalAmount: Double
+            let tax: Double
+            let tip: Double
+            let surcharge: Double
             enum CodingKeys: String, CodingKey {
+                case tax, tip, surcharge
                 case meetupId    = "meetup_id"
                 case placeName   = "place_name"
                 case payerUserId = "payer_user_id"
                 case totalAmount = "total_amount"
             }
         }
-        let insert = ReceiptInsert(meetupId: meetupId, placeName: placeName, payerUserId: payerUserId, totalAmount: 0)
+        let insert = ReceiptInsert(meetupId: meetupId, placeName: placeName, payerUserId: payerUserId, totalAmount: 0, tax: 0, tip: 0, surcharge: 0)
         let result: [Receipt] = try await supabase
             .from("receipts")
             .insert(insert)
@@ -121,6 +125,24 @@ final class BillService {
         try await supabase
             .from("receipts")
             .update(TotalUpdate(totalAmount: total))
+            .eq("id", value: receiptId)
+            .execute()
+    }
+
+    func updateReceiptFinancials(_ receiptId: UUID, total: Double, tax: Double, tip: Double, surcharge: Double) async throws {
+        struct FinancialsUpdate: Encodable {
+            let totalAmount: Double
+            let tax: Double
+            let tip: Double
+            let surcharge: Double
+            enum CodingKeys: String, CodingKey {
+                case tax, tip, surcharge
+                case totalAmount = "total_amount"
+            }
+        }
+        try await supabase
+            .from("receipts")
+            .update(FinancialsUpdate(totalAmount: total, tax: tax, tip: tip, surcharge: surcharge))
             .eq("id", value: receiptId)
             .execute()
     }
@@ -278,7 +300,6 @@ final class BillService {
             .sorted { $0.total > $1.total }
     }
 
-    // Per-receipt totals — no tax/tip split (receipt total_amount is the full amount).
     static func computeReceiptTotals(
         receipts: [Receipt],
         items: [UUID: [BillItem]],
@@ -293,19 +314,20 @@ final class BillService {
                 let claimants = claims.filter { $0.billItemId == item.id }.map { $0.userId }
                 guard !claimants.isEmpty else { continue }
                 let share = item.price / Double(claimants.count)
-                for uid in claimants {
-                    subtotals[uid, default: 0] += share
-                }
+                for uid in claimants { subtotals[uid, default: 0] += share }
             }
+            let totalSubtotal = subtotals.values.reduce(0, +)
+            let fees = receipt.tax + receipt.tip + receipt.surcharge
             let totals = participants.map { p in
                 let sub = subtotals[p.userId] ?? 0
+                let feeShare = totalSubtotal > 0 ? (sub / totalSubtotal) * fees : 0
                 return PersonTotal(
                     userId: p.userId,
                     displayName: p.displayName ?? "Unknown",
                     subtotal: sub,
-                    taxShare: 0,
-                    tipShare: 0,
-                    total: sub
+                    taxShare: totalSubtotal > 0 ? (sub / totalSubtotal) * receipt.tax : 0,
+                    tipShare: totalSubtotal > 0 ? (sub / totalSubtotal) * (receipt.tip + receipt.surcharge) : 0,
+                    total: sub + feeShare
                 )
             }.sorted { $0.total > $1.total }
             result[receipt.id] = totals

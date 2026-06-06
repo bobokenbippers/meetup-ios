@@ -24,6 +24,7 @@ struct ParsedReceipt {
     var subtotal: Double
     var tax: Double
     var tip: Double
+    var surcharge: Double
     var total: Double
 }
 
@@ -41,7 +42,7 @@ struct ReceiptParser {
         defer { if accessed { pdfURL.stopAccessingSecurityScopedResource() } }
 
         guard let doc = PDFDocument(url: pdfURL) else {
-            return ParsedReceipt(items: [], subtotal: 0, tax: 0, tip: 0, total: 0)
+            return ParsedReceipt(items: [], subtotal: 0, tax: 0, tip: 0, surcharge: 0, total: 0)
         }
 
         // Try embedded text across all pages
@@ -59,7 +60,7 @@ struct ReceiptParser {
 
         // Scanned PDF — rasterize page 0 and OCR it
         guard let page = doc.page(at: 0) else {
-            return ParsedReceipt(items: [], subtotal: 0, tax: 0, tip: 0, total: 0)
+            return ParsedReceipt(items: [], subtotal: 0, tax: 0, tip: 0, surcharge: 0, total: 0)
         }
         let pageRect = page.bounds(for: .mediaBox)
         let renderer = UIGraphicsImageRenderer(size: pageRect.size)
@@ -121,13 +122,15 @@ struct ReceiptParser {
         var subtotal: Double = 0
         var tax: Double = 0
         var tip: Double = 0
+        var surcharge: Double = 0
         var total: Double = 0
 
         let subtotalKeywords = ["subtotal", "sub total", "sub-total"]
         let taxKeywords = ["tax", "hst", "gst", "vat", "sales tax"]
         let tipKeywords = ["tip", "gratuity", "service charge"]
+        let surchargeKeywords = ["surcharge", "credit card", "card fee", "processing fee", "cc fee", "convenience fee"]
         let totalKeywords = ["total", "amount due", "balance due", "grand total"]
-        let summaryKeywords = subtotalKeywords + taxKeywords + tipKeywords + totalKeywords
+        let summaryKeywords = subtotalKeywords + taxKeywords + tipKeywords + surchargeKeywords + totalKeywords
             + ["change", "cash", "credit", "visa", "mastercard", "amex", "thank you", "receipt",
                "no refund", "transactions are final", "qr", "tel", "fax", "no. of guest",
                "server", "tab#", "dine in", "table", "check", "guest", "amount"]
@@ -150,10 +153,11 @@ struct ReceiptParser {
                     range: NSRange(normalizedLines[idx - 1].startIndex..., in: normalizedLines[idx - 1])
                 ) != nil
                 guard !prevHasPrice else { return nil }
-                if subtotalKeywords.contains(where: { prev.contains($0) }) { return "subtotal" }
-                if taxKeywords.contains(where: { prev.contains($0) })      { return "tax" }
-                if tipKeywords.contains(where: { prev.contains($0) })      { return "tip" }
-                if totalKeywords.contains(where: { prev.contains($0) })    { return "total" }
+                if subtotalKeywords.contains(where: { prev.contains($0) })  { return "subtotal" }
+                if taxKeywords.contains(where: { prev.contains($0) })       { return "tax" }
+                if tipKeywords.contains(where: { prev.contains($0) })       { return "tip" }
+                if surchargeKeywords.contains(where: { prev.contains($0) }) { return "surcharge" }
+                if totalKeywords.contains(where: { prev.contains($0) })     { return "total" }
                 return nil
             }
 
@@ -163,6 +167,8 @@ struct ReceiptParser {
                 tax = price
             } else if tipKeywords.contains(where: { lower.contains($0) }) {
                 tip = price
+            } else if surchargeKeywords.contains(where: { lower.contains($0) }) {
+                surcharge = price
             } else if totalKeywords.contains(where: { lower.contains($0) }) {
                 if price > total { total = price }
             } else if !summaryKeywords.contains(where: { lower.contains($0) }) {
@@ -176,10 +182,11 @@ struct ReceiptParser {
                 if name.isEmpty {
                     // Price-on-own-line: check if prev was a summary label first
                     switch prevLineCategory() {
-                    case "subtotal": subtotal = price; continue
-                    case "tax":      tax = price;      continue
-                    case "tip":      tip = price;      continue
-                    case "total":    if price > total { total = price }; continue
+                    case "subtotal":  subtotal = price;                         continue
+                    case "tax":       tax = price;                               continue
+                    case "tip":       tip = price;                               continue
+                    case "surcharge": surcharge = price;                         continue
+                    case "total":     if price > total { total = price };        continue
                     default: break
                     }
                 }
@@ -208,10 +215,11 @@ struct ReceiptParser {
                 if effectivelyEmpty {
                     // Treat as standalone price — check if prev line was a summary label
                     switch prevLineCategory() {
-                    case "subtotal": subtotal = price; continue
-                    case "tax":      tax = price;      continue
-                    case "tip":      tip = price;      continue
-                    case "total":    if price > total { total = price }; continue
+                    case "subtotal":  subtotal = price;                         continue
+                    case "tax":       tax = price;                               continue
+                    case "tip":       tip = price;                               continue
+                    case "surcharge": surcharge = price;                         continue
+                    case "total":     if price > total { total = price };        continue
                     default: continue  // discard noise item
                     }
                 }
@@ -245,8 +253,8 @@ struct ReceiptParser {
         }
 
         if subtotal == 0 { subtotal = items.reduce(0) { $0 + $1.price } }
-        if total == 0 { total = subtotal + tax + tip }
+        if total == 0 { total = subtotal + tax + tip + surcharge }
 
-        return ParsedReceipt(items: items, subtotal: subtotal, tax: tax, tip: tip, total: total)
+        return ParsedReceipt(items: items, subtotal: subtotal, tax: tax, tip: tip, surcharge: surcharge, total: total)
     }
 }

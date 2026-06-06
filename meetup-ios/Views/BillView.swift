@@ -619,6 +619,7 @@ struct AddReceiptView: View {
                     receipt = Receipt(
                         id: receipt.id, meetupId: receipt.meetupId, placeName: receipt.placeName,
                         payerUserId: receipt.payerUserId, totalAmount: receipt.totalAmount,
+                        tax: receipt.tax, tip: receipt.tip, surcharge: receipt.surcharge,
                         photoUrl: photoUrl, createdAt: receipt.createdAt
                     )
                 }
@@ -629,12 +630,16 @@ struct AddReceiptView: View {
                 parsedItems: editableItems.map { (name: $0.name, price: $0.price) }
             )
 
-            let total = savedItems.reduce(0.0) { $0 + $1.price }
-            try await BillService.shared.updateReceiptTotal(receipt.id, total: total)
+            let tax = parsedReceipt?.tax ?? 0
+            let tip = parsedReceipt?.tip ?? 0
+            let surcharge = parsedReceipt?.surcharge ?? 0
+            let total = savedItems.reduce(0.0) { $0 + $1.price } + tax + tip + surcharge
+            try await BillService.shared.updateReceiptFinancials(receipt.id, total: total, tax: tax, tip: tip, surcharge: surcharge)
 
             let finalReceipt = Receipt(
                 id: receipt.id, meetupId: receipt.meetupId, placeName: receipt.placeName,
                 payerUserId: receipt.payerUserId, totalAmount: total,
+                tax: tax, tip: tip, surcharge: surcharge,
                 photoUrl: receipt.photoUrl, createdAt: receipt.createdAt
             )
 
