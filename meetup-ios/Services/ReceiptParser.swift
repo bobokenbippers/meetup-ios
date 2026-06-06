@@ -124,7 +124,7 @@ struct ReceiptParser {
                "no refund", "transactions are final", "qr", "tel", "fax", "no. of guest",
                "server", "tab#", "dine in", "table", "check", "guest"]
 
-        for line in lines {
+        for (idx, line) in lines.enumerated() {
             let lower = line.lowercased()
             guard let match = priceRegex.firstMatch(in: line, range: NSRange(line.startIndex..., in: line)) else { continue }
             let priceStr = Range(match.range(at: 1), in: line).map { String(line[$0]) }
@@ -151,6 +151,20 @@ struct ReceiptParser {
                 }
                 // Skip modifier lines like "**w.Salad"
                 if name.hasPrefix("*") { continue }
+                // If price is on its own line, use previous non-price line as the item name
+                if name.isEmpty, idx > 0 {
+                    let prev = lines[idx - 1]
+                    let prevLower = prev.lowercased()
+                    let prevHasPrice = priceRegex.firstMatch(in: prev, range: NSRange(prev.startIndex..., in: prev)) != nil
+                    let prevIsSummary = summaryKeywords.contains(where: { prevLower.contains($0) })
+                    if !prevHasPrice && !prevIsSummary && !prev.hasPrefix("*") {
+                        var prevName = prev.trimmingCharacters(in: .whitespaces)
+                        if let qtyRange = prevName.range(of: #"^\d+\s+"#, options: .regularExpression) {
+                            prevName = String(prevName[qtyRange.upperBound...]).trimmingCharacters(in: .whitespaces)
+                        }
+                        name = prevName
+                    }
+                }
                 if !name.isEmpty {
                     items.append((name: name, price: price))
                 }
