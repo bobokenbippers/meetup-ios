@@ -318,9 +318,11 @@ struct PeopleListView: View {
                     Task { await acceptRequest(request) }
                 }
                 .font(.system(size: 13, weight: .bold))
+                .lineLimit(1)
                 .foregroundStyle(.white)
                 .padding(.horizontal, 14)
                 .padding(.vertical, 8)
+                .frame(minWidth: 70)
                 .background(Color.coral)
                 .clipShape(Capsule())
 
@@ -328,9 +330,11 @@ struct PeopleListView: View {
                     Task { await declineRequest(request) }
                 }
                 .font(.system(size: 13, weight: .semibold))
+                .lineLimit(1)
                 .foregroundStyle(.secondary)
                 .padding(.horizontal, 12)
                 .padding(.vertical, 8)
+                .frame(minWidth: 70)
                 .background(Color.white.opacity(0.1))
                 .clipShape(Capsule())
             }
