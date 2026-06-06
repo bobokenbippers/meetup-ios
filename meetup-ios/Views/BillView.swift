@@ -385,8 +385,15 @@ struct AddReceiptView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(AuthViewModel.self) private var auth
 
-    @State private var placeName = ""
+    @State private var placeName: String
     @State private var selectedPayerId: UUID?
+
+    init(meetup: Meetup, participants: [MeetupParticipant], onSaved: @escaping (Receipt, [BillItem]) -> Void) {
+        self.meetup = meetup
+        self.participants = participants
+        self.onSaved = onSaved
+        _placeName = State(initialValue: meetup.destinationName)
+    }
     @State private var selectedPhotoItem: PhotosPickerItem?
     @State private var receiptImage: UIImage?
     @State private var showCamera = false
