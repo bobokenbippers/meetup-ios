@@ -125,6 +125,10 @@ struct MeetupsListView: View {
             .toolbarBackground(Color.appBackground.opacity(0.95), for: .navigationBar)
             .toolbarBackground(.visible, for: .navigationBar)
             .toolbarColorScheme(.dark, for: .navigationBar)
+            .onAppear {
+                UINavigationBar.appearance().largeTitleTextAttributes = [.foregroundColor: UIColor.white]
+                UINavigationBar.appearance().titleTextAttributes = [.foregroundColor: UIColor.white]
+            }
             .toolbar {
                 Button(action: { showCreate = true }) {
                     Image(systemName: "plus")
