@@ -186,9 +186,15 @@ struct ReceiptParser {
 
                 // Strip leading all-consonant OCR noise tokens (e.g. "nll "),
                 // then leading single-letter artifacts (e.g. "I " misread from "1 "),
-                // then leading quantity digits (e.g. "1 ", "2 ")
+                // then leading quantity digits (e.g. "1 ", "2 ") — capture qty before stripping
                 name = name.replacingOccurrences(of: #"^([^aeiouAEIOU\s]{1,5}\s+)+"#, with: "", options: .regularExpression)
                 name = name.replacingOccurrences(of: #"^[A-Za-z]\s+"#, with: "", options: .regularExpression)
+                var quantity = 1
+                if let qRange = name.range(of: #"^(\d+)\s+"#, options: .regularExpression),
+                   let qInt = Int(name[qRange].trimmingCharacters(in: .whitespaces)),
+                   qInt >= 2, qInt <= 20 {
+                    quantity = qInt
+                }
                 name = name.replacingOccurrences(of: #"^\d+\s+"#, with: "", options: .regularExpression)
                 name = name.trimmingCharacters(in: .whitespaces)
 
@@ -228,7 +234,12 @@ struct ReceiptParser {
                 }
 
                 if !name.isEmpty {
-                    items.append((name: name, price: price))
+                    let unitPrice = quantity > 1
+                        ? (price / Double(quantity) * 100).rounded() / 100
+                        : price
+                    for _ in 0..<quantity {
+                        items.append((name: name, price: unitPrice))
+                    }
                 }
             }
         }
