@@ -75,8 +75,22 @@ struct ReceiptParser {
 
     // MARK: - Private
 
+    private static func preprocessed(_ image: UIImage) -> UIImage {
+        guard let ciImage = CIImage(image: image) else { return image }
+        let context = CIContext()
+        // Grayscale + contrast boost — improves OCR on low-contrast receipt paper
+        let gray = ciImage.applyingFilter("CIColorControls", parameters: [
+            kCIInputSaturationKey: 0.0,
+            kCIInputContrastKey: 1.2,
+            kCIInputBrightnessKey: 0.05
+        ])
+        guard let cgOut = context.createCGImage(gray, from: gray.extent) else { return image }
+        return UIImage(cgImage: cgOut, scale: image.scale, orientation: image.imageOrientation)
+    }
+
     private static func extractText(from image: UIImage) async -> [String] {
-        guard let cgImage = image.cgImage else { return [] }
+        let processed = preprocessed(image)
+        guard let cgImage = processed.cgImage else { return [] }
         // Pass the image orientation so Vision auto-rotates upside-down receipts
         let orientation = CGImagePropertyOrientation(image.imageOrientation)
         return await withCheckedContinuation { continuation in
@@ -86,6 +100,7 @@ struct ReceiptParser {
                 continuation.resume(returning: lines)
             }
             request.recognitionLevel = .accurate
+            request.usesLanguageCorrection = false
             try? VNImageRequestHandler(cgImage: cgImage, orientation: orientation).perform([request])
         }
     }
