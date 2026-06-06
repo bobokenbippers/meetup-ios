@@ -318,28 +318,22 @@ struct PeopleListView: View {
 
             Spacer(minLength: 8)
 
-            HStack(spacing: 8) {
-                Button("Accept") {
+            HStack(spacing: 12) {
+                Button {
                     Task { await acceptRequest(request) }
+                } label: {
+                    Text("✅")
+                        .font(.system(size: 24))
                 }
-                .font(.system(size: 13, weight: .bold))
-                .foregroundStyle(.white)
-                .padding(.horizontal, 14)
-                .padding(.vertical, 8)
-                .fixedSize()
-                .background(Color.coral)
-                .clipShape(Capsule())
+                .buttonStyle(.plain)
 
-                Button("Decline") {
+                Button {
                     Task { await declineRequest(request) }
+                } label: {
+                    Text("❌")
+                        .font(.system(size: 24))
                 }
-                .font(.system(size: 13, weight: .semibold))
-                .foregroundStyle(.secondary)
-                .padding(.horizontal, 12)
-                .padding(.vertical, 8)
-                .fixedSize()
-                .background(Color.white.opacity(0.1))
-                .clipShape(Capsule())
+                .buttonStyle(.plain)
             }
             .layoutPriority(1)
         }
