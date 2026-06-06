@@ -171,6 +171,7 @@ final class MeetupService {
             .eq("meetup_id", value: meetupId)
             .eq("user_id", value: userId)
             .execute()
+        Task { try? await fireRSVPPush(meetupId: meetupId, userId: userId, newStatus: "yes") }
     }
 
     func decline(meetupId: UUID) async throws {
@@ -181,6 +182,7 @@ final class MeetupService {
             .eq("meetup_id", value: meetupId)
             .eq("user_id", value: userId)
             .execute()
+        Task { try? await fireRSVPPush(meetupId: meetupId, userId: userId, newStatus: "no") }
     }
 
     func maybe(meetupId: UUID) async throws {
@@ -191,6 +193,7 @@ final class MeetupService {
             .eq("meetup_id", value: meetupId)
             .eq("user_id", value: userId)
             .execute()
+        Task { try? await fireRSVPPush(meetupId: meetupId, userId: userId, newStatus: "maybe") }
     }
 
     func updateParticipantStatus(meetupId: UUID, status: String) async throws {
@@ -507,6 +510,24 @@ final class MeetupService {
             .eq("id", value: meetup.id)
             .execute()
         return newToken
+    }
+
+    // MARK: - Push helpers
+
+    private func fireRSVPPush(meetupId: UUID, userId: UUID, newStatus: String) async throws {
+        let url = URL(string: "https://boyrqhbdkqzffvfokpri.supabase.co/functions/v1/push-rsvp-update")!
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        let token = try await supabase.auth.session.accessToken
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        let body: [String: String] = [
+            "meetupId": meetupId.uuidString,
+            "userId": userId.uuidString,
+            "newStatus": newStatus,
+        ]
+        request.httpBody = try JSONEncoder().encode(body)
+        _ = try await URLSession.shared.data(for: request)
     }
 
     /// Join a meetup via share link — inserts an "invited" participant row if not already present.

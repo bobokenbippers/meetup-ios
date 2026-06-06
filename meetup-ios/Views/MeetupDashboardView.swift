@@ -468,7 +468,7 @@ struct MeetupDashboardView: View {
                 if fresh != participants { participants = fresh }
                 hasLoaded = true
             }
-            if myParticipant?.isEnRoute == true && meetup.status == "active" {
+            if myParticipant?.status == "yes" && meetup.status == "active" {
                 LocationManager.shared.requestPermission()
                 LocationManager.shared.startTracking(meetup: meetup)
             }
