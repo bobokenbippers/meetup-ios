@@ -108,10 +108,19 @@ struct meetup_iosApp: App {
 
     private func handleDeepLink(_ url: URL) {
         // Universal link: https://squadbrunch.app/join/<token>
-        if let host = url.host, host == "squadbrunch.app" {
+        // Also handles Supabase edge function URL: https://<ref>.supabase.co/functions/v1/join-meetup/<token>
+        if let host = url.host, host == "squadbrunch.app" || host.hasSuffix(".supabase.co") {
             let path = url.pathComponents.filter { $0 != "/" }
+            // squadbrunch.app/join/<token>
             if path.count >= 2, path[0] == "join" {
                 pendingShareToken = path[1]
+                showJoinSheet = true
+                return
+            }
+            // <ref>.supabase.co/functions/v1/join-meetup/<token>
+            if let tokenIndex = path.firstIndex(of: "join-meetup").map({ $0 + 1 }),
+               tokenIndex < path.count {
+                pendingShareToken = path[tokenIndex]
                 showJoinSheet = true
                 return
             }
