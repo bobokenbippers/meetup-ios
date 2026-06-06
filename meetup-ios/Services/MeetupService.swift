@@ -448,17 +448,14 @@ final class MeetupService {
 
     func removeFriend(userId: UUID) async throws {
         guard let myId = supabase.auth.currentUser?.id else { throw MeetupError.notSignedIn }
+        let (userAId, userBId) = myId.uuidString < userId.uuidString
+            ? (myId, userId)
+            : (userId, myId)
         try await supabase
             .from("friendships")
             .delete()
-            .eq("user_a_id", value: myId)
-            .eq("user_b_id", value: userId)
-            .execute()
-        try await supabase
-            .from("friendships")
-            .delete()
-            .eq("user_a_id", value: userId)
-            .eq("user_b_id", value: myId)
+            .eq("user_a_id", value: userAId)
+            .eq("user_b_id", value: userBId)
             .execute()
     }
 
