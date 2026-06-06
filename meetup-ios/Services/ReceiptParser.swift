@@ -84,9 +84,11 @@ struct ReceiptParser {
         let subtotalKeywords = ["subtotal", "sub total", "sub-total"]
         let taxKeywords = ["tax", "hst", "gst", "vat", "sales tax"]
         let tipKeywords = ["tip", "gratuity", "service charge"]
-        let totalKeywords = ["total", "amount due", "balance due", "grand total"]
+        let totalKeywords = ["total", "amount due", "balance due", "grand total", "amount"]
         let summaryKeywords = subtotalKeywords + taxKeywords + tipKeywords + totalKeywords
-            + ["change", "cash", "credit", "visa", "mastercard", "amex", "thank you", "receipt"]
+            + ["change", "cash", "credit", "visa", "mastercard", "amex", "thank you", "receipt",
+               "no refund", "transactions are final", "qr", "tel", "fax", "no. of guest",
+               "server", "tab#", "dine in", "table", "check", "guest"]
 
         for line in lines {
             let lower = line.lowercased()
@@ -104,11 +106,17 @@ struct ReceiptParser {
             } else if totalKeywords.contains(where: { lower.contains($0) }) {
                 if price > total { total = price }
             } else if !summaryKeywords.contains(where: { lower.contains($0) }) {
-                let name = line
+                var name = line
                     .replacingOccurrences(of: pricePattern, with: "", options: .regularExpression)
                     .trimmingCharacters(in: .whitespaces)
                     .trimmingCharacters(in: CharacterSet(charactersIn: "$"))
                     .trimmingCharacters(in: .whitespaces)
+                // Strip leading quantity like "1 " or "2 "
+                if let qtyRange = name.range(of: #"^\d+\s+"#, options: .regularExpression) {
+                    name = String(name[qtyRange.upperBound...]).trimmingCharacters(in: .whitespaces)
+                }
+                // Skip modifier lines like "**w.Salad"
+                if name.hasPrefix("*") { continue }
                 if !name.isEmpty {
                     items.append((name: name, price: price))
                 }
