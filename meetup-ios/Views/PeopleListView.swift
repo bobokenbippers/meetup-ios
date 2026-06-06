@@ -304,25 +304,29 @@ struct PeopleListView: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(request.requester.displayName ?? "Unknown")
                     .font(.system(size: 14, weight: .semibold))
+                    .lineLimit(1)
+                    .truncationMode(.tail)
                 if let phone = request.requester.phoneE164 {
                     Text(phone)
                         .font(.system(size: 12))
                         .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                        .truncationMode(.tail)
                 }
             }
+            .layoutPriority(0)
 
-            Spacer()
+            Spacer(minLength: 8)
 
             HStack(spacing: 8) {
                 Button("Accept") {
                     Task { await acceptRequest(request) }
                 }
                 .font(.system(size: 13, weight: .bold))
-                .lineLimit(1)
                 .foregroundStyle(.white)
                 .padding(.horizontal, 14)
                 .padding(.vertical, 8)
-                .frame(minWidth: 70)
+                .fixedSize()
                 .background(Color.coral)
                 .clipShape(Capsule())
 
@@ -330,14 +334,14 @@ struct PeopleListView: View {
                     Task { await declineRequest(request) }
                 }
                 .font(.system(size: 13, weight: .semibold))
-                .lineLimit(1)
                 .foregroundStyle(.secondary)
                 .padding(.horizontal, 12)
                 .padding(.vertical, 8)
-                .frame(minWidth: 70)
+                .fixedSize()
                 .background(Color.white.opacity(0.1))
                 .clipShape(Capsule())
             }
+            .layoutPriority(1)
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 12)
