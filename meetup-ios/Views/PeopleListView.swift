@@ -160,9 +160,6 @@ struct PeopleListView: View {
             .scrollContentBackground(.hidden)
             .background(Color.appBackground)
             .navigationTitle("People")
-            .toolbarBackground(Color.appBackground.opacity(0.95), for: .navigationBar)
-            .toolbarBackground(.visible, for: .navigationBar)
-            .toolbarColorScheme(.dark, for: .navigationBar)
             .preferredColorScheme(.dark)
             .task {
                 await load()
