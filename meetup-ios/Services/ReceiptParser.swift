@@ -1,6 +1,23 @@
 import Vision
 import UIKit
 import PDFKit
+import ImageIO
+
+extension CGImagePropertyOrientation {
+    init(_ uiOrientation: UIImage.Orientation) {
+        switch uiOrientation {
+        case .up:            self = .up
+        case .down:          self = .down
+        case .left:          self = .left
+        case .right:         self = .right
+        case .upMirrored:    self = .upMirrored
+        case .downMirrored:  self = .downMirrored
+        case .leftMirrored:  self = .leftMirrored
+        case .rightMirrored: self = .rightMirrored
+        @unknown default:    self = .up
+        }
+    }
+}
 
 struct ParsedReceipt {
     var items: [(name: String, price: Double)]
@@ -60,6 +77,8 @@ struct ReceiptParser {
 
     private static func extractText(from image: UIImage) async -> [String] {
         guard let cgImage = image.cgImage else { return [] }
+        // Pass the image orientation so Vision auto-rotates upside-down receipts
+        let orientation = CGImagePropertyOrientation(image.imageOrientation)
         return await withCheckedContinuation { continuation in
             let request = VNRecognizeTextRequest { req, _ in
                 let lines = (req.results as? [VNRecognizedTextObservation] ?? [])
@@ -67,7 +86,7 @@ struct ReceiptParser {
                 continuation.resume(returning: lines)
             }
             request.recognitionLevel = .accurate
-            try? VNImageRequestHandler(cgImage: cgImage).perform([request])
+            try? VNImageRequestHandler(cgImage: cgImage, orientation: orientation).perform([request])
         }
     }
 
