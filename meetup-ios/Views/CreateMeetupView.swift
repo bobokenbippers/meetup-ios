@@ -110,13 +110,13 @@ struct CreateMeetupView: View {
                                     .font(.subheadline.weight(.medium))
                                     .multilineTextAlignment(.center)
                                     .frame(maxWidth: .infinity, minHeight: 52)
-                                    .foregroundStyle(isSelected ? Color.coral : Color(white: 0.55))
+                                    .foregroundStyle(isSelected ? option.color : option.color.opacity(0.5))
                                     .background(
                                         RoundedRectangle(cornerRadius: 12)
-                                            .fill(Color(white: 0.12))
+                                            .fill(isSelected ? option.color.opacity(0.18) : Color(white: 0.10))
                                             .overlay(
                                                 RoundedRectangle(cornerRadius: 12)
-                                                    .strokeBorder(isSelected ? Color.coral : Color.clear, lineWidth: 1.5)
+                                                    .strokeBorder(isSelected ? option.color : option.color.opacity(0.25), lineWidth: 1.5)
                                             )
                                     )
                             }
