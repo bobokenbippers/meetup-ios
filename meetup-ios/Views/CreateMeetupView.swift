@@ -465,11 +465,6 @@ private struct InviteSection: View {
         for phone in contact.phones {
             if let user = try? await MeetupService.shared.findUserByPhone(phone) { found = user; break }
         }
-        if found == nil {
-            for email in contact.emails {
-                if let user = try? await MeetupService.shared.findUserByEmail(email) { found = user; break }
-            }
-        }
         if let user = found {
             if user.id == myId { error = "That's you!" }
             else if invitees.contains(where: { $0.id == user.id }) { error = "Already added" }

@@ -106,6 +106,14 @@ struct ReceiptParser {
     }
 
     static func parseText(_ lines: [String]) -> ParsedReceipt {
+        // Also handle European-style numbers (comma as decimal separator)
+        let normalizedLines = lines.map { line -> String in
+            // Replace patterns like "35,84" (digit-comma-2digits) with "35.84"
+            let commaDecimal = try! NSRegularExpression(pattern: #"\b(\d+),(\d{2})\b"#)
+            let range = NSRange(line.startIndex..., in: line)
+            return commaDecimal.stringByReplacingMatches(in: line, range: range, withTemplate: "$1.$2")
+        }
+
         let pricePattern = #"\$(\d+(?:\.\d{1,2})?)|\b(\d+\.\d{1,2})\b"#
         let priceRegex = try! NSRegularExpression(pattern: pricePattern)
 
@@ -118,18 +126,36 @@ struct ReceiptParser {
         let subtotalKeywords = ["subtotal", "sub total", "sub-total"]
         let taxKeywords = ["tax", "hst", "gst", "vat", "sales tax"]
         let tipKeywords = ["tip", "gratuity", "service charge"]
-        let totalKeywords = ["total", "amount due", "balance due", "grand total", "amount"]
+        let totalKeywords = ["total", "amount due", "balance due", "grand total"]
         let summaryKeywords = subtotalKeywords + taxKeywords + tipKeywords + totalKeywords
             + ["change", "cash", "credit", "visa", "mastercard", "amex", "thank you", "receipt",
                "no refund", "transactions are final", "qr", "tel", "fax", "no. of guest",
-               "server", "tab#", "dine in", "table", "check", "guest"]
+               "server", "tab#", "dine in", "table", "check", "guest", "amount"]
 
-        for (idx, line) in lines.enumerated() {
+        for (idx, line) in normalizedLines.enumerated() {
             let lower = line.lowercased()
-            guard let match = priceRegex.firstMatch(in: line, range: NSRange(line.startIndex..., in: line)) else { continue }
+            guard let match = priceRegex.firstMatch(in: line, range: NSRange(line.startIndex..., in: line)) else {
+                continue
+            }
             let priceStr = Range(match.range(at: 1), in: line).map { String(line[$0]) }
                         ?? Range(match.range(at: 2), in: line).map { String(line[$0]) }
             guard let priceStr, let price = Double(priceStr), price >= 0.01 else { continue }
+
+            // Helper: resolve what the previous label line was when price is on its own line
+            func prevLineCategory() -> String? {
+                guard idx > 0 else { return nil }
+                let prev = normalizedLines[idx - 1].lowercased()
+                let prevHasPrice = priceRegex.firstMatch(
+                    in: normalizedLines[idx - 1],
+                    range: NSRange(normalizedLines[idx - 1].startIndex..., in: normalizedLines[idx - 1])
+                ) != nil
+                guard !prevHasPrice else { return nil }
+                if subtotalKeywords.contains(where: { prev.contains($0) }) { return "subtotal" }
+                if taxKeywords.contains(where: { prev.contains($0) })      { return "tax" }
+                if tipKeywords.contains(where: { prev.contains($0) })      { return "tip" }
+                if totalKeywords.contains(where: { prev.contains($0) })    { return "total" }
+                return nil
+            }
 
             if subtotalKeywords.contains(where: { lower.contains($0) }) {
                 subtotal = price
@@ -140,31 +166,67 @@ struct ReceiptParser {
             } else if totalKeywords.contains(where: { lower.contains($0) }) {
                 if price > total { total = price }
             } else if !summaryKeywords.contains(where: { lower.contains($0) }) {
+                // Standalone price line — check if previous line was a summary label
                 var name = line
                     .replacingOccurrences(of: pricePattern, with: "", options: .regularExpression)
                     .trimmingCharacters(in: .whitespaces)
                     .trimmingCharacters(in: CharacterSet(charactersIn: "$"))
                     .trimmingCharacters(in: .whitespaces)
-                // Strip leading quantity like "1 " or "2 "
-                if let qtyRange = name.range(of: #"^\d+\s+"#, options: .regularExpression) {
-                    name = String(name[qtyRange.upperBound...]).trimmingCharacters(in: .whitespaces)
+
+                if name.isEmpty {
+                    // Price-on-own-line: check if prev was a summary label first
+                    switch prevLineCategory() {
+                    case "subtotal": subtotal = price; continue
+                    case "tax":      tax = price;      continue
+                    case "tip":      tip = price;      continue
+                    case "total":    if price > total { total = price }; continue
+                    default: break
+                    }
                 }
+
+                // Strip leading all-consonant OCR noise tokens (e.g. "nll "),
+                // then leading single-letter artifacts (e.g. "I " misread from "1 "),
+                // then leading quantity digits (e.g. "1 ", "2 ")
+                name = name.replacingOccurrences(of: #"^([^aeiouAEIOU\s]{1,5}\s+)+"#, with: "", options: .regularExpression)
+                name = name.replacingOccurrences(of: #"^[A-Za-z]\s+"#, with: "", options: .regularExpression)
+                name = name.replacingOccurrences(of: #"^\d+\s+"#, with: "", options: .regularExpression)
+                name = name.trimmingCharacters(in: .whitespaces)
+
                 // Skip modifier lines like "**w.Salad"
                 if name.hasPrefix("*") { continue }
-                // If price is on its own line, use previous non-price line as the item name
+
+                // Require at least 2 letters — reject pure punctuation/noise like "("
+                let letterCount = name.filter(\.isLetter).count
+                let effectivelyEmpty = letterCount < 2
+
+                if effectivelyEmpty {
+                    // Treat as standalone price — check if prev line was a summary label
+                    switch prevLineCategory() {
+                    case "subtotal": subtotal = price; continue
+                    case "tax":      tax = price;      continue
+                    case "tip":      tip = price;      continue
+                    case "total":    if price > total { total = price }; continue
+                    default: continue  // discard noise item
+                    }
+                }
+
+                // If name is still empty after cleaning, use previous non-summary, non-price line
                 if name.isEmpty, idx > 0 {
-                    let prev = lines[idx - 1]
+                    let prev = normalizedLines[idx - 1]
                     let prevLower = prev.lowercased()
                     let prevHasPrice = priceRegex.firstMatch(in: prev, range: NSRange(prev.startIndex..., in: prev)) != nil
                     let prevIsSummary = summaryKeywords.contains(where: { prevLower.contains($0) })
                     if !prevHasPrice && !prevIsSummary && !prev.hasPrefix("*") {
                         var prevName = prev.trimmingCharacters(in: .whitespaces)
-                        if let qtyRange = prevName.range(of: #"^\d+\s+"#, options: .regularExpression) {
-                            prevName = String(prevName[qtyRange.upperBound...]).trimmingCharacters(in: .whitespaces)
-                        }
+                        prevName = prevName
+                            .replacingOccurrences(of: #"^([^aeiouAEIOU\s]{1,5}\s+)+"#, with: "", options: .regularExpression)
+                            .replacingOccurrences(of: #"^[A-Za-z]\s+"#, with: "", options: .regularExpression)
+                            .replacingOccurrences(of: #"^\d+\s+"#, with: "", options: .regularExpression)
+                            .trimmingCharacters(in: .whitespaces)
                         name = prevName
                     }
                 }
+
                 if !name.isEmpty {
                     items.append((name: name, price: price))
                 }

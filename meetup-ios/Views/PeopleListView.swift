@@ -11,6 +11,7 @@ struct PeopleListView: View {
     @State private var phoneSearch = ""
     @State private var foundUser: FoundUser?
     @State private var isSearching = false
+    @State private var isAdding = false
     @State private var contactsManager = ContactsManager()
     @State private var contactSuggestions: [DeviceContact] = []
     @State private var contactNameOverrides: [UUID: String] = [:]
@@ -259,13 +260,24 @@ struct PeopleListView: View {
 
             Spacer()
 
-            Button("Add") { addFriend(user) }
-                .font(.system(size: 13, weight: .bold))
-                .foregroundStyle(.white)
-                .padding(.horizontal, 16)
-                .padding(.vertical, 8)
-                .background(Color.coral)
-                .clipShape(Capsule())
+            Button {
+                addFriend(user)
+            } label: {
+                if isAdding {
+                    ProgressView().tint(.white).scaleEffect(0.8)
+                        .frame(width: 44, height: 20)
+                } else {
+                    Text("Add")
+                        .font(.system(size: 13, weight: .bold))
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 8)
+                }
+            }
+            .frame(minWidth: 60)
+            .background(Color.coral)
+            .clipShape(Capsule())
+            .disabled(isAdding)
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 12)
@@ -418,16 +430,23 @@ struct PeopleListView: View {
         } catch {
             return
         }
-        for await _ in changes {
-            guard !Task.isCancelled else { break }
-            await load()
-            enrichWithContactNames()
+        do {
+            for await _ in changes {
+                try Task.checkCancellation()
+                await load()
+                enrichWithContactNames()
+            }
+        } catch {
+            // CancellationError — fall through to removeChannel
         }
         await SupabaseManager.shared.client.realtimeV2.removeChannel(channel)
     }
 
     private func searchUser() async {
-        guard let e164 = PhoneFormatter.toE164(phoneSearch) else { return }
+        guard let e164 = PhoneFormatter.toE164(phoneSearch) else {
+            error = "Enter a valid 10-digit US phone number"
+            return
+        }
         let myId = SupabaseManager.shared.client.auth.currentUser?.id
         isSearching = true
         foundUser = nil
@@ -460,11 +479,6 @@ struct PeopleListView: View {
         var found: FoundUser?
         for phone in contact.phones {
             if let user = try? await MeetupService.shared.findUserByPhone(phone) { found = user; break }
-        }
-        if found == nil {
-            for email in contact.emails {
-                if let user = try? await MeetupService.shared.findUserByEmail(email) { found = user; break }
-            }
         }
         if let user = found {
             if user.id == myId { error = "That's you!" }
@@ -512,16 +526,28 @@ struct PeopleListView: View {
     }
 
     private func addFriend(_ user: FoundUser) {
+        guard !isAdding else { return }
+        isAdding = true
         Task {
             do {
                 try await MeetupService.shared.addFriend(userId: user.id)
                 phoneSearch = ""
                 foundUser = nil
-                await load()
-                enrichWithContactNames()
+                // Realtime subscription triggers load() — no need to call it here.
+                // Optimistically add to pending so UI feels instant.
+                pendingOutgoingIds.insert(user.id)
+                if !people.contains(where: { $0.id == user.id }) {
+                    let placeholder = Profile(
+                        id: user.id, displayName: user.displayName,
+                        phoneE164: user.phone, email: nil
+                    )
+                    people.append(placeholder)
+                    people.sort { ($0.displayName ?? "") < ($1.displayName ?? "") }
+                }
             } catch {
                 self.error = error.localizedDescription
             }
+            isAdding = false
         }
     }
 
@@ -757,13 +783,22 @@ private struct PersonCard: View {
             Spacer()
 
             if isPending {
-                Text("Pending")
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundStyle(.secondary)
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 5)
-                    .background(Color.white.opacity(0.1))
-                    .clipShape(Capsule())
+                HStack(spacing: 6) {
+                    Text("Pending")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(.secondary)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 5)
+                        .background(Color.white.opacity(0.1))
+                        .clipShape(Capsule())
+                    Button(action: onRemove) {
+                        Image(systemName: "xmark.circle.fill")
+                            .font(.system(size: 18))
+                            .foregroundStyle(.secondary)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Cancel request to \(displayedName)")
+                }
             } else {
                 Button(action: onRemove) {
                     Image(systemName: "person.badge.minus")
@@ -783,10 +818,8 @@ private struct PersonCard: View {
                 .strokeBorder(.white.opacity(0.08), lineWidth: 1)
         )
         .contextMenu {
-            if !isPending {
-                Button(role: .destructive, action: onRemove) {
-                    Label("Remove", systemImage: "trash")
-                }
+            Button(role: .destructive, action: onRemove) {
+                Label(isPending ? "Cancel Request" : "Remove", systemImage: isPending ? "xmark" : "trash")
             }
         }
     }
