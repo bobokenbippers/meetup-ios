@@ -382,10 +382,10 @@ struct PeopleListView: View {
         #endif
         do {
             async let friendsFetch = MeetupService.shared.getFriends()
-            async let meetupFetch = MeetupService.shared.getPeopleFromMeetups()
             async let incomingFetch = MeetupService.shared.getPendingIncomingRequests()
             async let outgoingFetch = MeetupService.shared.getPendingOutgoingRequests()
-            let (friends, meetupPeople, incoming, outgoing) = try await (friendsFetch, meetupFetch, incomingFetch, outgoingFetch)
+            let (friends, incoming, outgoing) = try await (friendsFetch, incomingFetch, outgoingFetch)
+            let meetupPeople: [Profile] = []
 
             let incomingIds = Set(incoming.map { $0.requester.id })
             let outgoingIds = Set(outgoing.map { $0.addressee.id })
