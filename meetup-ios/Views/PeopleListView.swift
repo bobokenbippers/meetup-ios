@@ -500,6 +500,8 @@ struct PeopleListView: View {
             people.removeAll { $0.id == person.id }
             pendingOutgoingIds.remove(person.id)
             contactNameOverrides.removeValue(forKey: person.id)
+            await load()
+            enrichWithContactNames()
         } catch {
             self.error = error.localizedDescription
         }
