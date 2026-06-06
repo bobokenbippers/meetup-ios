@@ -38,42 +38,71 @@ struct SettingsView: View {
     var body: some View {
         @Bindable var settings = settings
         NavigationStack {
-            Form {
-                Section("Appearance") {
-                    Picker("Theme", selection: $settings.themePreference) {
+            List {
+                Section {
+                    Picker("", selection: $settings.themePreference) {
                         Text("Light").tag(ThemePreference.light)
                         Text("Dark").tag(ThemePreference.dark)
                         Text("System").tag(ThemePreference.system)
                     }
                     .pickerStyle(.segmented)
-                }
-
-                Section("Accessibility") {
-                    Toggle("Bold Text", isOn: $settings.boldText)
-                    Toggle("Larger Text", isOn: $settings.largerText)
-                    Toggle("Reduce Motion", isOn: $settings.reduceMotion)
-                }
-
-                Section("Privacy") {
-                    Toggle("Sync Contacts", isOn: $settings.contactsEnabled)
+                    .tint(Color.coral)
+                    .listRowBackground(Color.appSurface)
+                } header: {
+                    Text("APPEARANCE")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(Color(white: 0.4))
+                        .textCase(nil)
                 }
 
                 Section {
-                    Button("Sign Out", role: .destructive) {
+                    Toggle("Bold Text", isOn: $settings.boldText)
+                        .tint(Color.coral)
+                        .foregroundStyle(.white)
+                        .listRowBackground(Color.appSurface)
+                    Toggle("Larger Text", isOn: $settings.largerText)
+                        .tint(Color.coral)
+                        .foregroundStyle(.white)
+                        .listRowBackground(Color.appSurface)
+                    Toggle("Reduce Motion", isOn: $settings.reduceMotion)
+                        .tint(Color.coral)
+                        .foregroundStyle(.white)
+                        .listRowBackground(Color.appSurface)
+                } header: {
+                    Text("ACCESSIBILITY")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(Color(white: 0.4))
+                        .textCase(nil)
+                }
+
+                Section {
+                    Toggle("Sync Contacts", isOn: $settings.contactsEnabled)
+                        .tint(Color.coral)
+                        .foregroundStyle(.white)
+                        .listRowBackground(Color.appSurface)
+                } header: {
+                    Text("PRIVACY")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(Color(white: 0.4))
+                        .textCase(nil)
+                }
+
+                Section {
+                    Button {
                         Task { await auth.signOut() }
+                    } label: {
+                        Text("Sign Out")
+                            .frame(maxWidth: .infinity, alignment: .center)
+                            .foregroundStyle(Color.coral)
                     }
+                    .listRowBackground(Color.appSurface)
                 }
             }
+            .listStyle(.insetGrouped)
+            .scrollContentBackground(.hidden)
+            .background(Color.appBackground)
             .navigationTitle("Settings")
-            .preferredColorScheme(colorScheme(for: settings.themePreference))
-        }
-    }
-
-    private func colorScheme(for preference: ThemePreference) -> ColorScheme? {
-        switch preference {
-        case .light: return .light
-        case .dark: return .dark
-        case .system: return nil
+            .preferredColorScheme(.dark)
         }
     }
 }

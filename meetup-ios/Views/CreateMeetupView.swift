@@ -51,10 +51,16 @@ struct CreateMeetupView: View {
             Form {
                 DestinationSection(selectedPlace: $selectedPlace)
 
-                Section("Time") {
+                Section {
                     Toggle("Set a target arrival time", isOn: $setTargetTime)
+                        .tint(Color.coral)
+                        .foregroundStyle(.white)
+                        .listRowBackground(Color.appSurface)
                     if setTargetTime {
                         DatePicker("Date", selection: $targetTime, in: Date()..., displayedComponents: [.date])
+                            .foregroundStyle(.white)
+                            .tint(Color.coral)
+                            .listRowBackground(Color.appSurface)
                         HStack(spacing: 0) {
                             Picker("Hour", selection: $pickerHour) {
                                 ForEach(1...12, id: \.self) { h in
@@ -83,24 +89,35 @@ struct CreateMeetupView: View {
                         .onChange(of: pickerHour)  { _, _ in syncTimePickers() }
                         .onChange(of: pickerMinute) { _, _ in syncTimePickers() }
                         .onChange(of: pickerAmPm)   { _, _ in syncTimePickers() }
+                        .listRowBackground(Color.appSurface)
                     }
+                } header: {
+                    Text("TIME")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(Color(white: 0.4))
+                        .textCase(nil)
                 }
 
-                Section("Category") {
+                Section {
                     LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
                         ForEach(CategoryOption.presets) { option in
                             Button {
                                 selectedCategory = (selectedCategory == option.title) ? nil : option.title
                                 showingCustomCategory = false
                             } label: {
+                                let isSelected = selectedCategory == option.title
                                 Text(option.title)
                                     .font(.subheadline.weight(.medium))
                                     .multilineTextAlignment(.center)
                                     .frame(maxWidth: .infinity, minHeight: 52)
-                                    .foregroundStyle(selectedCategory == option.title ? .white : option.color)
+                                    .foregroundStyle(isSelected ? Color.coral : Color(white: 0.55))
                                     .background(
                                         RoundedRectangle(cornerRadius: 12)
-                                            .fill(selectedCategory == option.title ? option.color : option.color.opacity(0.12))
+                                            .fill(Color(white: 0.12))
+                                            .overlay(
+                                                RoundedRectangle(cornerRadius: 12)
+                                                    .strokeBorder(isSelected ? Color.coral : Color.clear, lineWidth: 1.5)
+                                            )
                                     )
                             }
                             .buttonStyle(.plain)
@@ -112,21 +129,34 @@ struct CreateMeetupView: View {
                             Text("Custom...")
                                 .font(.subheadline.weight(.medium))
                                 .frame(maxWidth: .infinity, minHeight: 52)
-                                .foregroundStyle(showingCustomCategory ? .white : .purple)
+                                .foregroundStyle(showingCustomCategory ? Color.coral : Color(white: 0.55))
                                 .background(
                                     RoundedRectangle(cornerRadius: 12)
-                                        .fill(showingCustomCategory ? Color.purple : Color.purple.opacity(0.12))
+                                        .fill(Color(white: 0.12))
+                                        .overlay(
+                                            RoundedRectangle(cornerRadius: 12)
+                                                .strokeBorder(showingCustomCategory ? Color.coral : Color.clear, lineWidth: 1.5)
+                                        )
                                 )
                         }
                         .buttonStyle(.plain)
                     }
                     .padding(.vertical, 4)
+                    .listRowBackground(Color.appSurface)
                     if showingCustomCategory {
                         TextField("e.g. Squad Picnic", text: $customCategoryText)
+                            .foregroundStyle(.white)
+                            .tint(Color.coral)
+                            .listRowBackground(Color.appSurface)
                             .onChange(of: customCategoryText) { _, v in
                                 selectedCategory = v.isEmpty ? nil : v
                             }
                     }
+                } header: {
+                    Text("CATEGORY")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(Color(white: 0.4))
+                        .textCase(nil)
                 }
 
                 InviteSection(invitees: $invitees)
@@ -134,26 +164,52 @@ struct CreateMeetupView: View {
                 if let error {
                     Section {
                         Text(error).foregroundStyle(.red).font(.caption)
+                            .listRowBackground(Color.appSurface)
                     }
                 }
             }
+            .scrollContentBackground(.hidden)
+            .background(Color.appBackground)
             .navigationTitle("New Meetup")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }
                 }
-                ToolbarItem(placement: .confirmationAction) {
-                    if isCreating {
-                        ProgressView()
-                    } else {
-                        Button("Create") { Task { await create() } }
-                            .buttonStyle(.glassProminent)
+            }
+            .safeAreaInset(edge: .bottom, spacing: 0) {
+                VStack(spacing: 0) {
+                    Divider()
+                        .overlay(Color(white: 0.15))
+                    Group {
+                        if isCreating {
+                            ProgressView()
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 20)
+                        } else {
+                            Button {
+                                Task { await create() }
+                            } label: {
+                                Text("Create")
+                                    .font(.headline)
+                                    .foregroundStyle(.white)
+                                    .frame(maxWidth: .infinity)
+                                    .padding(.vertical, 16)
+                                    .background(
+                                        RoundedRectangle(cornerRadius: 16)
+                                            .fill(selectedPlace == nil ? Color.coral.opacity(0.45) : Color.coral)
+                                    )
+                            }
                             .disabled(selectedPlace == nil)
+                            .padding(.horizontal, 20)
+                            .padding(.vertical, 12)
                             .accessibilityIdentifier("btn_create_confirm")
+                        }
                     }
+                    .background(Color.appBackground)
                 }
             }
+            .preferredColorScheme(.dark)
             .alert("Error", isPresented: Binding(get: { error != nil }, set: { if !$0 { error = nil } })) {
                 Button("OK") { error = nil }
             } message: { Text(error ?? "") }
@@ -202,13 +258,13 @@ private struct DestinationSection: View {
     @State private var isLoadingDetails = false
 
     var body: some View {
-        Section("Destination") {
+        Section {
             if let place = selectedPlace {
                 HStack {
                     VStack(alignment: .leading, spacing: 2) {
-                        Text(place.name).font(.subheadline).bold()
+                        Text(place.name).font(.subheadline).bold().foregroundStyle(.white)
                         if let addr = place.address {
-                            Text(addr).font(.caption).foregroundStyle(.secondary)
+                            Text(addr).font(.caption).foregroundStyle(Color(white: 0.6))
                         }
                     }
                     Spacer()
@@ -217,25 +273,37 @@ private struct DestinationSection: View {
                         searchQuery = ""
                     }
                     .font(.caption)
+                    .foregroundStyle(Color.coral)
                 }
+                .listRowBackground(Color.appSurface)
             } else {
                 TextField("Search for a place", text: $searchQuery)
                     .autocorrectionDisabled()
+                    .foregroundStyle(.white)
+                    .tint(Color.coral)
                     .accessibilityIdentifier("field_destination")
+                    .listRowBackground(Color.appSurface)
                 if isLoadingDetails {
                     ProgressView().frame(maxWidth: .infinity)
+                        .listRowBackground(Color.appSurface)
                 }
                 ForEach(predictions) { prediction in
                     Button(action: { Task { await selectPrediction(prediction) } }) {
                         VStack(alignment: .leading, spacing: 2) {
-                            Text(prediction.mainText).foregroundStyle(.primary)
+                            Text(prediction.mainText).foregroundStyle(.white)
                             if !prediction.secondaryText.isEmpty {
-                                Text(prediction.secondaryText).font(.caption).foregroundStyle(.secondary)
+                                Text(prediction.secondaryText).font(.caption).foregroundStyle(Color(white: 0.6))
                             }
                         }
                     }
+                    .listRowBackground(Color.appSurface)
                 }
             }
+        } header: {
+            Text("DESTINATION")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(Color(white: 0.4))
+                .textCase(nil)
         }
         .task(id: searchQuery) {
             guard searchQuery.count >= 2 else { predictions = []; return }
@@ -283,12 +351,15 @@ private struct InviteSection: View {
     }
 
     var body: some View {
-        Section("Invite people") {
+        Section {
             FriendSuggestionsRow(invitees: $invitees)
+                .listRowBackground(Color.appSurface)
             HStack {
                 TextField("Name or +1 (646) 946-6861", text: $inviteePhone)
                     .keyboardType(.default)
                     .autocorrectionDisabled()
+                    .foregroundStyle(.white)
+                    .tint(Color.coral)
                     .onChange(of: inviteePhone) { _, v in
                         // Single pass — no write-back to inviteePhone, so one render per keystroke.
                         let query: String
@@ -305,37 +376,48 @@ private struct InviteSection: View {
                 } else {
                     Button("Search") { Task { await searchUser() } }
                         .disabled(phoneDigits.count < 10)
+                        .foregroundStyle(Color.coral)
                 }
             }
+            .listRowBackground(Color.appSurface)
             ForEach(contactSuggestions) { contact in
                 Button { Task { await selectContact(contact) } } label: {
                     VStack(alignment: .leading, spacing: 2) {
-                        Text(contact.displayName).foregroundStyle(.primary)
+                        Text(contact.displayName).foregroundStyle(.white)
                         Text(contact.phones.first ?? contact.emails.first ?? "")
-                            .font(.caption).foregroundStyle(.secondary)
+                            .font(.caption).foregroundStyle(Color(white: 0.6))
                     }
                 }
+                .listRowBackground(Color.appSurface)
             }
             if let user = foundUser {
                 HStack {
                     VStack(alignment: .leading, spacing: 2) {
-                        Text(user.displayName).font(.subheadline)
-                        Text(user.phone).font(.caption).foregroundStyle(.secondary)
+                        Text(user.displayName).font(.subheadline).foregroundStyle(.white)
+                        Text(user.phone).font(.caption).foregroundStyle(Color(white: 0.6))
                     }
                     Spacer()
                     Button("Add") { addInvitee(user) }
                         .buttonStyle(.borderedProminent)
+                        .tint(Color.coral)
                         .controlSize(.small)
                 }
+                .listRowBackground(Color.appSurface)
             }
             ForEach(invitees, id: \.id) { invitee in
                 HStack {
-                    Text(invitee.displayName)
+                    Text(invitee.displayName).foregroundStyle(.white)
                     Spacer()
-                    Text(invitee.phone).font(.caption).foregroundStyle(.secondary)
+                    Text(invitee.phone).font(.caption).foregroundStyle(Color(white: 0.6))
                 }
+                .listRowBackground(Color.appSurface)
             }
             .onDelete { indexSet in invitees.remove(atOffsets: indexSet) }
+        } header: {
+            Text("INVITE PEOPLE")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(Color(white: 0.4))
+                .textCase(nil)
         }
         .task { await contactsManager.load() }
         .alert("Error", isPresented: Binding(get: { error != nil }, set: { if !$0 { error = nil } })) {
@@ -411,7 +493,7 @@ private struct FriendSuggestionsRow: View {
                 VStack(alignment: .leading, spacing: 8) {
                     Text("From your squad")
                         .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Color(white: 0.6))
                         .textCase(.uppercase)
                     ScrollView(.horizontal, showsIndicators: false) {
                         HStack(spacing: 12) {
@@ -484,7 +566,7 @@ private struct FriendChip: View {
                 }
                 Text(shortName)
                     .font(.system(size: 11, weight: .medium))
-                    .foregroundStyle(isInvited ? Color.coral : .primary)
+                    .foregroundStyle(isInvited ? Color.coral : Color(white: 0.6))
                     .lineLimit(1)
             }
             .frame(width: 56)
