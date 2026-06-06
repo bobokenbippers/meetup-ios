@@ -494,7 +494,7 @@ struct MeetupDashboardView: View {
         isGeneratingShareLink = true
         do {
             let token = try await MeetupService.shared.ensureShareToken(for: meetup)
-            let urlString = "https://squadbrunch.app/join/\(token)"
+            let urlString = "https://boyrqhbdkqzffvfokpri.supabase.co/functions/v1/join-meetup/\(token)"
             if let url = URL(string: urlString) {
                 shareURL = url
             }
