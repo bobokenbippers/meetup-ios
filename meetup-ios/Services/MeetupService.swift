@@ -7,6 +7,15 @@ struct FoundUser {
     let phone: String
 }
 
+/// Friendship relationship between the current user and another user.
+/// Drives whether someone can be invited directly or must be friend-requested first.
+enum FriendshipStatus {
+    case none             // no friendship row — must send a request before inviting
+    case accepted         // accepted friends — invitable
+    case pendingOutgoing  // I sent a request, awaiting their acceptance
+    case pendingIncoming  // they sent me a request, I can accept it
+}
+
 enum MeetupError: LocalizedError {
     case notSignedIn
     case createFailed
@@ -269,6 +278,36 @@ final class MeetupService {
             .in("id", values: ids.map { $0.uuidString })
             .execute()
             .value
+    }
+
+    /// Current friendship relationship between the signed-in user and `userId`.
+    /// Used by the invite flows to gate direct adds behind an accepted friendship.
+    func friendshipStatus(with userId: UUID) async throws -> FriendshipStatus {
+        guard let myId = supabase.auth.currentUser?.id else { return .none }
+        let (userAId, userBId) = myId.uuidString < userId.uuidString
+            ? (myId, userId)
+            : (userId, myId)
+        struct Row: Codable {
+            let status: String
+            let initiatedBy: UUID
+            enum CodingKeys: String, CodingKey {
+                case status
+                case initiatedBy = "initiated_by"
+            }
+        }
+        let rows: [Row] = try await supabase
+            .from("friendships")
+            .select("status,initiated_by")
+            .eq("user_a_id", value: userAId.uuidString)
+            .eq("user_b_id", value: userBId.uuidString)
+            .execute()
+            .value
+        guard let row = rows.first else { return .none }
+        if row.status == "accepted" { return .accepted }
+        if row.status == "pending" {
+            return row.initiatedBy == myId ? .pendingOutgoing : .pendingIncoming
+        }
+        return .none
     }
 
     func getPendingIncomingRequests() async throws -> [IncomingFriendRequest] {

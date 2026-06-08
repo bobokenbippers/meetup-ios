@@ -610,6 +610,52 @@ as $$
 $$;
 ```
 
+### M2.4 Friendship Gate on Meetup Invites (June 2026)
+
+Meetup invitations are gated behind an **accepted** friendship. A host can only insert a
+`meetup_participants` row for themselves or for a user who is an accepted friend, in either
+canonical friendship direction. Pending/declined friendships do **not** unlock invites.
+Existing participant rows are untouched — the gate applies to new INSERTs only.
+
+```sql
+-- Helper: is p_user_id an accepted friend of p_host_id (either direction)?
+create or replace function public.is_accepted_friend(p_host_id uuid, p_user_id uuid)
+returns boolean
+language sql
+security definer
+set search_path = public
+as $$
+  select exists (
+    select 1 from public.friendships f
+    where f.status = 'accepted'
+      and (
+        (f.user_a_id = p_host_id and f.user_b_id = p_user_id)
+        or (f.user_a_id = p_user_id and f.user_b_id = p_host_id)
+      )
+  );
+$$;
+
+-- Replaces the old "host can add anyone" INSERT policy.
+drop policy if exists participants_insert on public.meetup_participants;
+
+create policy participants_insert
+  on public.meetup_participants for insert
+  with check (
+    is_meetup_host(meetup_id)
+    and (
+      user_id = auth.uid()                          -- host inserting their own row
+      or public.is_accepted_friend(auth.uid(), user_id)  -- host inviting an accepted friend
+    )
+  );
+```
+
+`is_meetup_host(p_meetup_id)` is the existing `SECURITY DEFINER` helper
+(`select exists (select 1 from meetups where id = p_meetup_id and host_id = auth.uid())`).
+
+iOS surfaces only accepted friends in the invite picker; phone-search / contact selection of a
+non-friend shows **"Send friend request"** (or **"Request pending"** / **"Accept request"**)
+instead of **Add**, via `MeetupService.friendshipStatus(with:)`.
+
 ### M2.2 Profile Phone Number Setup
 
 Add a "complete your profile" flow that runs after first sign-in if `phone_e164` is null. Create `MeetupTracker/Views/ProfileSetupView.swift`:
@@ -1020,6 +1066,12 @@ create policy "user updates own participation"
   on public.meetup_participants for update
   using (auth.uid() = user_id);
 ```
+
+> **Note (friendship gate, June 2026):** The live INSERT policy has been renamed
+> `participants_insert` and tightened so a host can only add an invitee who is an
+> **accepted friend** (the host's own row is exempt — you are not your own friend).
+> Client-side gating in `CreateMeetupView` / `AddParticipantsSheet` is bypassable, so
+> this RLS policy is the real enforcement. See M2.4 below for the canonical SQL.
 
 ### M3.2 Sequence Number for WebSocket Updates (preparation for M4)
 

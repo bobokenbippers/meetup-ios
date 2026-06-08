@@ -10,7 +10,9 @@ struct AddParticipantsSheet: View {
     @State private var friends: [Profile] = []
     @State private var inviteePhone = ""
     @State private var foundUser: FoundUser?
+    @State private var foundUserStatus: FriendshipStatus = .none
     @State private var isSearchingUser = false
+    @State private var isSendingRequest = false
     @State private var isAdding = false
     @State private var error: String?
     @State private var addedNames: [String] = []
@@ -66,21 +68,24 @@ struct AddParticipantsSheet: View {
                     .listRowBackground(Color.appSurface)
 
                     if let user = foundUser {
-                        HStack {
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(user.displayName)
-                                    .font(.subheadline)
-                                    .foregroundStyle(.white)
-                                Text(user.phone)
-                                    .font(.caption)
-                                    .foregroundStyle(Color(white: 0.6))
+                        VStack(alignment: .leading, spacing: 6) {
+                            HStack {
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(user.displayName)
+                                        .font(.subheadline)
+                                        .foregroundStyle(.white)
+                                    Text(user.phone)
+                                        .font(.caption)
+                                        .foregroundStyle(Color(white: 0.6))
+                                }
+                                Spacer()
+                                foundUserAction(for: user)
                             }
-                            Spacer()
-                            Button("Add") { Task { await addUser(id: user.id, name: user.displayName) } }
-                                .buttonStyle(.borderedProminent)
-                                .tint(Color.coral)
-                                .controlSize(.small)
-                                .disabled(isAdding)
+                            if let hint = foundUserHint {
+                                Text(hint)
+                                    .font(.caption2)
+                                    .foregroundStyle(Color(white: 0.55))
+                            }
                         }
                         .listRowBackground(Color.appSurface)
                     }
@@ -135,6 +140,45 @@ struct AddParticipantsSheet: View {
         }
     }
 
+    @ViewBuilder
+    private func foundUserAction(for user: FoundUser) -> some View {
+        if isSendingRequest {
+            ProgressView()
+        } else {
+            switch foundUserStatus {
+            case .accepted:
+                Button("Add") { Task { await addUser(id: user.id, name: user.displayName) } }
+                    .buttonStyle(.borderedProminent)
+                    .tint(Color.coral)
+                    .controlSize(.small)
+                    .disabled(isAdding)
+            case .pendingOutgoing:
+                Text("Request pending")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(Color(white: 0.6))
+            case .pendingIncoming:
+                Button("Accept request") { Task { await sendFriendRequest(to: user) } }
+                    .buttonStyle(.borderedProminent)
+                    .tint(Color.coral)
+                    .controlSize(.small)
+            case .none:
+                Button("Send friend request") { Task { await sendFriendRequest(to: user) } }
+                    .buttonStyle(.bordered)
+                    .tint(Color.coral)
+                    .controlSize(.small)
+            }
+        }
+    }
+
+    private var foundUserHint: String? {
+        switch foundUserStatus {
+        case .accepted: return nil
+        case .pendingOutgoing: return "You can invite them once they accept your friend request."
+        case .pendingIncoming: return "They sent you a friend request — accept it to invite them."
+        case .none: return "You can only invite friends. Send a request first; they'll be invitable once accepted."
+        }
+    }
+
     private func searchUser() async {
         let digits = phoneDigits
         guard digits.count == 10 else { return }
@@ -150,6 +194,7 @@ struct AddParticipantsSheet: View {
                 } else if existingParticipantIds.contains(user.id) || addedNames.contains(user.displayName) {
                     error = "\(user.displayName) is already in this meetup"
                 } else {
+                    foundUserStatus = try await MeetupService.shared.friendshipStatus(with: user.id)
                     foundUser = user
                 }
             } else {
@@ -161,6 +206,18 @@ struct AddParticipantsSheet: View {
         isSearchingUser = false
     }
 
+    private func sendFriendRequest(to user: FoundUser) async {
+        isSendingRequest = true
+        error = nil
+        do {
+            try await MeetupService.shared.addFriend(userId: user.id)
+            foundUserStatus = try await MeetupService.shared.friendshipStatus(with: user.id)
+        } catch {
+            self.error = error.localizedDescription
+        }
+        isSendingRequest = false
+    }
+
     private func addUser(id: UUID, name: String) async {
         isAdding = true
         error = nil
@@ -168,6 +225,7 @@ struct AddParticipantsSheet: View {
             try await MeetupService.shared.inviteParticipant(meetupId: meetupId, userId: id)
             addedNames.append(name)
             foundUser = nil
+            foundUserStatus = .none
             inviteePhone = ""
             onAdded()
         } catch {
