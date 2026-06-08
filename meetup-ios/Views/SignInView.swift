@@ -72,6 +72,7 @@ struct SignInView: View {
                 VStack(spacing: 16) {
                     SignInWithAppleButton(.signIn) { request in
                         request.requestedScopes = [.fullName, .email]
+                        request.nonce = auth.generateNonce()
                     } onCompletion: { result in
                         Task {
                             switch result {
