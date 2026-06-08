@@ -340,7 +340,9 @@ private struct InviteSection: View {
 
     @State private var inviteePhone = ""
     @State private var foundUser: FoundUser?
+    @State private var foundUserStatus: FriendshipStatus = .none
     @State private var isSearchingUser = false
+    @State private var isSendingRequest = false
     @State private var contactsManager = ContactsManager()
     @State private var contactSuggestions: [DeviceContact] = []
     @State private var error: String?
@@ -391,16 +393,20 @@ private struct InviteSection: View {
                 .listRowBackground(Color.appSurface)
             }
             if let user = foundUser {
-                HStack {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(user.displayName).font(.subheadline).foregroundStyle(.white)
-                        Text(user.phone).font(.caption).foregroundStyle(Color(white: 0.6))
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(user.displayName).font(.subheadline).foregroundStyle(.white)
+                            Text(user.phone).font(.caption).foregroundStyle(Color(white: 0.6))
+                        }
+                        Spacer()
+                        foundUserAction(for: user)
                     }
-                    Spacer()
-                    Button("Add") { addInvitee(user) }
-                        .buttonStyle(.borderedProminent)
-                        .tint(Color.coral)
-                        .controlSize(.small)
+                    if let hint = foundUserHint {
+                        Text(hint)
+                            .font(.caption2)
+                            .foregroundStyle(Color(white: 0.55))
+                    }
                 }
                 .listRowBackground(Color.appSurface)
             }
@@ -425,6 +431,44 @@ private struct InviteSection: View {
         } message: { Text(error ?? "") }
     }
 
+    @ViewBuilder
+    private func foundUserAction(for user: FoundUser) -> some View {
+        if isSendingRequest {
+            ProgressView()
+        } else {
+            switch foundUserStatus {
+            case .accepted:
+                Button("Add") { addInvitee(user) }
+                    .buttonStyle(.borderedProminent)
+                    .tint(Color.coral)
+                    .controlSize(.small)
+            case .pendingOutgoing:
+                Text("Request pending")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(Color(white: 0.6))
+            case .pendingIncoming:
+                Button("Accept request") { Task { await sendFriendRequest(to: user) } }
+                    .buttonStyle(.borderedProminent)
+                    .tint(Color.coral)
+                    .controlSize(.small)
+            case .none:
+                Button("Send friend request") { Task { await sendFriendRequest(to: user) } }
+                    .buttonStyle(.bordered)
+                    .tint(Color.coral)
+                    .controlSize(.small)
+            }
+        }
+    }
+
+    private var foundUserHint: String? {
+        switch foundUserStatus {
+        case .accepted: return nil
+        case .pendingOutgoing: return "You can invite them once they accept your friend request."
+        case .pendingIncoming: return "They sent you a friend request — accept it to invite them."
+        case .none: return "You can only invite friends. Send a request first; they'll be invitable once accepted."
+        }
+    }
+
     private func searchUser() async {
         let digits = phoneDigits
         guard digits.count == 10 else { return }
@@ -437,7 +481,10 @@ private struct InviteSection: View {
             if let user = try await MeetupService.shared.findUserByPhone(e164) {
                 if user.id == myId { error = "That's you!" }
                 else if invitees.contains(where: { $0.id == user.id }) { error = "Already added" }
-                else { foundUser = user }
+                else {
+                    foundUserStatus = try await MeetupService.shared.friendshipStatus(with: user.id)
+                    foundUser = user
+                }
             } else {
                 error = "No user found with that number"
             }
@@ -450,8 +497,22 @@ private struct InviteSection: View {
     private func addInvitee(_ user: FoundUser) {
         invitees.append(user)
         foundUser = nil
+        foundUserStatus = .none
         inviteePhone = ""
         error = nil
+    }
+
+    private func sendFriendRequest(to user: FoundUser) async {
+        isSendingRequest = true
+        error = nil
+        do {
+            try await MeetupService.shared.addFriend(userId: user.id)
+            // addFriend auto-accepts an existing incoming request; otherwise creates a pending one.
+            foundUserStatus = try await MeetupService.shared.friendshipStatus(with: user.id)
+        } catch {
+            self.error = error.localizedDescription
+        }
+        isSendingRequest = false
     }
 
     private func selectContact(_ contact: DeviceContact) async {
@@ -468,7 +529,10 @@ private struct InviteSection: View {
         if let user = found {
             if user.id == myId { error = "That's you!" }
             else if invitees.contains(where: { $0.id == user.id }) { error = "Already added" }
-            else { addInvitee(user) }
+            else {
+                foundUserStatus = (try? await MeetupService.shared.friendshipStatus(with: user.id)) ?? .none
+                foundUser = user
+            }
         } else {
             error = "\(contact.displayName) isn't on the app yet"
         }
