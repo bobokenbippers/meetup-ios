@@ -1,9 +1,17 @@
 name: TestFlight
 
 on:
+  workflow_dispatch:
   push:
     branches:
       - main
+    paths:
+      - 'meetup-ios/**'
+      - 'meetup-ios.xcodeproj/**'
+      - 'fastlane/**'
+      - 'Gemfile'
+      - 'Gemfile.lock'
+      - '.github/workflows/testflight.yml'
 
 jobs:
   build:
