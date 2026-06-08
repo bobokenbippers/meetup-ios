@@ -128,7 +128,8 @@ struct MeetupsListView: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .background(Color.appBackground)
             .animation(.easeOut(duration: 0.3), value: hasLoaded)
-            .navigationTitle("Meetups")
+            .navigationTitle("")
+            .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 Button(action: { showCreate = true }) {
                     Image(systemName: "plus")
@@ -174,10 +175,12 @@ struct MeetupsListView: View {
 
     private var meetupsList: some View {
         List {
-            Color.clear.frame(height: 4)
+            Text("Meetups")
+                .font(.system(size: 34, weight: .bold))
+                .foregroundStyle(.white)
                 .listRowBackground(Color.clear)
                 .listRowSeparator(.hidden)
-                .listRowInsets(EdgeInsets())
+                .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
 
             if !invited.isEmpty {
                 Section {
@@ -285,6 +288,7 @@ struct MeetupsListView: View {
                 .listRowInsets(EdgeInsets())
         }
         .listStyle(.plain)
+        .contentMargins(.top, 0, for: .scrollContent)
         .scrollContentBackground(.hidden)
         .background(Color.appBackground)
     }
