@@ -527,6 +527,37 @@ final class MeetupService {
         _ = try await URLSession.shared.data(for: request)
     }
 
+    /// Invite a user to an existing meetup; no-op if they're already a participant.
+    func inviteParticipant(meetupId: UUID, userId: UUID) async throws {
+        struct ExistingCheck: Codable {
+            let userId: UUID
+            enum CodingKeys: String, CodingKey { case userId = "user_id" }
+        }
+        let existing: [ExistingCheck] = try await supabase
+            .from("meetup_participants")
+            .select("user_id")
+            .eq("meetup_id", value: meetupId)
+            .eq("user_id", value: userId)
+            .execute()
+            .value
+        if !existing.isEmpty { return }
+
+        struct ParticipantInsert: Encodable {
+            let meetupId: UUID
+            let userId: UUID
+            let status: String
+            enum CodingKeys: String, CodingKey {
+                case meetupId = "meetup_id"
+                case userId = "user_id"
+                case status
+            }
+        }
+        try await supabase
+            .from("meetup_participants")
+            .insert(ParticipantInsert(meetupId: meetupId, userId: userId, status: "invited"))
+            .execute()
+    }
+
     /// Join a meetup via share link — inserts an "invited" participant row if not already present.
     func joinByShareToken(meetupId: UUID) async throws {
         guard let userId = supabase.auth.currentUser?.id else { throw MeetupError.notSignedIn }

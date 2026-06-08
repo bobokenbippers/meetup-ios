@@ -21,6 +21,7 @@ struct MeetupDashboardView: View {
     @State private var shareURL: URL?
     @State private var isGeneratingShareLink = false
     @State private var showRecap = false
+    @State private var showAddParticipants = false
 
     // Photo state
     @State private var recentPhotos: [MeetupPhoto] = []
@@ -148,6 +149,13 @@ struct MeetupDashboardView: View {
             }
             .sheet(isPresented: $showRecap, onDismiss: { dismiss() }) {
                 RecapView(meetup: meetup).environment(auth)
+            }
+            .sheet(isPresented: $showAddParticipants) {
+                AddParticipantsSheet(
+                    meetupId: meetup.id,
+                    existingParticipantIds: Set(participants.map(\.userId)),
+                    onAdded: { Task { await load() } }
+                )
             }
             .sheet(item: $shareURL) { url in
                 ShareSheet(url: url)
@@ -304,13 +312,25 @@ struct MeetupDashboardView: View {
                 .padding(.top, 10)
                 .padding(.bottom, 6)
 
-            // "Everyone" label
-            Text("Everyone")
-                .font(.system(size: 13, weight: .bold))
-                .foregroundStyle(.white)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.horizontal, 16)
-                .padding(.bottom, 8)
+            // "Everyone" label + host "Add People" button
+            HStack {
+                Text("Everyone")
+                    .font(.system(size: 13, weight: .bold))
+                    .foregroundStyle(.white)
+                if myUserId == meetup.hostId {
+                    Spacer()
+                    Button {
+                        showAddParticipants = true
+                    } label: {
+                        Label("Add People", systemImage: "person.badge.plus")
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundStyle(Color.coral)
+                    }
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 16)
+            .padding(.bottom, 8)
 
             // Participant rows
             if hasLoaded {
