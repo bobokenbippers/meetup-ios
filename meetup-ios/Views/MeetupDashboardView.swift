@@ -330,7 +330,12 @@ struct MeetupDashboardView: View {
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.horizontal, 16)
-            .padding(.bottom, 8)
+            .padding(.bottom, 6)
+
+            // Punctuality color legend
+            PunctualityLegend(showsRunningLate: meetup.targetArrivalAt != nil)
+                .padding(.horizontal, 16)
+                .padding(.bottom, 8)
 
             // Participant rows
             if hasLoaded {
@@ -757,7 +762,10 @@ private struct DashboardParticipantRow: View {
 
             Spacer()
 
-            RSVPStatusBadge(status: participant.status)
+            PunctualityTile(
+                rawStatus: participant.status,
+                targetArrivalAt: targetArrivalAt
+            )
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 8)
@@ -770,35 +778,6 @@ private struct DashboardParticipantRow: View {
             }
         }
         .animation(.easeInOut(duration: 0.3), value: participant.etaSeconds)
-    }
-}
-
-// MARK: - RSVP Status Badge
-
-private struct RSVPStatusBadge: View {
-    let status: String
-
-    private var config: (text: String, color: Color)? {
-        switch status {
-        case "yes", "accepted": return ("Yes", .statusLive)
-        case "maybe":           return ("Maybe", .statusPending)
-        case "no", "declined":  return ("No", .statusLate)
-        case "arrived":         return ("Here", .statusLive)
-        default:                return nil
-        }
-    }
-
-    var body: some View {
-        if let c = config {
-            Text(c.text)
-                .font(.system(size: 9, weight: .bold))
-                .foregroundStyle(c.color)
-                .padding(.vertical, 3)
-                .padding(.horizontal, 7)
-                .background(c.color.opacity(0.15))
-                .clipShape(Capsule())
-                .overlay(Capsule().strokeBorder(c.color.opacity(0.3), lineWidth: 1))
-        }
     }
 }
 
