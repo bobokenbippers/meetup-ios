@@ -14,6 +14,11 @@ extension Color {
     static let statusLate    = Color(red: 0.949, green: 0.349, blue: 0.349)  // muted red
     static let statusLive    = Color(red: 0.180, green: 0.835, blue: 0.451)  // green
 
+    // Punctuality tile colors
+    static let statusEnRoute     = Color(red: 0.118, green: 0.565, blue: 1.000)  // blue — accepted / on the way
+    static let statusInvited     = Color(red: 0.560, green: 0.560, blue: 0.620)  // gray — invited, no response
+    static let statusRunningLate = Color(red: 1.000, green: 0.620, blue: 0.000)  // amber — late past start time
+
     // Ordered palette for participant avatars and map pins (indigo-first, was orange-first)
     static let participantPalette: [Color] = [
         Color(red: 0.424, green: 0.341, blue: 0.773),  // indigo
