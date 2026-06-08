@@ -73,11 +73,18 @@ struct MeetupsListView: View {
     private var invited: [MyParticipation] {
         participations.filter { isVisible($0) && $0.status == "invited" && $0.meetup.status == "active" }
     }
+    private func isExpired(_ p: MyParticipation) -> Bool {
+        p.meetup.endsAt.addingTimeInterval(2 * 3600) < Date()
+    }
     private var active: [MyParticipation] {
-        participations.filter { isVisible($0) && $0.status != "invited" && $0.meetup.status == "active" }
+        participations.filter { isVisible($0) && $0.status != "invited" && $0.meetup.status == "active" && !isExpired($0) }
     }
     private var past: [MyParticipation] {
-        participations.filter { isVisible($0) && $0.meetup.status != "active" && $0.meetup.status != "cancelled" }
+        participations.filter {
+            isVisible($0) &&
+            (($0.meetup.status != "active" && $0.meetup.status != "cancelled") ||
+             ($0.meetup.status == "active" && isExpired($0)))
+        }
     }
     private var deleted: [MyParticipation] {
         participations.filter {
