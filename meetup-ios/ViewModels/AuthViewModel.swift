@@ -2,6 +2,7 @@ import Foundation
 import AuthenticationServices
 import Supabase
 import Observation
+import CryptoKit
 
 @Observable
 final class AuthViewModel {
@@ -12,6 +13,7 @@ final class AuthViewModel {
 
     private let supabase = SupabaseManager.shared.client
     private var authTask: Task<Void, Never>?
+    private(set) var currentNonce: String?
 
     init() {
         #if DEBUG
@@ -45,6 +47,17 @@ final class AuthViewModel {
         }
     }
 
+    func generateNonce() -> String {
+        let raw = (0..<32).map { _ in UInt8.random(in: 0...255) }
+        let nonce = Data(raw).base64EncodedString()
+            .replacingOccurrences(of: "+", with: "-")
+            .replacingOccurrences(of: "/", with: "_")
+            .replacingOccurrences(of: "=", with: "")
+        currentNonce = nonce
+        return SHA256.hash(data: Data(nonce.utf8))
+            .map { String(format: "%02x", $0) }.joined()
+    }
+
     func signInWithApple(authorization: ASAuthorization) async {
         guard
             let credential = authorization.credential as? ASAuthorizationAppleIDCredential,
@@ -60,7 +73,7 @@ final class AuthViewModel {
 
         do {
             try await supabase.auth.signInWithIdToken(
-                credentials: .init(provider: .apple, idToken: identityToken)
+                credentials: .init(provider: .apple, idToken: identityToken, nonce: currentNonce)
             )
 
             if let fullName = credential.fullName,
