@@ -1,4 +1,5 @@
 import SwiftUI
+import Supabase
 
 struct AddParticipantsSheet: View {
     let meetupId: UUID
