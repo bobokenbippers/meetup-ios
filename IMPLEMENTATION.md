@@ -1593,6 +1593,7 @@ Three Edge Functions live in `supabase/functions/`. They are deployed via:
 ```bash
 supabase functions deploy push-meetup-invite
 supabase functions deploy push-meetup-status
+supabase functions deploy push-meetup-cancelled
 supabase functions deploy push-friend-request
 ```
 
@@ -1693,6 +1694,18 @@ create or replace trigger trg_friendship_push
 ```
 
 > **Note:** `current_setting('app.service_role_key', true)` requires the service role key to be set as a Postgres config var: `alter database postgres set app.service_role_key = '<key>';` — or replace with a hardcoded value during initial setup and rotate to the config var approach before prod.
+
+> **Live trigger wiring:** the documentation above reflects the original design. The triggers that are actually applied live in `supabase/migrations/20260609_push_triggers.sql`, which route through the `public.call_push_function(fn, payload)` helper and read the service-role key from Supabase Vault (`vault.decrypted_secrets where name = 'service_role_key'`) instead of `current_setting`. New push triggers should follow that pattern.
+
+#### Meetup cancelled push (`push-meetup-cancelled`)
+
+When a host cancels a meetup, every still-engaged participant gets a push telling them the event was cancelled (meetup title in the body). Edge function: `supabase/functions/push-meetup-cancelled/index.ts`. Trigger: `supabase/migrations/20260609_cancel_meetup_push.sql`.
+
+- **Trigger:** `trg_notify_meetup_cancelled` — `AFTER UPDATE ON public.meetups`, fires `public.notify_meetup_cancelled()` only when `new.status = 'cancelled' AND old.status IS DISTINCT FROM 'cancelled'`. Auto-expiry sets status to `'ended'`, so it never fires this push.
+- **Payload:** `{ meetupId }`.
+- **Recipients:** all `meetup_participants` for the meetup with status in (`invited`, `accepted`, `arrived`), excluding the host (who performed the cancellation). `declined` participants are skipped.
+- **Notification:** title `Meetup cancelled`, body `<destination_name> has been cancelled`, `event: meetup_cancelled`, `meetupId` for deep-linking.
+- The iOS cancel flow is unchanged: `MeetupService.cancelMeetup(meetupId:)` already updates `meetups.status` to `'cancelled'`, which is what the trigger keys off of.
 
 ### M5.1 Punctuality Computation (Backend)
 
