@@ -169,6 +169,8 @@ struct MessageThreadView: View {
     let conversationId: UUID
     let friend: Profile
 
+    @Environment(\.dismiss) private var dismiss
+
     @State private var messages: [Message] = []
     @State private var draft = ""
     @State private var selectedPhoto: PhotosPickerItem?
@@ -209,6 +211,19 @@ struct MessageThreadView: View {
         .background(Color.appBackground)
         .navigationTitle(friendName)
         .navigationBarTitleDisplayMode(.inline)
+        .navigationBarBackButtonHidden(true)
+        .toolbar {
+            ToolbarItem(placement: .navigationBarLeading) {
+                Button {
+                    dismiss()
+                } label: {
+                    Label("Messages", systemImage: "chevron.left")
+                        .labelStyle(.titleAndIcon)
+                }
+                .foregroundStyle(Color.coral)
+                .accessibilityLabel("Back to messages")
+            }
+        }
         .preferredColorScheme(.dark)
         .task {
             await load()

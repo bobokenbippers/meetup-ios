@@ -88,9 +88,11 @@ struct meetup_iosApp: App {
             Group {
                 if isUITestingMode {
                     HomeView()
+                } else if !auth.hasResolvedInitialSession {
+                    ProgressView("Loading...")
                 } else if auth.session == nil {
                     SignInView()
-                } else if auth.profile == nil {
+                } else if auth.profile?.id != auth.session?.user.id {
                     ProgressView("Loading...")
                 } else if auth.profile?.phoneE164 == nil {
                     ProfileSetupView()
