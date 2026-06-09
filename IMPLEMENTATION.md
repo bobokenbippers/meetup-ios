@@ -656,6 +656,15 @@ iOS surfaces only accepted friends in the invite picker; phone-search / contact 
 non-friend shows **"Send friend request"** (or **"Request pending"** / **"Accept request"**)
 instead of **Add**, via `MeetupService.friendshipStatus(with:)`.
 
+> **Insert ordering (required by this gate):** `MeetupService.createMeetup` must insert
+> the host's own `meetup_participants` row in its **own** statement and then insert each
+> invitee **individually** — never host + invitees in one atomic `insert([...])`. Because
+> `participants_insert` is evaluated per row, a single non-accepted-friend invitee in a
+> batch rolls back the entire insert (host row + every other invite), orphaning the meetup
+> with zero participants so it surfaces for no one — neither the host nor the invitees.
+> Per-row inserts isolate a gate rejection to just that invitee. (Fixed in
+> `fix/invites-not-surfacing`.)
+
 ### M2.2 Profile Phone Number Setup
 
 Add a "complete your profile" flow that runs after first sign-in if `phone_e164` is null. Create `MeetupTracker/Views/ProfileSetupView.swift`:
