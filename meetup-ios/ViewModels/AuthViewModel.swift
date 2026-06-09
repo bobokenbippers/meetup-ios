@@ -10,6 +10,7 @@ final class AuthViewModel {
     var profile: Profile?
     var error: String?
     var isLoading = false
+    var hasResolvedInitialSession = false
 
     private let supabase = SupabaseManager.shared.client
     private var authTask: Task<Void, Never>?
@@ -24,6 +25,7 @@ final class AuthViewModel {
                 phoneE164: "+16469466861",
                 email: "test@example.com"
             )
+            hasResolvedInitialSession = true
             return
         }
         #endif
@@ -34,14 +36,21 @@ final class AuthViewModel {
         authTask = Task {
             for await (event, session) in supabase.auth.authStateChanges {
                 self.session = session
-                if event == .initialSession, let session = session, !session.isExpired {
-                    await loadProfile(userId: session.user.id)
+                if event == .initialSession {
+                    if let session, !session.isExpired {
+                        await loadProfile(userId: session.user.id)
+                    } else {
+                        self.profile = nil
+                        Self.clearCachedProfile()
+                    }
+                    self.hasResolvedInitialSession = true
                 } else if event == .signedIn, let session = session {
                     await loadProfile(userId: session.user.id)
                 }
                 if event == .signedOut {
                     self.profile = nil
                     Self.clearCachedProfile()
+                    self.hasResolvedInitialSession = true
                 }
             }
         }
