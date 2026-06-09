@@ -2,8 +2,9 @@ import { serve } from "https://deno.land/std@0.224.0/http/server.ts"
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2"
 
 // Triggered by pg_cron every 5 minutes.
-// Marks meetups as 'completed' when target_arrival_at + 90 min has passed,
+// Marks meetups as 'ended' when target_arrival_at + 90 min has passed,
 // then wipes location data so participants can't see each other's whereabouts.
+// ('ended' is the terminal status allowed by meetups_status_check.)
 serve(async (_req) => {
   try {
     const supabase = createClient(
@@ -31,7 +32,7 @@ serve(async (_req) => {
 
     const { error: updateErr } = await supabase
       .from("meetups")
-      .update({ status: "completed" })
+      .update({ status: "ended" })
       .in("id", ids)
 
     if (updateErr) {
@@ -44,7 +45,7 @@ serve(async (_req) => {
       .update({ lat: null, lng: null, bearing: null, eta_seconds: null })
       .in("meetup_id", ids)
 
-    console.log(`expire-meetups: marked ${ids.length} meetup(s) as completed, wiped location data`)
+    console.log(`expire-meetups: marked ${ids.length} meetup(s) as ended, wiped location data`)
     return new Response(JSON.stringify({ expired: ids.length, ids }), { status: 200 })
   } catch (err) {
     return new Response(JSON.stringify({ error: String(err) }), { status: 500 })
