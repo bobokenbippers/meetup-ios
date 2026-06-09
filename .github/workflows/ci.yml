@@ -56,24 +56,6 @@ jobs:
             CODE_SIGNING_ALLOWED=NO \
             | xcpretty
 
-      - name: Prepare test simulator
-        shell: bash
-        timeout-minutes: 5
-        run: |
-          set -euo pipefail
-          SIMULATOR_ID="$(xcrun simctl list devices available "iPhone 17 Pro" | awk -F '[()]' '/iPhone 17 Pro/ { print $2; exit }')"
-          if [ -z "$SIMULATOR_ID" ]; then
-            echo "No available iPhone 17 Pro simulator found"
-            xcrun simctl list devices available
-            exit 1
-          fi
-          SIMULATOR_STATE="$(xcrun simctl list devices "$SIMULATOR_ID" | awk -F '[()]' -v id="$SIMULATOR_ID" '$0 ~ id { print $4; exit }')"
-          if [ "$SIMULATOR_STATE" != "Booted" ]; then
-            xcrun simctl boot "$SIMULATOR_ID"
-          fi
-          xcrun simctl bootstatus "$SIMULATOR_ID" -b
-          echo "SIMULATOR_ID=$SIMULATOR_ID" >> "$GITHUB_ENV"
-
       - name: Run unit tests
         shell: bash
         timeout-minutes: 10
@@ -82,7 +64,8 @@ jobs:
           xcodebuild test \
             -project meetup-ios.xcodeproj \
             -scheme meetup-ios \
-            -destination "platform=iOS Simulator,id=${SIMULATOR_ID}" \
+            -destination "platform=iOS Simulator,name=iPhone 17 Pro,OS=26.5" \
+            -destination-timeout 60 \
             CODE_SIGNING_ALLOWED=NO \
             -only-testing:meetup-iosTests \
             -resultBundlePath TestResults.xcresult \
