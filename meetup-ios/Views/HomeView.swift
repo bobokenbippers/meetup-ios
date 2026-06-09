@@ -13,6 +13,9 @@ struct HomeView: View {
             PeopleListView()
                 .tabItem { Label("People", systemImage: "person.crop.circle") }
                 .tag(NavigationState.Tab.people)
+            DirectMessagesView()
+                .tabItem { Label("Messages", systemImage: "bubble.left.and.bubble.right") }
+                .tag(NavigationState.Tab.messages)
             SettingsView()
                 .tabItem { Label("Settings", systemImage: "gear") }
                 .tag(NavigationState.Tab.settings)
@@ -30,4 +33,3 @@ struct HomeView: View {
         .animation(.spring(response: 0.35, dampingFraction: 0.8), value: locationManager.isTracking)
     }
 }
-

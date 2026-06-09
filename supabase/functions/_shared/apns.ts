@@ -51,6 +51,8 @@ export interface PushPayload {
   event: string
   meetupId?: string
   friendshipId?: string
+  conversationId?: string
+  senderId?: string
   badge?: number
 }
 
@@ -65,6 +67,8 @@ export async function sendPush(token: string, payload: PushPayload): Promise<voi
     event: payload.event,
     ...(payload.meetupId ? { meetupId: payload.meetupId } : {}),
     ...(payload.friendshipId ? { friendshipId: payload.friendshipId } : {}),
+    ...(payload.conversationId ? { conversationId: payload.conversationId } : {}),
+    ...(payload.senderId ? { senderId: payload.senderId } : {}),
   }
 
   const url = `https://${APNS_HOST}/3/device/${token}`

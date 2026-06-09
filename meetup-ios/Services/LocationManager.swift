@@ -223,7 +223,12 @@ extension LocationManager: CLLocationManagerDelegate {
         location = locations.last
     }
 
-    func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {}
+    func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
+        guard location == nil else { return }
+        let status = manager.authorizationStatus
+        guard status == .authorizedWhenInUse || status == .authorizedAlways else { return }
+        manager.requestLocation()
+    }
 
     // requestLocation() reports failures here; swallow them — callers degrade gracefully
     // when `location` stays nil (e.g. nearby-event suggestions just hide their section).

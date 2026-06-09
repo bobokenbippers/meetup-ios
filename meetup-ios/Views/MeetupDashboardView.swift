@@ -40,8 +40,12 @@ struct MeetupDashboardView: View {
     private var destinationCoord: CLLocationCoordinate2D {
         CLLocationCoordinate2D(latitude: meetup.destinationLat, longitude: meetup.destinationLng)
     }
-    private var acceptedCount: Int {
-        participants.filter { $0.isEnRoute || $0.status == "maybe" || $0.status == "arrived" }.count
+    private var meetingCount: Int {
+        participants.filter { participant in
+            participant.userId != myUserId
+                && participant.status != "no"
+                && participant.status != "declined"
+        }.count
     }
     private var greeting: String {
         let h = Calendar.current.component(.hour, from: Date())
@@ -222,7 +226,7 @@ struct MeetupDashboardView: View {
                 .scaledFont(size: 24, weight: .black)
                 .foregroundStyle(.white)
                 .lineLimit(1)
-            Text("You're meeting \(acceptedCount) \(acceptedCount == 1 ? "person" : "people")")
+            Text("You're meeting \(meetingCount) \(meetingCount == 1 ? "person" : "people")")
                 .scaledFont(size: 12)
                 .foregroundStyle(Color(white: 0.55))
         }
@@ -390,14 +394,14 @@ struct MeetupDashboardView: View {
             if myStatus == "invited" {
                 GlassEffectContainer(spacing: 8) {
                     HStack(spacing: 8) {
-                        Button("No") { Task { await respond(status: "no") } }
-                            .buttonStyle(.glass)
+                        Button("Yes") { Task { await respond(status: "yes") } }
+                            .buttonStyle(.glassProminent)
                             .disabled(isActing)
                         Button("Maybe") { Task { await respond(status: "maybe") } }
                             .buttonStyle(.glass)
                             .disabled(isActing)
-                        Button("Yes") { Task { await respond(status: "yes") } }
-                            .buttonStyle(.glassProminent)
+                        Button("No") { Task { await respond(status: "no") } }
+                            .buttonStyle(.glass)
                             .disabled(isActing)
                     }
                 }

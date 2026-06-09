@@ -35,9 +35,15 @@ struct RSVPInviteCard: View {
                             .scaledFont(size: 14, weight: .bold)
                             .foregroundStyle(Color(.label))
                             .lineLimit(1)
+                        if let hostName = participation.meetup.hostDisplayName, !hostName.isEmpty {
+                            Text("From \(hostName)")
+                                .scaledFont(size: 11, weight: .medium)
+                                .foregroundStyle(Color(.secondaryLabel))
+                                .lineLimit(1)
+                        }
                         if let addr = participation.meetup.destinationAddress, !addr.isEmpty {
                             Text(addr)
-                                .scaledFont(size: 11)
+                                .scaledFont(size: 10)
                                 .foregroundStyle(Color(.secondaryLabel))
                                 .lineLimit(1)
                         }

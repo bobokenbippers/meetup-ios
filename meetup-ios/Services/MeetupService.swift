@@ -178,19 +178,58 @@ final class MeetupService {
         guard let myId = supabase.auth.currentUser?.id else { return [] }
         return try await supabase
             .from("meetup_participants")
-            .select("status, meetups(*)")
+            .select("status, meetups(*, host_profile:profiles!meetups_host_id_fkey(id, display_name, phone_e164, email))")
             .eq("user_id", value: myId)
             .execute()
             .value
     }
 
     func listParticipants(meetupId: UUID) async throws -> [MeetupParticipant] {
-        return try await supabase
-            .from("meetup_participants")
-            .select("*, profiles(display_name, phone_e164)")
-            .eq("meetup_id", value: meetupId)
+        struct ParticipantRow: Codable {
+            let meetupId: UUID
+            let userId: UUID
+            let status: String
+            let lat: Double?
+            let lng: Double?
+            let bearing: Double?
+            let etaSeconds: Int?
+            let locationUpdatedAt: Date?
+            let displayName: String?
+            let phoneE164: String?
+
+            enum CodingKeys: String, CodingKey {
+                case meetupId = "meetup_id"
+                case userId = "user_id"
+                case status
+                case lat, lng, bearing
+                case etaSeconds = "eta_seconds"
+                case locationUpdatedAt = "location_updated_at"
+                case displayName = "display_name"
+                case phoneE164 = "phone_e164"
+            }
+        }
+
+        let rows: [ParticipantRow] = try await supabase
+            .rpc("list_meetup_participants", params: ["p_meetup_id": meetupId.uuidString])
             .execute()
             .value
+
+        return rows.map { row in
+            MeetupParticipant(
+                meetupId: row.meetupId,
+                userId: row.userId,
+                status: row.status,
+                lat: row.lat,
+                lng: row.lng,
+                bearing: row.bearing,
+                etaSeconds: row.etaSeconds,
+                locationUpdatedAt: row.locationUpdatedAt,
+                profiles: MeetupParticipant.ParticipantProfile(
+                    displayName: row.displayName,
+                    phoneE164: row.phoneE164
+                )
+            )
+        }
     }
 
     func accept(meetupId: UUID) async throws {

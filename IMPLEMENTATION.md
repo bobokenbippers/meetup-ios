@@ -1055,20 +1055,77 @@ create policy "host creates meetups"
   on public.meetups for insert
   with check (auth.uid() = host_id);
 
--- NOTE: Do NOT reference the meetups table here — doing so creates a circular RLS
--- dependency (meetup_participants policy → meetups → meetup_participants → …) that
--- causes infinite recursion for non-host participants, resulting in empty results.
--- The base case user_id = auth.uid() breaks the cycle without any cross-table lookup.
-create policy "see participants of meetups you're in"
-  on public.meetup_participants for select
-  using (
-    user_id = auth.uid()
-    or exists (
-      select 1 from public.meetup_participants self
-      where self.meetup_id = meetup_participants.meetup_id
-        and self.user_id = auth.uid()
-    )
+-- Hardened in migration 20260609_meetup_participant_visibility.sql: the SELECT policy
+-- uses SECURITY DEFINER helpers instead of a direct self-recursive policy subquery.
+-- Invited users must see the whole roster, including the host/inviter.
+create or replace function public.is_meetup_participant(p_meetup_id uuid, p_user_id uuid)
+returns boolean
+language sql
+security definer
+set search_path = public
+as $$
+  select exists (
+    select 1
+    from public.meetup_participants mp
+    where mp.meetup_id = p_meetup_id
+      and mp.user_id = p_user_id
   );
+$$;
+
+create policy participants_select
+  on public.meetup_participants for select
+  to authenticated
+  using (
+    public.is_meetup_host(meetup_id)
+    or public.is_meetup_participant(meetup_id, auth.uid())
+  );
+
+create or replace function public.list_meetup_participants(p_meetup_id uuid)
+returns table (
+  meetup_id uuid,
+  user_id uuid,
+  status text,
+  lat double precision,
+  lng double precision,
+  bearing double precision,
+  eta_seconds int,
+  location_updated_at timestamptz,
+  display_name text,
+  phone_e164 text
+)
+language sql
+security definer
+set search_path = public
+as $$
+  select
+    mp.meetup_id,
+    mp.user_id,
+    mp.status,
+    mp.lat,
+    mp.lng,
+    mp.bearing,
+    mp.eta_seconds,
+    mp.location_updated_at,
+    p.display_name,
+    p.phone_e164
+  from public.meetup_participants mp
+  join public.profiles p on p.id = mp.user_id
+  join public.meetups m on m.id = mp.meetup_id
+  where mp.meetup_id = p_meetup_id
+    and (
+      public.is_meetup_host(p_meetup_id)
+      or public.is_meetup_participant(p_meetup_id, auth.uid())
+    )
+  order by
+    case
+      when mp.user_id = m.host_id then 0
+      when mp.user_id = auth.uid() then 1
+      else 2
+    end,
+    p.display_name;
+$$;
+
+grant execute on function public.list_meetup_participants(uuid) to authenticated;
 
 create policy "host adds participants on create"
   on public.meetup_participants for insert
@@ -2351,6 +2408,33 @@ grant execute on function public.deactivate_account() to authenticated;
 `AuthViewModel.deactivateAndSignOut()` calls the RPC then signs out.
 
 **Placeholder / follow-up (not built in this MVP):** a *hard* delete of the `auth.users` row requires the service-role key and must run server-side. Implement later as a Supabase Edge Function (e.g. `delete-account`) that authenticates the caller's JWT, then calls `auth.admin.deleteUser(uid)` with the service-role key held in the function's secrets — never shipped in the app. The current build does a soft deactivate + sign out.
+
+### M9.3 Friend direct messages
+
+Direct messages are 1:1 conversations between accepted friends. The canonical migration is `supabase/migrations/20260609_direct_messages.sql`; run it in Supabase before shipping the iOS UI.
+
+Schema:
+
+- `conversations`: one canonical row per friend pair (`user_a_id < user_b_id`), with `last_message_at`, `last_read_a`, and `last_read_b`.
+- `messages`: text and/or image messages with `conversation_id`, `sender_id`, `body`, `image_path`, and `created_at`.
+- `message-photos` storage bucket: private bucket for DM images, stored at `<conversation_id>/<uuid>.jpg` and read through signed URLs.
+
+RPCs:
+
+- `get_or_create_conversation(p_other_user_id uuid)`: returns the existing accepted-friend conversation or creates one.
+- `list_conversation_summaries()`: inbox feed with the other participant, last message preview, and unread count.
+- `mark_conversation_read(p_conversation_id uuid)`: updates the caller's read timestamp.
+
+RLS:
+
+- Conversation reads/inserts/updates are limited to participants and accepted friends.
+- Message reads/sends are limited to accepted friends in the conversation.
+- Message deletes are limited to the sender of the message.
+- Storage object read/upload/delete policies are scoped to conversation participants by the first storage path segment.
+
+Push:
+
+- `push-new-message` is called by the `trg_on_new_message` database trigger and sends `event: new_message`, `conversationId`, and `senderId` through APNs.
 
 ## Appendix C — Testing Strategy
 
