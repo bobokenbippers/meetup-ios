@@ -39,5 +39,10 @@
 	<array>
 		<string>comgooglemaps</string>
 	</array>
+	<!-- Ticketmaster Discovery API consumer key for "Happening near you" event suggestions.
+	     Replace the placeholder below with a real key from https://developer-acct.ticketmaster.com
+	     (Discovery API -> app -> Consumer Key). Until set, the suggestions section is hidden. -->
+	<key>TicketmasterAPIKey</key>
+	<string>REPLACE_WITH_TICKETMASTER_CONSUMER_KEY</string>
 </dict>
 </plist>

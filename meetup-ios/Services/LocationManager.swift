@@ -81,6 +81,16 @@ final class LocationManager: NSObject {
         clManager.requestWhenInUseAuthorization()
     }
 
+    /// Fetch a single current fix when we're not in an active tracking session,
+    /// so features like nearby-event suggestions have a coordinate to query with.
+    /// No-op once we already have a location (tracking loop or a prior one-shot).
+    func requestOneShotLocation() {
+        guard location == nil else { return }
+        let status = clManager.authorizationStatus
+        guard status == .authorizedWhenInUse || status == .authorizedAlways else { return }
+        clManager.requestLocation()
+    }
+
     func startTracking(meetup: Meetup) {
         if trackingMeetup?.id == meetup.id { return }
         trackingMeetup = meetup
@@ -214,4 +224,8 @@ extension LocationManager: CLLocationManagerDelegate {
     }
 
     func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {}
+
+    // requestLocation() reports failures here; swallow them — callers degrade gracefully
+    // when `location` stays nil (e.g. nearby-event suggestions just hide their section).
+    func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {}
 }
