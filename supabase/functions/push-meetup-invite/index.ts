@@ -3,33 +3,28 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2"
 import { sendPush } from "../_shared/apns.ts"
 
 // Triggered by Postgres: AFTER INSERT ON meetup_participants WHERE status = 'invited'
-// Payload: { participantId: string }
+// meetup_participants has a composite PK (meetup_id, user_id) — no id column.
+// Payload: { meetupId: string, userId: string }
 serve(async (req) => {
   try {
-    const { participantId } = await req.json()
+    const { meetupId, userId } = await req.json()
+    if (!meetupId || !userId) return new Response("missing fields", { status: 200 })
+
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
     )
 
-    // Resolve the invite: who was invited, to which meetup, by whom
-    const { data: participant, error: pErr } = await supabase
-      .from("meetup_participants")
-      .select("user_id, meetup_id")
-      .eq("id", participantId)
-      .single()
-    if (pErr || !participant) return new Response("not found", { status: 200 })
-
     const [{ data: meetup }, { data: invitee }] = await Promise.all([
       supabase
         .from("meetups")
         .select("host_id, destination_name")
-        .eq("id", participant.meetup_id)
+        .eq("id", meetupId)
         .single(),
       supabase
         .from("profiles")
         .select("apns_token")
-        .eq("id", participant.user_id)
+        .eq("id", userId)
         .single(),
     ])
 
@@ -44,13 +39,12 @@ serve(async (req) => {
 
     const hostName = host?.display_name ?? "Someone"
     const meetupName = meetup?.destination_name ?? "a meetup"
-    const dest = ""
 
     await sendPush(invitee.apns_token, {
       title: `${hostName} invited you`,
-      body: `Join ${meetupName}${dest}`,
+      body: `Join ${meetupName}`,
       event: "meetup_invite",
-      meetupId: participant.meetup_id,
+      meetupId: meetupId,
     })
 
     return new Response("ok", { status: 200 })

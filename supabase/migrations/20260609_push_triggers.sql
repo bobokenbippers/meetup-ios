@@ -39,7 +39,7 @@ begin
   if new.status = 'invited' then
     perform public.call_push_function(
       'push-meetup-invite',
-      jsonb_build_object('participantId', new.id)
+      jsonb_build_object('meetupId', new.meetup_id, 'userId', new.user_id)
     );
   end if;
   return new;
@@ -59,7 +59,7 @@ begin
      and new.status in ('accepted', 'declined', 'arrived') then
     perform public.call_push_function(
       'push-meetup-status',
-      jsonb_build_object('participantId', new.id, 'newStatus', new.status)
+      jsonb_build_object('meetupId', new.meetup_id, 'userId', new.user_id, 'newStatus', new.status)
     );
   end if;
   return new;

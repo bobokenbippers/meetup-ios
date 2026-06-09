@@ -18,22 +18,28 @@ serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
     )
 
+    // friendships has a composite PK (user_a_id, user_b_id) plus an id and
+    // initiated_by (the requester). The recipient is whichever side isn't the initiator.
     const { data: friendship, error: fErr } = await supabase
       .from("friendships")
-      .select("requester_id, recipient_id")
+      .select("user_a_id, user_b_id, initiated_by")
       .eq("id", friendshipId)
       .single()
     if (fErr || !friendship) return new Response("not found", { status: 200 })
 
+    const requesterId = friendship.initiated_by
+    const requesteeId =
+      friendship.user_a_id === requesterId ? friendship.user_b_id : friendship.user_a_id
+
     const recipientId =
       event === "friend_request"
-        ? friendship.recipient_id  // new request → notify the person being asked
-        : friendship.requester_id  // accepted → notify the person who asked
+        ? requesteeId   // new request → notify the person being asked
+        : requesterId   // accepted → notify the person who asked
 
     const actorId =
       event === "friend_request"
-        ? friendship.requester_id
-        : friendship.recipient_id
+        ? requesterId
+        : requesteeId
 
     const [{ data: recipient }, { data: actor }] = await Promise.all([
       supabase.from("profiles").select("apns_token").eq("id", recipientId).single(),
