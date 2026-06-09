@@ -2263,6 +2263,71 @@ fly deploy
 
 Update Supabase webhooks and iOS `BACKEND_URL` to the Fly URL.
 
+## M9 — Settings (User Preferences + Account)
+
+Expanded Settings screen (`Views/SettingsView.swift`): ACCOUNT (edit display name, delete account, sign out), APPEARANCE/ACCESSIBILITY (existing, UserDefaults via `AppSettings`), NOTIFICATIONS + PRIVACY (persisted to Supabase via `user_settings`), and ABOUT (bundle version, Terms/Support links).
+
+### M9.1 Schema — `user_settings`
+
+One row per user, keyed by `user_id = auth.uid()`. Notification + privacy preferences. Run in the Supabase SQL editor:
+
+```sql
+create table public.user_settings (
+  user_id                     uuid primary key references public.profiles(id) on delete cascade,
+  push_notifications_enabled  boolean not null default true,
+  event_cancelled_enabled     boolean not null default true,
+  location_sharing_enabled    boolean not null default true,
+  updated_at                  timestamptz not null default now()
+);
+
+alter table public.user_settings enable row level security;
+
+create policy "users can read their own settings"
+  on public.user_settings for select
+  using (auth.uid() = user_id);
+
+create policy "users can insert their own settings"
+  on public.user_settings for insert
+  with check (auth.uid() = user_id);
+
+create policy "users can update their own settings"
+  on public.user_settings for update
+  using (auth.uid() = user_id)
+  with check (auth.uid() = user_id);
+```
+
+The iOS client upserts on `user_id` (`UserSettingsService.save`). `location_sharing_enabled` is mirrored into `UserDefaults` so `MeetupDashboardView` / `LocationManager` can gate live tracking synchronously. The `event_cancelled_enabled` flag is the gate the `feature/cancel-event-push-notifications` branch should read before sending a cancel push (the push backend should `select` this column for the recipient and skip if false).
+
+### M9.2 Account deactivation (soft delete)
+
+`profiles` gains a `deactivated_at` column plus a `security definer` RPC so a user can deactivate their own account without exposing service-role keys. Run:
+
+```sql
+alter table public.profiles
+  add column if not exists deactivated_at timestamptz;
+
+create or replace function public.deactivate_account()
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  update public.profiles
+     set deactivated_at = now(),
+         updated_at = now()
+   where id = auth.uid();
+end;
+$$;
+
+revoke all on function public.deactivate_account() from public;
+grant execute on function public.deactivate_account() to authenticated;
+```
+
+`AuthViewModel.deactivateAndSignOut()` calls the RPC then signs out.
+
+**Placeholder / follow-up (not built in this MVP):** a *hard* delete of the `auth.users` row requires the service-role key and must run server-side. Implement later as a Supabase Edge Function (e.g. `delete-account`) that authenticates the caller's JWT, then calls `auth.admin.deleteUser(uid)` with the service-role key held in the function's secrets — never shipped in the app. The current build does a soft deactivate + sign out.
+
 ## Appendix C — Testing Strategy
 
 - **Unit tests (backend):** `pytest`. Focus on `services/punctuality.py`, `services/routing.py` ETA caching logic.
