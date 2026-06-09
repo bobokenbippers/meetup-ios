@@ -177,6 +177,7 @@ struct MessageThreadView: View {
     @State private var selectedImage: UIImage?
     @State private var isPreparingPhoto = false
     @State private var isSending = false
+    @State private var lastMarkedReadMessageId: UUID?
     @State private var error: String?
 
     private var myId: UUID? { SupabaseManager.shared.client.auth.currentUser?.id }
@@ -226,10 +227,13 @@ struct MessageThreadView: View {
             }
         }
         .preferredColorScheme(.dark)
-        .task {
+        .task(id: conversationId) {
             await load()
             await markRead()
-            await subscribeToThreadChanges()
+            lastMarkedReadMessageId = messages.last?.id
+            async let realtime: Void = subscribeToThreadChanges()
+            async let refresh: Void = refreshThreadWhileOpen()
+            _ = await (realtime, refresh)
         }
         .onChange(of: selectedPhoto) { _, item in
             guard let item else { return }
@@ -329,17 +333,20 @@ struct MessageThreadView: View {
         selectedImage != nil || !draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
-    private func load() async {
+    @discardableResult
+    private func load() async -> Bool {
         do {
             let next = try await DirectMessageService.shared.listMessages(conversationId: conversationId)
             if messages != next {
                 messages = next
+                return true
             }
         } catch is CancellationError {
-            return
+            return false
         } catch {
             self.error = error.localizedDescription
         }
+        return false
     }
 
     private func loadSelectedPhoto(_ item: PhotosPickerItem) async {
@@ -373,7 +380,7 @@ struct MessageThreadView: View {
             selectedImage = nil
             selectedPhoto = nil
             await load()
-            await markRead()
+            await markLatestIncomingReadIfNeeded()
         } catch is CancellationError {
             return
         } catch {
@@ -402,6 +409,27 @@ struct MessageThreadView: View {
         }
     }
 
+    private func markLatestIncomingReadIfNeeded() async {
+        guard let latest = messages.last, latest.senderId != myId else { return }
+        guard latest.id != lastMarkedReadMessageId else { return }
+        await markRead()
+        lastMarkedReadMessageId = latest.id
+    }
+
+    private func refreshThreadWhileOpen() async {
+        while !Task.isCancelled {
+            do {
+                try await Task.sleep(for: .seconds(2))
+            } catch {
+                return
+            }
+            let changed = await load()
+            if changed {
+                await markLatestIncomingReadIfNeeded()
+            }
+        }
+    }
+
     private func subscribeToThreadChanges() async {
         let channel = SupabaseManager.shared.client.realtimeV2.channel("thread-\(conversationId)")
         let changes = channel.postgresChange(AnyAction.self, schema: "public", table: "messages")
@@ -413,8 +441,10 @@ struct MessageThreadView: View {
         do {
             for await _ in changes {
                 try Task.checkCancellation()
-                await load()
-                await markRead()
+                let changed = await load()
+                if changed {
+                    await markLatestIncomingReadIfNeeded()
+                }
             }
         } catch {
             // CancellationError — fall through to removeChannel.
