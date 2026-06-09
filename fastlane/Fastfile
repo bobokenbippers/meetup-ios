@@ -19,6 +19,8 @@ platform :ios do
   desc "Enable the Push Notifications capability on the App ID and force-regenerate the App Store profile"
   lane :regen_profiles do
     produce(
+      username: ENV["APPLE_ID"],
+      team_id: "KLT4S6K9X8",
       app_identifier: "gautamlgtm.meetup-ios",
       skip_itc: true,
       enable_services: {
