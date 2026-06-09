@@ -2,10 +2,11 @@
 
 ## [Unreleased] - 2026-06-09
 ### TestFlight Notes
-Friend DMs are here: open Messages to chat with accepted friends, send text/photo messages, and delete your own messages. Meetup invites now show who sent them, RSVP buttons are ordered Yes/Maybe/No, chat threads have a clearer back button, Settings includes a prefilled beta feedback email, event suggestions stay visible while asking for location, and the app no longer flashes the meetup screen before auth finishes.
+Friend DMs are here: open Messages to chat with accepted friends, send text/photo messages, and delete your own messages. Meetup invites now share as normal web links, RSVP buttons are ordered Yes/Maybe/No, chat threads have a clearer back button, Settings includes a prefilled beta feedback email, event suggestions stay visible while asking for location, and the app no longer flashes the meetup screen before auth finishes.
 
 Please test:
 - Create a meetup, invite a friend, and confirm the invite says who sent it.
+- Use the dashboard share button and confirm the web invite link opens the join flow.
 - Open the meetup after accepting and confirm the host appears in the participant list.
 - Send text and photo DMs both ways.
 - Delete one of your own messages.
@@ -18,16 +19,20 @@ Please test:
 - Delete support for a user's own direct messages.
 - Supabase DM backend: conversations, messages, read-state RPCs, RLS policies, storage policies, and `push-new-message` edge function.
 - Settings beta feedback action with a prefilled email that includes app version, user id, iOS version, and device model.
+- Shareable meetup invite links now use a web fallback page that redirects into the app for installed beta testers.
 
 ### Changed
 - Received meetup invites now show the sender with a `From <name>` line.
 - Meetup dashboard invite responses are ordered `Yes`, `Maybe`, `No`.
 - Message threads now include an explicit `Messages` back button.
+- Meetup share sheets now include readable invite text plus the web invite URL.
 
 ### Fixed
 - Invitees can see the meetup host/sender in the participant roster after accepting an invite.
 - Missing host participant rows are backfilled so older meetups can render the inviter.
 - Settings feedback now sends to `gautam.pappu@utexas.edu` instead of the unregistered `support@squadbrunch.app` address.
+- The invite fallback page no longer points to a fake App Store listing.
+- The `join-meetup` Edge Function is configured as public so shared invite links can open from Messages or a browser.
 - Event suggestions can request location correctly after authorization by adding required iOS location usage strings and a one-shot location fetch.
 - Event suggestions no longer disappear when location permission is pending or unavailable; the Meetups tab now shows a clear location prompt or empty state.
 - Event suggestion API configuration is now included in the app target build settings so release builds can read it reliably.

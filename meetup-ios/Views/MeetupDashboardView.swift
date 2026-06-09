@@ -23,7 +23,7 @@ struct MeetupDashboardView: View {
     @State private var showCancelConfirm = false
     @State private var showBill = false
     @State private var showConfetti = false
-    @State private var shareURL: URL?
+    @State private var shareInvite: ShareInvite?
     @State private var isGeneratingShareLink = false
     @State private var showRecap = false
     @State private var showAddParticipants = false
@@ -172,8 +172,8 @@ struct MeetupDashboardView: View {
                     LocationManager.shared.updateTrackedDestination(meetup: updated)
                 }
             }
-            .sheet(item: $shareURL) { url in
-                ShareSheet(url: url)
+            .sheet(item: $shareInvite) { invite in
+                ShareSheet(invite: invite)
                     .ignoresSafeArea()
             }
             .sheet(item: $fullscreenPhoto) { photo in
@@ -551,13 +551,15 @@ struct MeetupDashboardView: View {
         isGeneratingShareLink = true
         do {
             let token = try await MeetupService.shared.ensureShareToken(for: meetup)
-            // Deep link into the app via the registered custom URL scheme (see Info.plist
-            // CFBundleURLTypes). Must NOT be a raw Supabase API/Edge-Function URL — opening
-            // that in a browser sends no auth header and Supabase returns
-            // UNAUTHORIZED_NO_AUTH_HEADER. The app's onOpenURL handler routes this to JoinMeetupSheet.
-            let urlString = "squadbrunch://join/\(token)"
+            // Share a normal web URL so beta testers can forward it anywhere. The Edge
+            // Function page redirects installed users into squadbrunch://join/<token>
+            // and gives people without the app a useful fallback instead of a dead link.
+            let urlString = "https://boyrqhbdkqzffvfokpri.supabase.co/functions/v1/join-meetup/\(token)"
             if let url = URL(string: urlString) {
-                shareURL = url
+                shareInvite = ShareInvite(
+                    url: url,
+                    message: "Join my Squad Brunch meetup at \(meetup.destinationName): \(url.absoluteString)"
+                )
             }
         } catch is CancellationError {
             // nothing
@@ -591,19 +593,22 @@ struct MeetupDashboardView: View {
     }
 }
 
-// MARK: - URL Identifiable (for sheet(item:))
+// MARK: - Share Invite Payload
 
-extension URL: @retroactive Identifiable {
-    public var id: String { absoluteString }
+private struct ShareInvite: Identifiable {
+    let url: URL
+    let message: String
+
+    var id: String { url.absoluteString }
 }
 
 // MARK: - Share Sheet (UIActivityViewController wrapper)
 
 private struct ShareSheet: UIViewControllerRepresentable {
-    let url: URL
+    let invite: ShareInvite
 
     func makeUIViewController(context: Context) -> UIActivityViewController {
-        UIActivityViewController(activityItems: [url], applicationActivities: nil)
+        UIActivityViewController(activityItems: [invite.message, invite.url], applicationActivities: nil)
     }
 
     func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {}

@@ -10,29 +10,31 @@ serve(async (req) => {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Opening Squad Brunch...</title>
+  <title>Squad Brunch Invite</title>
   <style>
     body { background: #0f0f1a; color: white; font-family: -apple-system, sans-serif;
            display: flex; flex-direction: column; align-items: center; justify-content: center;
            min-height: 100vh; margin: 0; text-align: center; padding: 24px; }
     h1 { font-size: 28px; font-weight: 800; margin-bottom: 8px; }
-    p { color: rgba(255,255,255,0.6); font-size: 16px; }
-    .badge { margin-top: 32px; opacity: 0; transition: opacity 0.5s; }
+    p { color: rgba(255,255,255,0.68); font-size: 16px; line-height: 1.45; max-width: 360px; }
+    .badge { margin-top: 28px; opacity: 0; transition: opacity 0.5s; }
     .badge.show { opacity: 1; }
-    .btn { display: inline-block; background: #6C57C5; color: white; padding: 14px 28px;
+    .btn { display: inline-block; background: #FF6B47; color: white; padding: 14px 28px;
            border-radius: 14px; text-decoration: none; font-weight: 700; font-size: 16px; margin-top: 16px; }
+    .secondary { color: rgba(255,255,255,0.5); font-size: 13px; margin-top: 16px; }
   </style>
 </head>
 <body>
-  <h1>Squad Brunch 🎯</h1>
-  <p>Opening your invite...</p>
+  <h1>Squad Brunch</h1>
+  <p>Opening your meetup invite in the app.</p>
   <div class="badge" id="badge">
-    <p>Don't have the app?</p>
-    <a class="btn" href="https://apps.apple.com/app/squad-brunch/id000000000">Get Squad Brunch</a>
+    <p>If nothing opened, tap below. If you do not have the beta yet, ask the host to add you on TestFlight.</p>
+    <a class="btn" href="squadbrunch://join/${token}">Open Invite</a>
+    <p class="secondary">This beta invite link works after Squad Brunch is installed.</p>
   </div>
   <script>
     window.location = 'squadbrunch://join/${token}';
-    setTimeout(() => { document.getElementById('badge').classList.add('show'); }, 2000);
+    setTimeout(() => { document.getElementById('badge').classList.add('show'); }, 1200);
   </script>
 </body>
 </html>`
