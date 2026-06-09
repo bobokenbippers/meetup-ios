@@ -134,21 +134,43 @@ final class MeetupService {
             }
         }
 
-        var participants = [ParticipantInsert(
-            meetupId: meetupId,
-            userId: hostId,
-            status: "yes",
-            joinedAt: iso.string(from: Date())
-        )]
-        for invitee in invitees {
-            participants.append(ParticipantInsert(
+        // Insert the host's own participant row on its own. It always satisfies the
+        // friendship-gate RLS (`participants_insert`) because user_id == auth.uid().
+        // Keeping it separate from the invitees guarantees a rejected invitee can
+        // never roll it back — an orphaned meetup with no host row is invisible to
+        // everyone, including the host.
+        try await supabase
+            .from("meetup_participants")
+            .insert(ParticipantInsert(
                 meetupId: meetupId,
-                userId: invitee.id,
-                status: "invited",
-                joinedAt: nil
+                userId: hostId,
+                status: "yes",
+                joinedAt: iso.string(from: Date())
             ))
+            .execute()
+
+        // Insert invitees one at a time rather than as a single atomic batch. The
+        // friendship gate rejects any invitee who isn't an accepted friend; in a
+        // batch that one rejection rolls back the whole insert (host row + every
+        // other invite), so legitimate invites never reach their recipients. Per-row
+        // inserts isolate each invitee so valid invites still land and surface.
+        for invitee in invitees {
+            do {
+                try await supabase
+                    .from("meetup_participants")
+                    .insert(ParticipantInsert(
+                        meetupId: meetupId,
+                        userId: invitee.id,
+                        status: "invited",
+                        joinedAt: nil
+                    ))
+                    .execute()
+            } catch is CancellationError {
+                throw CancellationError()
+            } catch {
+                continue
+            }
         }
-        try await supabase.from("meetup_participants").insert(participants).execute()
         return meetupId
     }
 
