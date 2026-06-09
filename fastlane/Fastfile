@@ -16,6 +16,18 @@ platform :ios do
     match(type: "appstore", readonly: is_ci)
   end
 
+  desc "Enable the Push Notifications capability on the App ID and force-regenerate the App Store profile"
+  lane :regen_profiles do
+    produce(
+      app_identifier: "gautamlgtm.meetup-ios",
+      skip_itc: true,
+      enable_services: {
+        push_notification: "on"
+      }
+    )
+    match(type: "appstore", force: true, readonly: false)
+  end
+
   desc "Build and upload to TestFlight"
   lane :beta do
     match(type: "appstore", readonly: is_ci)
