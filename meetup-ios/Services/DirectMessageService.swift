@@ -99,7 +99,8 @@ final class DirectMessageService {
     }
 
     func sendImage(_ image: UIImage, caption: String?, conversationId: UUID) async throws {
-        guard let jpeg = image.jpegData(compressionQuality: 0.82) else {
+        let preparedImage = image.resizedForMessageUpload(maxDimension: 1600)
+        guard let jpeg = preparedImage.jpegData(compressionQuality: 0.72) else {
             throw DirectMessageError.imageCompressionFailed
         }
         let path = "\(conversationId.uuidString)/\(UUID().uuidString).jpg"
@@ -163,5 +164,22 @@ final class DirectMessageService {
                 imagePath: imagePath
             ))
             .execute()
+    }
+}
+
+private extension UIImage {
+    func resizedForMessageUpload(maxDimension: CGFloat) -> UIImage {
+        let longestSide = max(size.width, size.height)
+        guard longestSide > maxDimension else { return self }
+
+        let scale = maxDimension / longestSide
+        let targetSize = CGSize(width: size.width * scale, height: size.height * scale)
+        let format = UIGraphicsImageRendererFormat.default()
+        format.scale = 1
+        format.opaque = true
+
+        return UIGraphicsImageRenderer(size: targetSize, format: format).image { _ in
+            draw(in: CGRect(origin: .zero, size: targetSize))
+        }
     }
 }

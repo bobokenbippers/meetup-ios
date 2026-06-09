@@ -28,6 +28,7 @@ Please test:
 - Event suggestions can request location correctly after authorization by adding required iOS location usage strings and a one-shot location fetch.
 - Event suggestions no longer disappear when location permission is pending or unavailable; the Meetups tab now shows a clear location prompt or empty state.
 - Event suggestion API configuration is now included in the app target build settings so release builds can read it reliably.
+- Chat photo selection now reliably prepares the selected image before sending and resizes uploads for faster delivery.
 - Auth startup no longer flashes the full meetup UI before Supabase finishes resolving the initial session.
 
 ---
