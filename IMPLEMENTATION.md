@@ -1032,9 +1032,13 @@ create policy "see own meetups"
                where meetup_id = meetups.id and user_id = auth.uid())
   );
 
+-- Hardened in migration 20260609_meetup_host_update_policy.sql: WITH CHECK added
+-- so the host edit path (e.g. editing the destination/address after creation) is
+-- fully covered and the host cannot reassign host_id on update.
 create policy "host can update meetups"
   on public.meetups for update
-  using (auth.uid() = host_id);
+  using (auth.uid() = host_id)
+  with check (auth.uid() = host_id);
 
 create policy "host creates meetups"
   on public.meetups for insert

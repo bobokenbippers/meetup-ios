@@ -223,6 +223,45 @@ final class MeetupService {
             .execute()
     }
 
+    /// Update a meetup's destination. Name/address/coordinates move together so the map
+    /// pin and directions stay consistent — same bundle Google Places returns at creation.
+    /// RLS ("host can update meetups") restricts this to the host. Returns the updated row.
+    func updateDestination(
+        meetupId: UUID,
+        destinationName: String,
+        destinationAddress: String?,
+        lat: Double,
+        lng: Double
+    ) async throws -> Meetup {
+        struct DestinationUpdate: Encodable {
+            let destinationName: String
+            let destinationAddress: String?
+            let destinationLat: Double
+            let destinationLng: Double
+            enum CodingKeys: String, CodingKey {
+                case destinationName = "destination_name"
+                case destinationAddress = "destination_address"
+                case destinationLat = "destination_lat"
+                case destinationLng = "destination_lng"
+            }
+        }
+
+        let updated: [Meetup] = try await supabase
+            .from("meetups")
+            .update(DestinationUpdate(
+                destinationName: destinationName,
+                destinationAddress: destinationAddress,
+                destinationLat: lat,
+                destinationLng: lng
+            ))
+            .eq("id", value: meetupId)
+            .select()
+            .execute()
+            .value
+        guard let meetup = updated.first else { throw MeetupError.meetupNotFound }
+        return meetup
+    }
+
     func updateMyLocation(meetupId: UUID, lat: Double, lng: Double, bearing: Double?, etaSeconds: Int?) async throws {
         guard let userId = supabase.auth.currentUser?.id else { return }
 
