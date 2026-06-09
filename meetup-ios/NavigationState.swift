@@ -24,7 +24,7 @@ final class NavigationState {
             selectedTab = .people
             showFriendRequests = true
         case "meetup_invite", "meetup_arrived", "meetup_accepted", "meetup_declined",
-             "leave_now", "rsvp_update":
+             "meetup_cancelled", "leave_now", "rsvp_update":
             selectedTab = .meetups
             if let idStr = meetupId, let id = UUID(uuidString: idStr) {
                 pendingMeetupId = id
