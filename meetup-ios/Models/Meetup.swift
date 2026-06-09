@@ -14,6 +14,7 @@ struct Meetup: Codable, Identifiable, Equatable {
     let shareToken: String?
     let createdAt: Date
     let category: String?
+    var hostProfile: Profile? = nil
 
     enum CodingKeys: String, CodingKey {
         case id, status, category
@@ -27,6 +28,11 @@ struct Meetup: Codable, Identifiable, Equatable {
         case endsAt = "ends_at"
         case shareToken = "share_token"
         case createdAt = "created_at"
+        case hostProfile = "host_profile"
+    }
+
+    var hostDisplayName: String? {
+        hostProfile?.displayName
     }
 
     var isRecap: Bool {

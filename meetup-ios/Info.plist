@@ -33,6 +33,10 @@
 	<array>
 		<string>location</string>
 	</array>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Squad Brunch uses your location to suggest nearby events and share your ETA during active meetups.</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>Squad Brunch uses background location only during active meetups so friends can see your live ETA.</string>
 	<key>NSMotionUsageDescription</key>
 	<string>Used to adapt location updates to save battery during active meetups.</string>
 	<key>LSApplicationQueriesSchemes</key>

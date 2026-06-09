@@ -1,6 +1,6 @@
 import Foundation
 
-struct Profile: Codable, Identifiable {
+struct Profile: Codable, Identifiable, Equatable {
     let id: UUID
     var displayName: String?
     var phoneE164: String?

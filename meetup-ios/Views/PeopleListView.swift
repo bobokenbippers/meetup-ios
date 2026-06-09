@@ -17,6 +17,7 @@ struct PeopleListView: View {
     @State private var contactNameOverrides: [UUID: String] = [:]
     @State private var smartSuggestions: [ProfileSuggestion] = []
     @State private var selectedSuggestion: ProfileSuggestion?
+    @State private var selectedDirectMessage: DirectMessageRoute?
     @Environment(NavigationState.self) private var navState
 
     private var isSearchEnabled: Bool {
@@ -104,10 +105,14 @@ struct PeopleListView: View {
 
                         LazyVStack(spacing: 8) {
                             ForEach(people) { person in
+                                let isPending = pendingOutgoingIds.contains(person.id)
                                 PersonCard(
                                     person: person,
                                     contactName: contactNameOverrides[person.id],
-                                    isPending: pendingOutgoingIds.contains(person.id)
+                                    isPending: isPending,
+                                    onMessage: isPending ? nil : {
+                                        Task { await openDirectMessage(with: person) }
+                                    }
                                 ) {
                                     Task { await removePerson(person) }
                                 }
@@ -179,6 +184,11 @@ struct PeopleListView: View {
                     },
                     onDismiss: { selectedSuggestion = nil }
                 )
+            }
+            .sheet(item: $selectedDirectMessage) { route in
+                NavigationStack {
+                    MessageThreadView(conversationId: route.id, friend: route.friend)
+                }
             }
             .onChange(of: navState.showFriendRequests) { _, show in
                 guard show else { return }
@@ -580,6 +590,22 @@ struct PeopleListView: View {
             self.error = error.localizedDescription
         }
     }
+
+    private func openDirectMessage(with person: Profile) async {
+        do {
+            let conversationId = try await DirectMessageService.shared.getOrCreateConversation(with: person.id)
+            selectedDirectMessage = DirectMessageRoute(id: conversationId, friend: person)
+        } catch is CancellationError {
+            return
+        } catch {
+            self.error = error.localizedDescription
+        }
+    }
+}
+
+private struct DirectMessageRoute: Identifiable {
+    let id: UUID
+    let friend: Profile
 }
 
 // MARK: - Suggestion Card
@@ -750,12 +776,20 @@ private struct PersonCard: View {
     let person: Profile
     let contactName: String?
     let isPending: Bool
+    let onMessage: (() -> Void)?
     let onRemove: () -> Void
 
-    init(person: Profile, contactName: String?, isPending: Bool = false, onRemove: @escaping () -> Void) {
+    init(
+        person: Profile,
+        contactName: String?,
+        isPending: Bool = false,
+        onMessage: (() -> Void)? = nil,
+        onRemove: @escaping () -> Void
+    ) {
         self.person = person
         self.contactName = contactName
         self.isPending = isPending
+        self.onMessage = onMessage
         self.onRemove = onRemove
     }
 
@@ -804,13 +838,25 @@ private struct PersonCard: View {
                     .accessibilityLabel("Cancel request to \(displayedName)")
                 }
             } else {
-                Button(action: onRemove) {
-                    Image(systemName: "person.badge.minus")
-                        .scaledFont(size: 15)
-                        .foregroundStyle(.red.opacity(0.75))
+                HStack(spacing: 12) {
+                    if let onMessage {
+                        Button(action: onMessage) {
+                            Image(systemName: "bubble.left.and.bubble.right")
+                                .scaledFont(size: 15)
+                                .foregroundStyle(Color.coral)
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("Message \(displayedName)")
+                    }
+
+                    Button(action: onRemove) {
+                        Image(systemName: "person.badge.minus")
+                            .scaledFont(size: 15)
+                            .foregroundStyle(.red.opacity(0.75))
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Remove \(displayedName)")
                 }
-                .buttonStyle(.plain)
-                .accessibilityLabel("Remove \(displayedName)")
             }
         }
         .padding(.horizontal, 14)
