@@ -43,7 +43,7 @@ struct SignInView: View {
                         .shadow(color: Color.coral.opacity(0.4), radius: 24)
 
                     Image(systemName: "fork.knife.circle.fill")
-                        .font(.system(size: 52))
+                        .scaledFont(size: 52)
                         .foregroundStyle(
                             LinearGradient(
                                 colors: [Color.coral, Color.coral.opacity(0.6)],
@@ -56,12 +56,12 @@ struct SignInView: View {
 
                 // Title
                 Text("Squad Brunch")
-                    .font(.system(size: 42, weight: .black, design: .default))
+                    .scaledFont(size: 42, weight: .black, design: .default)
                     .foregroundStyle(.white)
                     .tracking(-0.5)
 
                 Text("Know who's on their way.")
-                    .font(.system(size: 17, weight: .regular))
+                    .scaledFont(size: 17, weight: .regular)
                     .foregroundStyle(Color(white: 0.55))
                     .padding(.top, 6)
                     .padding(.bottom, 56)
@@ -97,7 +97,7 @@ struct SignInView: View {
                     }
 
                     Text("By signing in you agree to our terms")
-                        .font(.system(size: 11))
+                        .scaledFont(size: 11)
                         .foregroundStyle(Color(white: 0.35))
                 }
                 .padding(.horizontal, 32)

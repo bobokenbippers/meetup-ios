@@ -133,7 +133,7 @@ struct MeetupsListView: View {
             .toolbar {
                 Button(action: { showCreate = true }) {
                     Image(systemName: "plus")
-                        .font(.system(size: 17, weight: .semibold))
+                        .scaledFont(size: 17, weight: .semibold)
                         .foregroundStyle(.white)
                         .frame(width: 34, height: 34)
                         .background(Color.coral)
@@ -176,7 +176,7 @@ struct MeetupsListView: View {
     private var meetupsList: some View {
         List {
             Text("Meetups")
-                .font(.system(size: 34, weight: .bold))
+                .scaledFont(size: 34, weight: .bold)
                 .foregroundStyle(.white)
                 .listRowBackground(Color.clear)
                 .listRowSeparator(.hidden)
@@ -200,7 +200,7 @@ struct MeetupsListView: View {
                     HStack(spacing: 6) {
                         sectionHeader("Invited")
                         Text("\(invited.count)")
-                            .font(.system(size: 10, weight: .bold))
+                            .scaledFont(size: 10, weight: .bold)
                             .foregroundStyle(.white)
                             .padding(.horizontal, 6)
                             .padding(.vertical, 2)
@@ -302,7 +302,7 @@ struct MeetupsListView: View {
                     .shadow(color: (title == "Active" ? Color.statusLive : Color.statusPending).opacity(0.8), radius: 4)
             }
             Text(title.uppercased())
-                .font(.system(size: 10, weight: .bold))
+                .scaledFont(size: 10, weight: .bold)
                 .foregroundStyle(Color(white: 0.45))
                 .textCase(nil)
         }
@@ -425,27 +425,27 @@ private struct MeetupsEmptyState: View {
                         .frame(width: 72, height: 72)
 
                     Text("📍")
-                        .font(.system(size: 32))
+                        .scaledFont(size: 32)
                         .frame(width: 72, height: 72)
 
                     Text("✨")
-                        .font(.system(size: 14))
+                        .scaledFont(size: 14)
                         .offset(x: 8, y: -8)
                 }
             }
 
             VStack(spacing: 8) {
                 Text("No meetups yet")
-                    .font(.system(size: 18, weight: .bold))
+                    .scaledFont(size: 18, weight: .bold)
 
                 Text("Gather your crew and plan something fun.")
-                    .font(.system(size: 12))
+                    .scaledFont(size: 12)
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
             }
 
             Button("Plan a Meetup", action: onCreate)
-                .font(.system(size: 14, weight: .bold))
+                .scaledFont(size: 14, weight: .bold)
                 .foregroundStyle(.white)
                 .padding(.horizontal, 24)
                 .padding(.vertical, 12)
@@ -485,17 +485,17 @@ struct MeetupRowCard: View {
     var body: some View {
         HStack(spacing: 12) {
             Text(meetupCategoryEmoji(participation.meetup.category))
-                .font(.system(size: 22))
+                .scaledFont(size: 22)
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(participation.meetup.destinationName)
-                    .font(.system(size: 14, weight: .bold))
+                    .scaledFont(size: 14, weight: .bold)
                     .foregroundStyle(primaryTextColor)
                     .lineLimit(1)
 
                 if let addr = participation.meetup.destinationAddress, !addr.isEmpty {
                     Text(addr)
-                        .font(.system(size: 11))
+                        .scaledFont(size: 11)
                         .foregroundStyle(secondaryTextColor)
                         .lineLimit(1)
                 }
@@ -506,7 +506,7 @@ struct MeetupRowCard: View {
             VStack(alignment: .trailing, spacing: 5) {
                 if let target = participation.meetup.targetArrivalAt {
                     Text(target, format: .dateTime.weekday(.abbreviated).hour().minute())
-                        .font(.system(size: 10, weight: .medium))
+                        .scaledFont(size: 10, weight: .medium)
                         .foregroundStyle(secondaryTextColor)
                 }
                 MeetupStatusPill(participation: participation)
@@ -570,7 +570,7 @@ private struct MeetupStatusPill: View {
     var body: some View {
         if let c = config {
             Text(c.text)
-                .font(.system(size: 9, weight: .bold))
+                .scaledFont(size: 9, weight: .bold)
                 .foregroundStyle(c.fg)
                 .padding(.vertical, 3)
                 .padding(.horizontal, 8)

@@ -205,14 +205,14 @@ struct MeetupDashboardView: View {
     private var dashboardHeader: some View {
         VStack(alignment: .leading, spacing: 2) {
             Text("\(greeting), \(auth.profile?.displayName ?? "there") 👋")
-                .font(.system(size: 12))
+                .scaledFont(size: 12)
                 .foregroundStyle(Color(white: 0.55))
             Text(meetup.destinationName)
-                .font(.system(size: 24, weight: .black))
+                .scaledFont(size: 24, weight: .black)
                 .foregroundStyle(.white)
                 .lineLimit(1)
             Text("You're meeting \(acceptedCount) \(acceptedCount == 1 ? "person" : "people")")
-                .font(.system(size: 12))
+                .scaledFont(size: 12)
                 .foregroundStyle(Color(white: 0.55))
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -225,17 +225,17 @@ struct MeetupDashboardView: View {
                 .frame(width: 32, height: 32)
                 .overlay {
                     Image(systemName: "mappin.circle.fill")
-                        .font(.system(size: 18))
+                        .scaledFont(size: 18)
                         .foregroundStyle(.white)
                 }
 
             VStack(alignment: .leading, spacing: 1) {
                 Text(meetup.destinationName)
-                    .font(.system(size: 13, weight: .bold))
+                    .scaledFont(size: 13, weight: .bold)
                     .lineLimit(1)
                 if let addr = meetup.destinationAddress {
                     Text(addr)
-                        .font(.system(size: 10))
+                        .scaledFont(size: 10)
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
                 }
@@ -246,11 +246,11 @@ struct MeetupDashboardView: View {
             if let target = meetup.targetArrivalAt {
                 VStack(alignment: .trailing, spacing: 1) {
                     Text(target, format: .dateTime.hour().minute())
-                        .font(.system(size: 13, weight: .bold))
+                        .scaledFont(size: 13, weight: .bold)
                     let mins = Int(target.timeIntervalSinceNow / 60)
                     if mins > 0 {
                         Text("in \(mins) min")
-                            .font(.system(size: 10, weight: .semibold))
+                            .scaledFont(size: 10, weight: .semibold)
                             .foregroundStyle(Color.coral)
                     }
                 }
@@ -315,7 +315,7 @@ struct MeetupDashboardView: View {
             // "Everyone" label + host "Add People" button
             HStack {
                 Text("Everyone")
-                    .font(.system(size: 13, weight: .bold))
+                    .scaledFont(size: 13, weight: .bold)
                     .foregroundStyle(.white)
                 if myUserId == meetup.hostId {
                     Spacer()
@@ -323,7 +323,7 @@ struct MeetupDashboardView: View {
                         showAddParticipants = true
                     } label: {
                         Label("Add People", systemImage: "person.badge.plus")
-                            .font(.system(size: 12, weight: .semibold))
+                            .scaledFont(size: 12, weight: .semibold)
                             .foregroundStyle(Color.coral)
                     }
                 }
@@ -639,7 +639,7 @@ struct DashboardParticipantPin: View {
                     .overlay(Circle().strokeBorder(.white, lineWidth: 2.5))
                     .overlay {
                         Text(String((participant.displayName ?? "?").prefix(1)).uppercased())
-                            .font(.system(size: 13, weight: .bold))
+                            .scaledFont(size: 13, weight: .bold)
                             .foregroundStyle(.white)
                     }
                     .shadow(radius: 3)
@@ -647,10 +647,10 @@ struct DashboardParticipantPin: View {
                 // Callout bubble
                 VStack(alignment: .leading, spacing: 1) {
                     Text(participant.displayName ?? "?")
-                        .font(.system(size: 10, weight: .bold))
+                        .scaledFont(size: 10, weight: .bold)
                         .foregroundStyle(.white)
                     Text(etaText)
-                        .font(.system(size: 9, weight: .semibold))
+                        .scaledFont(size: 9, weight: .semibold)
                         .foregroundStyle(etaColor)
                 }
                 .padding(.horizontal, 7)
@@ -735,11 +735,11 @@ private struct DashboardParticipantRow: View {
                 .overlay {
                     if participant.status == "arrived" {
                         Image(systemName: "checkmark")
-                            .font(.system(size: 12, weight: .bold))
+                            .scaledFont(size: 12, weight: .bold)
                             .foregroundStyle(.white)
                     } else {
                         Text(String((participant.displayName ?? "?").prefix(1)).uppercased())
-                            .font(.system(size: 12, weight: .bold))
+                            .scaledFont(size: 12, weight: .bold)
                             .foregroundStyle(.white)
                     }
                 }
@@ -747,16 +747,16 @@ private struct DashboardParticipantRow: View {
             VStack(alignment: .leading, spacing: 1) {
                 HStack(spacing: 4) {
                     Text(participant.displayName ?? "Unknown")
-                        .font(.system(size: 12, weight: .semibold))
+                        .scaledFont(size: 12, weight: .semibold)
                         .foregroundStyle(.white)
                     if isMe {
                         Text("(you)")
-                            .font(.system(size: 11))
+                            .scaledFont(size: 11)
                             .foregroundStyle(Color(white: 0.5))
                     }
                 }
                 Text(etaText)
-                    .font(.system(size: 10, weight: .semibold))
+                    .scaledFont(size: 10, weight: .semibold)
                     .foregroundStyle(etaColor)
             }
 
@@ -870,7 +870,7 @@ private struct DashboardFullscreenPhotoView: View {
                             .frame(maxWidth: .infinity, maxHeight: .infinity)
                     case .failure:
                         Image(systemName: "photo")
-                            .font(.system(size: 48))
+                            .scaledFont(size: 48)
                             .foregroundStyle(.secondary)
                             .frame(maxWidth: .infinity, maxHeight: .infinity)
                     default:
@@ -881,7 +881,7 @@ private struct DashboardFullscreenPhotoView: View {
 
                 if let caption = photo.caption, !caption.isEmpty {
                     Text(caption)
-                        .font(.system(size: 14))
+                        .scaledFont(size: 14)
                         .foregroundStyle(.white.opacity(0.9))
                         .padding(.horizontal, 20)
                         .padding(.bottom, 24)
@@ -893,7 +893,7 @@ private struct DashboardFullscreenPhotoView: View {
                 dismiss()
             } label: {
                 Image(systemName: "xmark.circle.fill")
-                    .font(.system(size: 28))
+                    .scaledFont(size: 28)
                     .foregroundStyle(.white.opacity(0.8))
                     .padding(20)
             }

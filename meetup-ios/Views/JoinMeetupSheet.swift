@@ -63,7 +63,7 @@ struct JoinMeetupSheet: View {
                             .fill(Color.coral.opacity(0.12))
                             .frame(width: 80, height: 80)
                         Text(meetupCategoryEmoji(meetup.category))
-                            .font(.system(size: 38))
+                            .scaledFont(size: 38)
                     }
                     .padding(.top, 24)
 
@@ -113,7 +113,7 @@ struct JoinMeetupSheet: View {
                 Divider()
                 if joined {
                     Label("You're in!", systemImage: "checkmark.circle.fill")
-                        .font(.system(size: 16, weight: .bold))
+                        .scaledFont(size: 16, weight: .bold)
                         .foregroundStyle(Color.statusLive)
                         .padding(.vertical, 20)
                 } else {
@@ -126,7 +126,7 @@ struct JoinMeetupSheet: View {
                                     .tint(.white)
                             } else {
                                 Text("Join Meetup")
-                                    .font(.system(size: 16, weight: .bold))
+                                    .scaledFont(size: 16, weight: .bold)
                             }
                         }
                         .frame(maxWidth: .infinity)
@@ -147,10 +147,10 @@ struct JoinMeetupSheet: View {
     private var errorContent: some View {
         VStack(spacing: 20) {
             Image(systemName: "link.badge.plus")
-                .font(.system(size: 48))
+                .scaledFont(size: 48)
                 .foregroundStyle(.secondary)
             Text("Invite link invalid or expired")
-                .font(.system(size: 16, weight: .semibold))
+                .scaledFont(size: 16, weight: .semibold)
                 .foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -159,17 +159,17 @@ struct JoinMeetupSheet: View {
     private func detailRow(icon: String, iconColor: Color, title: String, subtitle: String?) -> some View {
         HStack(spacing: 14) {
             Image(systemName: icon)
-                .font(.system(size: 20))
+                .scaledFont(size: 20)
                 .foregroundStyle(iconColor)
                 .frame(width: 28)
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(title)
-                    .font(.system(size: 14, weight: .semibold))
+                    .scaledFont(size: 14, weight: .semibold)
                     .lineLimit(2)
                 if let sub = subtitle {
                     Text(sub)
-                        .font(.system(size: 12))
+                        .scaledFont(size: 12)
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
                 }

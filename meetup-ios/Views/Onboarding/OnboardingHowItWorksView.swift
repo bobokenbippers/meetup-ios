@@ -17,7 +17,7 @@ struct OnboardingHowItWorksView: View {
                 Spacer()
 
                 Text("How it works")
-                    .font(.system(size: 36, weight: .black, design: .rounded))
+                    .scaledFont(size: 36, weight: .black, design: .rounded)
                     .foregroundColor(.white)
                     .padding(.bottom, 48)
 
@@ -25,15 +25,15 @@ struct OnboardingHowItWorksView: View {
                     ForEach(steps, id: \.title) { step in
                         HStack(alignment: .top, spacing: 20) {
                             Text(step.emoji)
-                                .font(.system(size: 36))
+                                .scaledFont(size: 36)
                                 .frame(width: 48)
 
                             VStack(alignment: .leading, spacing: 5) {
                                 Text(step.title)
-                                    .font(.system(size: 18, weight: .bold))
+                                    .scaledFont(size: 18, weight: .bold)
                                     .foregroundColor(.white)
                                 Text(step.subtitle)
-                                    .font(.system(size: 15))
+                                    .scaledFont(size: 15)
                                     .foregroundColor(Color(white: 0.6))
                             }
                             Spacer()
@@ -46,7 +46,7 @@ struct OnboardingHowItWorksView: View {
 
                 Button(action: onNext) {
                     Text("Sounds good →")
-                        .font(.system(size: 18, weight: .semibold))
+                        .scaledFont(size: 18, weight: .semibold)
                         .foregroundColor(.white)
                         .frame(maxWidth: .infinity)
                         .frame(height: 56)

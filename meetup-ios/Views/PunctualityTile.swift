@@ -117,7 +117,7 @@ struct PunctualityTile: View {
             HStack(spacing: 6) {
                 tile
                 Text(status.label)
-                    .font(.system(size: 10, weight: .bold))
+                    .scaledFont(size: 10, weight: .bold)
                     .foregroundStyle(status.color)
             }
         }
@@ -133,7 +133,7 @@ struct PunctualityTile: View {
             )
             .overlay(
                 Image(systemName: status.systemImage)
-                    .font(.system(size: 11, weight: .bold))
+                    .scaledFont(size: 11, weight: .bold)
                     .foregroundStyle(status.color)
             )
             .accessibilityLabel(status.label)
@@ -163,7 +163,7 @@ struct PunctualityLegend: View {
                             .fill(status.color)
                             .frame(width: 9, height: 9)
                         Text(status.label)
-                            .font(.system(size: 10, weight: .medium))
+                            .scaledFont(size: 10, weight: .medium)
                             .foregroundStyle(Color(white: 0.6))
                     }
                 }

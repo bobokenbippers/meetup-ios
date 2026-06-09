@@ -11,7 +11,7 @@ struct ProfileSetupView: View {
         VStack(spacing: 24) {
             Spacer()
             Image(systemName: "phone.circle.fill")
-                .font(.system(size: 60))
+                .scaledFont(size: 60)
                 .foregroundStyle(.tint)
             Text("One more thing")
                 .font(.largeTitle.bold())

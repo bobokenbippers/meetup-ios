@@ -259,11 +259,11 @@ private struct AddFriendChip: View {
                     .frame(width: 44, height: 44)
                     .overlay {
                         Text(initial)
-                            .font(.system(size: 16, weight: .bold))
+                            .scaledFont(size: 16, weight: .bold)
                             .foregroundStyle(Color.coral)
                     }
                 Text(shortName)
-                    .font(.system(size: 11, weight: .medium))
+                    .scaledFont(size: 11, weight: .medium)
                     .foregroundStyle(Color(white: 0.6))
                     .lineLimit(1)
             }
