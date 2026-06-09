@@ -262,6 +262,30 @@ final class MeetupService {
         return meetup
     }
 
+    /// Update a meetup's scheduled time (target arrival). The push-leave-now and
+    /// expire-meetups cron functions read target_arrival_at live, so they pick up the
+    /// new time automatically — no client-side rescheduling, same as the creation flow.
+    /// RLS ("host can update meetups") restricts this to the host. Returns the updated row.
+    func updateTargetArrival(meetupId: UUID, targetArrivalAt: Date) async throws -> Meetup {
+        struct TargetArrivalUpdate: Encodable {
+            let targetArrivalAt: String
+            enum CodingKeys: String, CodingKey {
+                case targetArrivalAt = "target_arrival_at"
+            }
+        }
+
+        let iso = ISO8601DateFormatter()
+        let updated: [Meetup] = try await supabase
+            .from("meetups")
+            .update(TargetArrivalUpdate(targetArrivalAt: iso.string(from: targetArrivalAt)))
+            .eq("id", value: meetupId)
+            .select()
+            .execute()
+            .value
+        guard let meetup = updated.first else { throw MeetupError.meetupNotFound }
+        return meetup
+    }
+
     func updateMyLocation(meetupId: UUID, lat: Double, lng: Double, bearing: Double?, etaSeconds: Int?) async throws {
         guard let userId = supabase.auth.currentUser?.id else { return }
 

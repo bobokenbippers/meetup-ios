@@ -1,17 +1,30 @@
 import SwiftUI
 import CoreLocation
 
-/// Host-only sheet to change an existing meetup's destination.
+/// Host-only sheet to change an existing meetup's destination and/or scheduled time.
 /// Re-selecting a place via Google Places carries name + address + coordinates together,
-/// so the map pin and directions stay consistent — matching the creation flow.
-struct EditMeetupLocationView: View {
+/// so the map pin and directions stay consistent — matching the creation flow. Editing the
+/// time writes target_arrival_at, which the cron push/expiry functions read live.
+struct EditMeetupView: View {
     let meetup: Meetup
     let onUpdated: (Meetup) -> Void
     @Environment(\.dismiss) private var dismiss
 
     @State private var selectedPlace: SelectedPlace?
+    @State private var selectedTime: Date
+    @State private var timeIsDirty = false
     @State private var isSaving = false
     @State private var error: String?
+
+    init(meetup: Meetup, onUpdated: @escaping (Meetup) -> Void) {
+        self.meetup = meetup
+        self.onUpdated = onUpdated
+        // Seed the picker with the current time, or the next hour if none was set yet.
+        let seed = meetup.targetArrivalAt ?? Date().addingTimeInterval(3600)
+        _selectedTime = State(initialValue: seed)
+    }
+
+    private var hasChanges: Bool { selectedPlace != nil || timeIsDirty }
 
     var body: some View {
         NavigationStack {
@@ -27,6 +40,8 @@ struct EditMeetupLocationView: View {
 
                 EditDestinationSection(selectedPlace: $selectedPlace)
 
+                timeSection
+
                 if let error {
                     Section {
                         Text(error).foregroundStyle(.red).font(.caption)
@@ -36,7 +51,7 @@ struct EditMeetupLocationView: View {
             }
             .scrollContentBackground(.hidden)
             .background(Color.appBackground)
-            .navigationTitle("Edit Location")
+            .navigationTitle("Edit Meetup")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -55,20 +70,20 @@ struct EditMeetupLocationView: View {
                             Button {
                                 Task { await save() }
                             } label: {
-                                Text("Save Location")
+                                Text("Save Changes")
                                     .font(.headline)
                                     .foregroundStyle(.white)
                                     .frame(maxWidth: .infinity)
                                     .padding(.vertical, 16)
                                     .background(
                                         RoundedRectangle(cornerRadius: 16)
-                                            .fill(selectedPlace == nil ? Color.coral.opacity(0.45) : Color.coral)
+                                            .fill(hasChanges ? Color.coral : Color.coral.opacity(0.45))
                                     )
                             }
-                            .disabled(selectedPlace == nil)
+                            .disabled(!hasChanges)
                             .padding(.horizontal, 20)
                             .padding(.vertical, 12)
-                            .accessibilityIdentifier("btn_save_location")
+                            .accessibilityIdentifier("btn_save_meetup")
                         }
                     }
                     .background(Color.appBackground)
@@ -103,19 +118,55 @@ struct EditMeetupLocationView: View {
         .listRowBackground(Color.appSurface)
     }
 
+    private var timeSection: some View {
+        Section {
+            DatePicker(
+                "Arrival time",
+                selection: $selectedTime,
+                in: Date()...,
+                displayedComponents: [.date, .hourAndMinute]
+            )
+            .foregroundStyle(.white)
+            .tint(Color.coral)
+            .listRowBackground(Color.appSurface)
+            .accessibilityIdentifier("picker_target_arrival")
+            .onChange(of: selectedTime) { _, _ in timeIsDirty = true }
+        } header: {
+            Text("TARGET ARRIVAL TIME")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(Color(white: 0.4))
+                .textCase(nil)
+        } footer: {
+            if meetup.targetArrivalAt == nil {
+                Text("No time set yet — pick one to schedule the meetup.")
+                    .font(.caption)
+                    .foregroundStyle(Color(white: 0.5))
+            }
+        }
+    }
+
     private func save() async {
-        guard let place = selectedPlace else { return }
+        guard hasChanges else { return }
         isSaving = true
         error = nil
         do {
-            let updated = try await MeetupService.shared.updateDestination(
-                meetupId: meetup.id,
-                destinationName: place.name,
-                destinationAddress: place.address,
-                lat: place.coordinate.latitude,
-                lng: place.coordinate.longitude
-            )
-            onUpdated(updated)
+            var latest = meetup
+            if let place = selectedPlace {
+                latest = try await MeetupService.shared.updateDestination(
+                    meetupId: meetup.id,
+                    destinationName: place.name,
+                    destinationAddress: place.address,
+                    lat: place.coordinate.latitude,
+                    lng: place.coordinate.longitude
+                )
+            }
+            if timeIsDirty {
+                latest = try await MeetupService.shared.updateTargetArrival(
+                    meetupId: meetup.id,
+                    targetArrivalAt: selectedTime
+                )
+            }
+            onUpdated(latest)
             dismiss()
         } catch {
             self.error = error.localizedDescription
