@@ -93,6 +93,13 @@ final class LocationManager: NSObject {
         scheduleExpiryTimer()
     }
 
+    /// Refresh the cached destination for an in-flight tracking session after the host
+    /// edits the meetup location, so the next ETA upload routes to the new coordinates.
+    func updateTrackedDestination(meetup: Meetup) {
+        guard trackingMeetup?.id == meetup.id else { return }
+        trackingMeetup = meetup
+    }
+
     func stopTracking() {
         expiryTimer?.invalidate()
         expiryTimer = nil

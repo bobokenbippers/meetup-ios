@@ -5,13 +5,18 @@ import Combine
 import Supabase
 
 struct MeetupDashboardView: View {
-    let meetup: Meetup
+    @State private var meetup: Meetup
     @Environment(\.dismiss) private var dismiss
     @Environment(AuthViewModel.self) private var auth
 
     @Environment(AppSettings.self) private var settings
 
+    init(meetup: Meetup) {
+        _meetup = State(initialValue: meetup)
+    }
+
     @State private var participants: [MeetupParticipant] = []
+    @State private var showEditLocation = false
     @State private var hasLoaded = false
     @State private var isActing = false
     @State private var error: String?
@@ -157,6 +162,12 @@ struct MeetupDashboardView: View {
                     onAdded: { Task { await load() } }
                 )
             }
+            .sheet(isPresented: $showEditLocation) {
+                EditMeetupLocationView(meetup: meetup) { updated in
+                    meetup = updated
+                    LocationManager.shared.updateTrackedDestination(meetup: updated)
+                }
+            }
             .sheet(item: $shareURL) { url in
                 ShareSheet(url: url)
                     .ignoresSafeArea()
@@ -254,6 +265,19 @@ struct MeetupDashboardView: View {
                             .foregroundStyle(Color.coral)
                     }
                 }
+            }
+
+            if myUserId == meetup.hostId && !meetup.isRecap {
+                Button {
+                    showEditLocation = true
+                } label: {
+                    Image(systemName: "pencil.circle.fill")
+                        .scaledFont(size: 22)
+                        .foregroundStyle(Color.coral)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Edit location")
+                .accessibilityIdentifier("btn_edit_location")
             }
         }
         .padding(.horizontal, 14)
