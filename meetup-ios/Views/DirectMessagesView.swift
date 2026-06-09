@@ -175,6 +175,7 @@ struct MessageThreadView: View {
     @State private var draft = ""
     @State private var selectedPhoto: PhotosPickerItem?
     @State private var selectedImage: UIImage?
+    @State private var isPreparingPhoto = false
     @State private var isSending = false
     @State private var error: String?
 
@@ -230,7 +231,10 @@ struct MessageThreadView: View {
             await markRead()
             await subscribeToThreadChanges()
         }
-        .task(id: selectedPhoto?.itemIdentifier) { await loadSelectedPhoto() }
+        .onChange(of: selectedPhoto) { _, item in
+            guard let item else { return }
+            Task { await loadSelectedPhoto(item) }
+        }
         .alert("Error", isPresented: Binding(get: { error != nil }, set: { if !$0 { error = nil } })) {
             Button("OK") { error = nil }
         } message: {
@@ -262,6 +266,16 @@ struct MessageThreadView: View {
                     .buttonStyle(.plain)
                 }
                 .padding(.horizontal, 12)
+            } else if isPreparingPhoto {
+                HStack(spacing: 10) {
+                    ProgressView()
+                        .tint(Color.coral)
+                    Text("Preparing photo…")
+                        .scaledFont(size: 12, weight: .medium)
+                        .foregroundStyle(Color(white: 0.65))
+                    Spacer()
+                }
+                .padding(.horizontal, 12)
             }
 
             HStack(spacing: 10) {
@@ -273,7 +287,7 @@ struct MessageThreadView: View {
                         .background(Color.white.opacity(0.08))
                         .clipShape(Circle())
                 }
-                .disabled(isSending)
+                .disabled(isSending || isPreparingPhoto)
 
                 TextField("Message", text: $draft, axis: .vertical)
                     .lineLimit(1...4)
@@ -301,7 +315,7 @@ struct MessageThreadView: View {
                     }
                 }
                 .buttonStyle(.plain)
-                .disabled(!canSend || isSending)
+                .disabled(!canSend || isSending || isPreparingPhoto)
                 .accessibilityLabel("Send message")
             }
             .padding(.horizontal, 12)
@@ -328,10 +342,14 @@ struct MessageThreadView: View {
         }
     }
 
-    private func loadSelectedPhoto() async {
-        guard let selectedPhoto else { return }
+    private func loadSelectedPhoto(_ item: PhotosPickerItem) async {
+        isPreparingPhoto = true
+        defer {
+            isPreparingPhoto = false
+            selectedPhoto = nil
+        }
         do {
-            guard let data = try await selectedPhoto.loadTransferable(type: Data.self),
+            guard let data = try await item.loadTransferable(type: Data.self),
                   let image = UIImage(data: data) else { return }
             selectedImage = image
         } catch is CancellationError {
@@ -344,6 +362,7 @@ struct MessageThreadView: View {
     private func send() async {
         guard canSend, !isSending else { return }
         isSending = true
+        defer { isSending = false }
         do {
             if let selectedImage {
                 try await DirectMessageService.shared.sendImage(selectedImage, caption: draft, conversationId: conversationId)
@@ -360,7 +379,6 @@ struct MessageThreadView: View {
         } catch {
             self.error = error.localizedDescription
         }
-        isSending = false
     }
 
     private func delete(_ message: Message) async {
