@@ -14,3 +14,10 @@ __pycache__/
 supabase-swift/
 CLAUDE.md
 Secrets.xcconfig
+
+# Local/private working notes
+PRODUCT_BRIEF.md
+UI_BRIEF.md
+
+# Supabase local link/cache state
+supabase/.temp/
