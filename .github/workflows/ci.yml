@@ -62,7 +62,7 @@ jobs:
           xcodebuild test \
             -project meetup-ios.xcodeproj \
             -scheme meetup-ios \
-            -destination "platform=iOS Simulator,name=iPhone 16" \
+            -destination "platform=iOS Simulator,name=iPhone 17 Pro" \
             CODE_SIGNING_ALLOWED=NO \
             -resultBundlePath TestResults.xcresult \
             | xcpretty
