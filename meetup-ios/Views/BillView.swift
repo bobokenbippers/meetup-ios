@@ -70,7 +70,7 @@ struct BillView: View {
         VStack(spacing: 24) {
             Spacer()
             Image(systemName: "receipt.stack")
-                .font(.system(size: 56))
+                .scaledFont(size: 56)
                 .foregroundStyle(.secondary)
             VStack(spacing: 8) {
                 Text("No receipts yet")

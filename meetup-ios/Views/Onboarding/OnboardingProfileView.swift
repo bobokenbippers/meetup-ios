@@ -24,24 +24,24 @@ struct OnboardingProfileView: View {
                         .frame(width: 120, height: 120)
                         .blur(radius: 28)
                     Image(systemName: "person.fill")
-                        .font(.system(size: 52))
+                        .scaledFont(size: 52)
                         .foregroundColor(Color.coral)
                 }
                 .padding(.bottom, 32)
 
                 Text("What should we\ncall you?")
-                    .font(.system(size: 34, weight: .black, design: .rounded))
+                    .scaledFont(size: 34, weight: .black, design: .rounded)
                     .foregroundColor(.white)
                     .multilineTextAlignment(.center)
                     .padding(.bottom, 10)
 
                 Text("This is how your friends will see you.")
-                    .font(.system(size: 16))
+                    .scaledFont(size: 16)
                     .foregroundColor(Color(white: 0.6))
                     .padding(.bottom, 40)
 
                 TextField("Your name", text: $displayName)
-                    .font(.system(size: 18))
+                    .scaledFont(size: 18)
                     .foregroundColor(.white)
                     .tint(Color.coral)
                     .padding(16)
@@ -74,7 +74,7 @@ struct OnboardingProfileView: View {
                             ProgressView().tint(.white)
                         } else {
                             Text("Done →")
-                                .font(.system(size: 18, weight: .semibold))
+                                .scaledFont(size: 18, weight: .semibold)
                                 .foregroundColor(.white)
                         }
                     }

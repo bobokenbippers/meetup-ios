@@ -18,13 +18,13 @@ struct OnboardingPermissionsView: View {
                         .frame(width: 120, height: 120)
                         .blur(radius: 28)
                     Image(systemName: "location.fill")
-                        .font(.system(size: 52))
+                        .scaledFont(size: 52)
                         .foregroundColor(Color.coral)
                 }
                 .padding(.bottom, 32)
 
                 Text("A couple of things")
-                    .font(.system(size: 34, weight: .black, design: .rounded))
+                    .scaledFont(size: 34, weight: .black, design: .rounded)
                     .foregroundColor(.white)
                     .padding(.bottom, 36)
 
@@ -48,7 +48,7 @@ struct OnboardingPermissionsView: View {
                     requestPermissions()
                 } label: {
                     Text(isRequesting ? "Requesting…" : "Allow →")
-                        .font(.system(size: 18, weight: .semibold))
+                        .scaledFont(size: 18, weight: .semibold)
                         .foregroundColor(.white)
                         .frame(maxWidth: .infinity)
                         .frame(height: 56)
@@ -66,17 +66,17 @@ struct OnboardingPermissionsView: View {
     private func permissionRow(icon: String, title: String, subtitle: String) -> some View {
         HStack(alignment: .top, spacing: 16) {
             Image(systemName: icon)
-                .font(.system(size: 20))
+                .scaledFont(size: 20)
                 .foregroundColor(Color.coral)
                 .frame(width: 28)
                 .padding(.top, 2)
 
             VStack(alignment: .leading, spacing: 4) {
                 Text(title)
-                    .font(.system(size: 16, weight: .semibold))
+                    .scaledFont(size: 16, weight: .semibold)
                     .foregroundColor(.white)
                 Text(subtitle)
-                    .font(.system(size: 14))
+                    .scaledFont(size: 14)
                     .foregroundColor(Color(white: 0.6))
                     .fixedSize(horizontal: false, vertical: true)
             }

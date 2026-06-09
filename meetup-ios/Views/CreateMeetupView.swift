@@ -615,16 +615,16 @@ private struct FriendChip: View {
                         .frame(width: 44, height: 44)
                     if isInvited {
                         Image(systemName: "checkmark")
-                            .font(.system(size: 14, weight: .bold))
+                            .scaledFont(size: 14, weight: .bold)
                             .foregroundStyle(.white)
                     } else {
                         Text(initial)
-                            .font(.system(size: 16, weight: .bold))
+                            .scaledFont(size: 16, weight: .bold)
                             .foregroundStyle(Color.coral)
                     }
                 }
                 Text(shortName)
-                    .font(.system(size: 11, weight: .medium))
+                    .scaledFont(size: 11, weight: .medium)
                     .foregroundStyle(isInvited ? Color.coral : Color(white: 0.6))
                     .lineLimit(1)
             }

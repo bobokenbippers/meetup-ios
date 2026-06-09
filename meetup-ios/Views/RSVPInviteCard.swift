@@ -28,16 +28,16 @@ struct RSVPInviteCard: View {
             Button(action: onOpen) {
                 HStack(spacing: 12) {
                     Text(meetupCategoryEmoji(participation.meetup.category))
-                        .font(.system(size: 22))
+                        .scaledFont(size: 22)
 
                     VStack(alignment: .leading, spacing: 2) {
                         Text(participation.meetup.destinationName)
-                            .font(.system(size: 14, weight: .bold))
+                            .scaledFont(size: 14, weight: .bold)
                             .foregroundStyle(Color(.label))
                             .lineLimit(1)
                         if let addr = participation.meetup.destinationAddress, !addr.isEmpty {
                             Text(addr)
-                                .font(.system(size: 11))
+                                .scaledFont(size: 11)
                                 .foregroundStyle(Color(.secondaryLabel))
                                 .lineLimit(1)
                         }
@@ -47,7 +47,7 @@ struct RSVPInviteCard: View {
 
                     if let target = participation.meetup.targetArrivalAt {
                         Text(target, format: .dateTime.weekday(.abbreviated).hour().minute())
-                            .font(.system(size: 10, weight: .medium))
+                            .scaledFont(size: 10, weight: .medium)
                             .foregroundStyle(Color(.secondaryLabel))
                     }
                 }
@@ -161,9 +161,9 @@ private struct RSVPPillButton: View {
         } label: {
             HStack(spacing: 5) {
                 Image(systemName: systemImage)
-                    .font(.system(size: 10, weight: .bold))
+                    .scaledFont(size: 10, weight: .bold)
                 Text(label)
-                    .font(.system(size: 13, weight: .semibold))
+                    .scaledFont(size: 13, weight: .semibold)
             }
             .foregroundStyle(color)
             .frame(maxWidth: .infinity)

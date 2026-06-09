@@ -26,21 +26,21 @@ struct OnboardingWelcomeView: View {
                         .frame(width: 110, height: 110)
                         .blur(radius: 24)
                     Text("🍳")
-                        .font(.system(size: 68))
+                        .scaledFont(size: 68)
                 }
                 .padding(.bottom, 36)
 
                 Text("Squad Brunch")
-                    .font(.system(size: 42, weight: .black, design: .rounded))
+                    .scaledFont(size: 42, weight: .black, design: .rounded)
                     .foregroundColor(.white)
 
                 Text("Know who's on their way.")
-                    .font(.system(size: 20, weight: .semibold))
+                    .scaledFont(size: 20, weight: .semibold)
                     .foregroundColor(.white)
                     .padding(.top, 14)
 
                 Text("Live location sharing for your crew.")
-                    .font(.system(size: 16))
+                    .scaledFont(size: 16)
                     .foregroundColor(Color(white: 0.6))
                     .padding(.top, 8)
 
@@ -51,7 +51,7 @@ struct OnboardingWelcomeView: View {
                         Text("Let's go")
                         Image(systemName: "arrow.right")
                     }
-                    .font(.system(size: 18, weight: .semibold))
+                    .scaledFont(size: 18, weight: .semibold)
                     .foregroundColor(.white)
                     .frame(maxWidth: .infinity)
                     .frame(height: 56)

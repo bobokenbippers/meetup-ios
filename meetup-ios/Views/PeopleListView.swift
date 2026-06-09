@@ -45,15 +45,15 @@ struct PeopleListView: View {
                                             .frame(width: 38, height: 38)
                                             .overlay {
                                                 Text(String(contact.displayName.prefix(1)).uppercased())
-                                                    .font(.system(size: 16, weight: .bold))
+                                                    .scaledFont(size: 16, weight: .bold)
                                                     .foregroundStyle(Color.coral)
                                             }
                                         VStack(alignment: .leading, spacing: 1) {
                                             Text(contact.displayName)
-                                                .font(.system(size: 13, weight: .semibold))
+                                                .scaledFont(size: 13, weight: .semibold)
                                                 .foregroundStyle(.primary)
                                             Text(contact.phones.first ?? contact.emails.first ?? "")
-                                                .font(.system(size: 11))
+                                                .scaledFont(size: 11)
                                                 .foregroundStyle(.secondary)
                                         }
                                         Spacer()
@@ -119,14 +119,14 @@ struct PeopleListView: View {
                                 && smartSuggestions.isEmpty {
                         VStack(spacing: 12) {
                             Image(systemName: "person.2.circle")
-                                .font(.system(size: 48))
+                                .scaledFont(size: 48)
                                 .foregroundStyle(Color.coral.opacity(0.4))
                                 .padding(.top, 48)
                             Text("No connections yet")
-                                .font(.system(size: 16, weight: .bold))
+                                .scaledFont(size: 16, weight: .bold)
                                 .foregroundStyle(.white)
                             Text("People you've had meetups with will appear here.")
-                                .font(.system(size: 13))
+                                .scaledFont(size: 13)
                                 .foregroundStyle(Color(white: 0.5))
                                 .multilineTextAlignment(.center)
                                 .padding(.horizontal, 40)
@@ -203,7 +203,7 @@ struct PeopleListView: View {
     private var searchBar: some View {
         HStack(spacing: 10) {
             Image(systemName: "magnifyingglass")
-                .font(.system(size: 15))
+                .scaledFont(size: 15)
                 .foregroundStyle(.secondary)
 
             TextField("Name or +1 (646) 946-6861", text: $phoneSearch)
@@ -228,7 +228,7 @@ struct PeopleListView: View {
                 ProgressView().controlSize(.small)
             } else if !phoneSearch.isEmpty {
                 Button("Search") { Task { await searchUser() } }
-                    .font(.system(size: 14, weight: .semibold))
+                    .scaledFont(size: 14, weight: .semibold)
                     .foregroundStyle(isSearchEnabled ? Color.coral : Color.secondary)
                     .disabled(!isSearchEnabled)
             }
@@ -246,15 +246,15 @@ struct PeopleListView: View {
                 .frame(width: 42, height: 42)
                 .overlay {
                     Text(String(user.displayName.prefix(1)).uppercased())
-                        .font(.system(size: 17, weight: .bold))
+                        .scaledFont(size: 17, weight: .bold)
                         .foregroundStyle(Color.coral)
                 }
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(user.displayName)
-                    .font(.system(size: 14, weight: .semibold))
+                    .scaledFont(size: 14, weight: .semibold)
                 Text(user.phone)
-                    .font(.system(size: 12))
+                    .scaledFont(size: 12)
                     .foregroundStyle(.secondary)
             }
 
@@ -268,7 +268,7 @@ struct PeopleListView: View {
                         .frame(width: 44, height: 20)
                 } else {
                     Text("Add")
-                        .font(.system(size: 13, weight: .bold))
+                        .scaledFont(size: 13, weight: .bold)
                         .foregroundStyle(.white)
                         .padding(.horizontal, 16)
                         .padding(.vertical, 8)
@@ -297,18 +297,18 @@ struct PeopleListView: View {
                 .frame(width: 42, height: 42)
                 .overlay {
                     Text(String((request.requester.displayName ?? "?").prefix(1)).uppercased())
-                        .font(.system(size: 17, weight: .bold))
+                        .scaledFont(size: 17, weight: .bold)
                         .foregroundStyle(Color.coral)
                 }
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(request.requester.displayName ?? "Unknown")
-                    .font(.system(size: 14, weight: .semibold))
+                    .scaledFont(size: 14, weight: .semibold)
                     .lineLimit(1)
                     .truncationMode(.tail)
                 if let phone = request.requester.phoneE164 {
                     Text(phone)
-                        .font(.system(size: 12))
+                        .scaledFont(size: 12)
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
                         .truncationMode(.tail)
@@ -323,7 +323,7 @@ struct PeopleListView: View {
                     Task { await acceptRequest(request) }
                 } label: {
                     Text("✅")
-                        .font(.system(size: 24))
+                        .scaledFont(size: 24)
                 }
                 .buttonStyle(.plain)
 
@@ -331,7 +331,7 @@ struct PeopleListView: View {
                     Task { await declineRequest(request) }
                 } label: {
                     Text("❌")
-                        .font(.system(size: 24))
+                        .scaledFont(size: 24)
                 }
                 .buttonStyle(.plain)
             }
@@ -350,7 +350,7 @@ struct PeopleListView: View {
 
     private func sectionLabel(_ title: String) -> some View {
         Text(title.uppercased())
-            .font(.system(size: 10, weight: .bold))
+            .scaledFont(size: 10, weight: .bold)
             .foregroundStyle(Color(white: 0.45))
     }
 
@@ -613,23 +613,23 @@ private struct SuggestionCard: View {
                     .frame(width: 42, height: 42)
                     .overlay {
                         Text(String(displayedName.prefix(1)).uppercased())
-                            .font(.system(size: 17, weight: .bold))
+                            .scaledFont(size: 17, weight: .bold)
                             .foregroundStyle(.white)
                     }
 
                 VStack(alignment: .leading, spacing: 2) {
                     Text(displayedName)
-                        .font(.system(size: 14, weight: .semibold))
+                        .scaledFont(size: 14, weight: .semibold)
                         .foregroundStyle(.primary)
                     Text(subtitleText)
-                        .font(.system(size: 12))
+                        .scaledFont(size: 12)
                         .foregroundStyle(Color.coral.opacity(0.85))
                 }
 
                 Spacer()
 
                 Image(systemName: "chevron.right")
-                    .font(.system(size: 12, weight: .semibold))
+                    .scaledFont(size: 12, weight: .semibold)
                     .foregroundStyle(.secondary)
             }
             .padding(.horizontal, 14)
@@ -684,22 +684,22 @@ private struct SuggestionProfileSheet: View {
                 .frame(width: 80, height: 80)
                 .overlay {
                     Text(String(displayedName.prefix(1)).uppercased())
-                        .font(.system(size: 32, weight: .bold))
+                        .scaledFont(size: 32, weight: .bold)
                         .foregroundStyle(.white)
                 }
                 .padding(.bottom, 16)
 
             // Name
             Text(displayedName)
-                .font(.system(size: 22, weight: .bold))
+                .scaledFont(size: 22, weight: .bold)
                 .padding(.bottom, 4)
 
             // Reason badge
             HStack(spacing: 4) {
                 Image(systemName: suggestion.reason == .inContacts ? "person.crop.circle" : "person.2")
-                    .font(.system(size: 12))
+                    .scaledFont(size: 12)
                 Text(subtitleText)
-                    .font(.system(size: 13, weight: .semibold))
+                    .scaledFont(size: 13, weight: .semibold)
             }
             .foregroundStyle(Color.coral)
             .padding(.horizontal, 14)
@@ -711,7 +711,7 @@ private struct SuggestionProfileSheet: View {
             // Phone
             if let phone = suggestion.profile.phoneE164 {
                 Text(phone)
-                    .font(.system(size: 14))
+                    .scaledFont(size: 14)
                     .foregroundStyle(.secondary)
                     .padding(.bottom, 32)
             } else {
@@ -721,7 +721,7 @@ private struct SuggestionProfileSheet: View {
             // Add Friend button
             Button(action: onAddFriend) {
                 Label("Add Friend", systemImage: "person.badge.plus")
-                    .font(.system(size: 16, weight: .bold))
+                    .scaledFont(size: 16, weight: .bold)
                     .foregroundStyle(.white)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 14)
@@ -733,7 +733,7 @@ private struct SuggestionProfileSheet: View {
 
             // Dismiss button
             Button("Not Now", action: onDismiss)
-                .font(.system(size: 15))
+                .scaledFont(size: 15)
                 .foregroundStyle(.secondary)
                 .padding(.bottom, 32)
         }
@@ -770,16 +770,16 @@ private struct PersonCard: View {
                 .frame(width: 38, height: 38)
                 .overlay {
                     Text(String(displayedName.prefix(1)).uppercased())
-                        .font(.system(size: 15, weight: .bold))
+                        .scaledFont(size: 15, weight: .bold)
                         .foregroundStyle(.white)
                 }
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(displayedName)
-                    .font(.system(size: 13, weight: .semibold))
+                    .scaledFont(size: 13, weight: .semibold)
                 if let phone = person.phoneE164 {
                     Text(phone)
-                        .font(.system(size: 11))
+                        .scaledFont(size: 11)
                         .foregroundStyle(.secondary)
                 }
             }
@@ -789,7 +789,7 @@ private struct PersonCard: View {
             if isPending {
                 HStack(spacing: 6) {
                     Text("Pending")
-                        .font(.system(size: 11, weight: .semibold))
+                        .scaledFont(size: 11, weight: .semibold)
                         .foregroundStyle(.secondary)
                         .padding(.horizontal, 10)
                         .padding(.vertical, 5)
@@ -797,7 +797,7 @@ private struct PersonCard: View {
                         .clipShape(Capsule())
                     Button(action: onRemove) {
                         Image(systemName: "xmark.circle.fill")
-                            .font(.system(size: 18))
+                            .scaledFont(size: 18)
                             .foregroundStyle(.secondary)
                     }
                     .buttonStyle(.plain)
@@ -806,7 +806,7 @@ private struct PersonCard: View {
             } else {
                 Button(action: onRemove) {
                     Image(systemName: "person.badge.minus")
-                        .font(.system(size: 15))
+                        .scaledFont(size: 15)
                         .foregroundStyle(.red.opacity(0.75))
                 }
                 .buttonStyle(.plain)

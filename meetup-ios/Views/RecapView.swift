@@ -94,19 +94,19 @@ struct RecapView: View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 10) {
                 Text(meetupCategoryEmoji(meetup.category))
-                    .font(.system(size: 28))
+                    .scaledFont(size: 28)
                     .frame(width: 48, height: 48)
                     .background(Color(.tertiarySystemBackground))
                     .clipShape(RoundedRectangle(cornerRadius: 12))
 
                 VStack(alignment: .leading, spacing: 2) {
                     Text(meetup.destinationName)
-                        .font(.system(size: 20, weight: .bold))
+                        .scaledFont(size: 20, weight: .bold)
                         .foregroundStyle(Color(.label))
                         .lineLimit(2)
                     if let addr = meetup.destinationAddress, !addr.isEmpty {
                         Text(addr)
-                            .font(.system(size: 12))
+                            .scaledFont(size: 12)
                             .foregroundStyle(Color(.secondaryLabel))
                             .lineLimit(1)
                     }
@@ -140,15 +140,15 @@ struct RecapView: View {
     private func recapDetail(icon: String, label: String, value: String) -> some View {
         HStack(spacing: 8) {
             Image(systemName: icon)
-                .font(.system(size: 12))
+                .scaledFont(size: 12)
                 .foregroundStyle(.secondary)
                 .frame(width: 16)
             Text(label)
-                .font(.system(size: 12))
+                .scaledFont(size: 12)
                 .foregroundStyle(.secondary)
             Spacer()
             Text(value)
-                .font(.system(size: 12, weight: .medium))
+                .scaledFont(size: 12, weight: .medium)
                 .foregroundStyle(Color(.label))
                 .multilineTextAlignment(.trailing)
         }
@@ -163,10 +163,10 @@ struct RecapView: View {
             Spacer()
             VStack(spacing: 4) {
                 Text("\(came) of \(total)")
-                    .font(.system(size: 28, weight: .black))
+                    .scaledFont(size: 28, weight: .black)
                     .foregroundStyle(Color(.label))
                 Text("people showed up")
-                    .font(.system(size: 13))
+                    .scaledFont(size: 13)
                     .foregroundStyle(.secondary)
             }
             Spacer()
@@ -206,14 +206,14 @@ struct RecapView: View {
         VStack(alignment: .leading, spacing: 0) {
             HStack(spacing: 6) {
                 Image(systemName: icon)
-                    .font(.system(size: 12, weight: .semibold))
+                    .scaledFont(size: 12, weight: .semibold)
                     .foregroundStyle(iconColor)
                 Text(title.uppercased())
-                    .font(.system(size: 10, weight: .semibold))
+                    .scaledFont(size: 10, weight: .semibold)
                     .foregroundStyle(.secondary)
                 Spacer()
                 Text("\(people.count)")
-                    .font(.system(size: 10, weight: .semibold))
+                    .scaledFont(size: 10, weight: .semibold)
                     .foregroundStyle(.secondary)
             }
             .padding(.horizontal, 14)
@@ -231,11 +231,11 @@ struct RecapView: View {
                         .frame(width: 28, height: 28)
                         .overlay(
                             Text(String((person.displayName ?? "?").prefix(1)).uppercased())
-                                .font(.system(size: 11, weight: .bold))
+                                .scaledFont(size: 11, weight: .bold)
                                 .foregroundStyle(.white)
                         )
                     Text(person.displayName ?? "Unknown")
-                        .font(.system(size: 14))
+                        .scaledFont(size: 14)
                         .foregroundStyle(Color(.label))
                     Spacer()
                 }
@@ -263,20 +263,20 @@ struct RecapView: View {
                             .fill(Color.coral.opacity(0.15))
                             .frame(width: 40, height: 40)
                         Image(systemName: "dollarsign.circle")
-                            .font(.system(size: 18))
+                            .scaledFont(size: 18)
                             .foregroundStyle(Color.coral.opacity(0.8))
                     }
                     VStack(alignment: .leading, spacing: 2) {
                         Text("No receipts")
-                            .font(.system(size: 14, weight: .semibold))
+                            .scaledFont(size: 14, weight: .semibold)
                             .foregroundStyle(Color(.label))
                         Text("Bill splitting not started")
-                            .font(.system(size: 12))
+                            .scaledFont(size: 12)
                             .foregroundStyle(.secondary)
                     }
                     Spacer()
                     Image(systemName: "chevron.right")
-                        .font(.system(size: 12, weight: .semibold))
+                        .scaledFont(size: 12, weight: .semibold)
                         .foregroundStyle(Color(.tertiaryLabel))
                 }
                 .padding(14)
@@ -308,19 +308,19 @@ struct RecapView: View {
                         .fill(Color.coral.opacity(0.15))
                         .frame(width: 32, height: 32)
                     Image(systemName: "dollarsign.circle")
-                        .font(.system(size: 15))
+                        .scaledFont(size: 15)
                         .foregroundStyle(Color.coral.opacity(0.8))
                 }
                 Text("Bill Summary")
-                    .font(.system(size: 14, weight: .semibold))
+                    .scaledFont(size: 14, weight: .semibold)
                     .foregroundStyle(Color(.label))
                 Spacer()
                 HStack(spacing: 4) {
                     Text("View details")
-                        .font(.system(size: 11))
+                        .scaledFont(size: 11)
                         .foregroundStyle(.secondary)
                     Image(systemName: "chevron.right")
-                        .font(.system(size: 10, weight: .semibold))
+                        .scaledFont(size: 10, weight: .semibold)
                         .foregroundStyle(Color(.tertiaryLabel))
                 }
             }
@@ -336,20 +336,20 @@ struct RecapView: View {
                 HStack(spacing: 8) {
                     VStack(alignment: .leading, spacing: 2) {
                         Text(receipt.placeName)
-                            .font(.system(size: 13, weight: .medium))
+                            .scaledFont(size: 13, weight: .medium)
                             .foregroundStyle(Color(.label))
                         Text("Paid by \(payerName)")
-                            .font(.system(size: 11))
+                            .scaledFont(size: 11)
                             .foregroundStyle(.secondary)
                     }
                     Spacer()
                     if myOwed > 0 {
                         Text("You owe \(myOwed, format: .currency(code: "USD"))")
-                            .font(.system(size: 12, weight: .semibold))
+                            .scaledFont(size: 12, weight: .semibold)
                             .foregroundStyle(Color.coral.opacity(0.9))
                     } else {
                         Text(receipt.totalAmount, format: .currency(code: "USD"))
-                            .font(.system(size: 12))
+                            .scaledFont(size: 12)
                             .foregroundStyle(.secondary)
                     }
                 }
@@ -367,11 +367,11 @@ struct RecapView: View {
                 Divider()
                 HStack {
                     Text("Total you owe")
-                        .font(.system(size: 12, weight: .semibold))
+                        .scaledFont(size: 12, weight: .semibold)
                         .foregroundStyle(.secondary)
                     Spacer()
                     Text(crossTotal, format: .currency(code: "USD"))
-                        .font(.system(size: 14, weight: .bold))
+                        .scaledFont(size: 14, weight: .bold)
                         .foregroundStyle(Color.coral)
                 }
                 .padding(.horizontal, 14)
@@ -416,11 +416,11 @@ struct RecapView: View {
                         .fill(Color.coral.opacity(0.15))
                         .frame(width: 32, height: 32)
                     Image(systemName: "camera.fill")
-                        .font(.system(size: 14))
+                        .scaledFont(size: 14)
                         .foregroundStyle(Color.coral.opacity(0.8))
                 }
                 Text("Photos")
-                    .font(.system(size: 14, weight: .semibold))
+                    .scaledFont(size: 14, weight: .semibold)
                     .foregroundStyle(Color(.label))
                 Spacer()
                 if isUploadingPhoto {
@@ -431,7 +431,7 @@ struct RecapView: View {
                         showPhotoPicker = true
                     } label: {
                         Image(systemName: "plus")
-                            .font(.system(size: 13, weight: .semibold))
+                            .scaledFont(size: 13, weight: .semibold)
                             .foregroundStyle(Color.coral)
                     }
                 }
@@ -448,10 +448,10 @@ struct RecapView: View {
                 } label: {
                     HStack(spacing: 8) {
                         Image(systemName: "camera")
-                            .font(.system(size: 16))
+                            .scaledFont(size: 16)
                             .foregroundStyle(Color.coral.opacity(0.7))
                         Text("Add Photos")
-                            .font(.system(size: 14, weight: .medium))
+                            .scaledFont(size: 14, weight: .medium)
                             .foregroundStyle(Color.coral.opacity(0.9))
                     }
                     .frame(maxWidth: .infinity)
@@ -564,7 +564,7 @@ private struct RecapFullscreenPhotoView: View {
                             .frame(maxWidth: .infinity, maxHeight: .infinity)
                     case .failure:
                         Image(systemName: "photo")
-                            .font(.system(size: 48))
+                            .scaledFont(size: 48)
                             .foregroundStyle(.secondary)
                             .frame(maxWidth: .infinity, maxHeight: .infinity)
                     default:
@@ -577,12 +577,12 @@ private struct RecapFullscreenPhotoView: View {
                 VStack(alignment: .leading, spacing: 4) {
                     if let caption = photo.caption, !caption.isEmpty {
                         Text(caption)
-                            .font(.system(size: 15))
+                            .scaledFont(size: 15)
                             .foregroundStyle(.white)
                     }
                     if let name = uploaderName {
                         Text("Shared by \(name)")
-                            .font(.system(size: 12))
+                            .scaledFont(size: 12)
                             .foregroundStyle(.white.opacity(0.7))
                     }
                 }
@@ -602,7 +602,7 @@ private struct RecapFullscreenPhotoView: View {
                 dismiss()
             } label: {
                 Image(systemName: "xmark.circle.fill")
-                    .font(.system(size: 28))
+                    .scaledFont(size: 28)
                     .foregroundStyle(.white.opacity(0.8))
                     .padding(20)
             }

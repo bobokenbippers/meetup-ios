@@ -8,13 +8,13 @@ struct LocationSharingBanner: View {
         Button(action: onTap) {
             HStack(spacing: 6) {
                 Image(systemName: "location.fill")
-                    .font(.system(size: 11, weight: .semibold))
+                    .scaledFont(size: 11, weight: .semibold)
                 Text("Sharing location for \(meetup.destinationName)")
-                    .font(.system(size: 12, weight: .semibold))
+                    .scaledFont(size: 12, weight: .semibold)
                     .lineLimit(1)
                 Spacer()
                 Image(systemName: "chevron.right")
-                    .font(.system(size: 10, weight: .semibold))
+                    .scaledFont(size: 10, weight: .semibold)
                     .opacity(0.7)
             }
             .foregroundStyle(.white)
