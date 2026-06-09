@@ -1,5 +1,25 @@
 # Changelog
 
+## [Unreleased] - 2026-06-09
+### Added
+- Friend direct messages with a Messages tab, inbox, chat threads, realtime updates, unread counts, and push routing.
+- Text and photo messages between accepted friends, backed by the new `message-photos` storage bucket.
+- Delete support for a user's own direct messages.
+- Supabase DM backend: conversations, messages, read-state RPCs, RLS policies, storage policies, and `push-new-message` edge function.
+
+### Changed
+- Received meetup invites now show the sender with a `From <name>` line.
+- Meetup dashboard invite responses are ordered `Yes`, `Maybe`, `No`.
+- Message threads now include an explicit `Messages` back button.
+
+### Fixed
+- Invitees can see the meetup host/sender in the participant roster after accepting an invite.
+- Missing host participant rows are backfilled so older meetups can render the inviter.
+- Event suggestions can request location correctly after authorization by adding required iOS location usage strings and a one-shot location fetch.
+- Auth startup no longer flashes the full meetup UI before Supabase finishes resolving the initial session.
+
+---
+
 ## [2.0.0] - 2026-05-20
 ### Added
 - Full UI redesign: coral accent color (`#FF6B47`) throughout the app
