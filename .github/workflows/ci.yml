@@ -1,6 +1,8 @@
 name: CI
 
 on:
+  # Public-repo safety: do not change this to pull_request_target unless the
+  # workflow is redesigned to avoid running untrusted code with privileged context.
   pull_request:
     branches:
       - main
@@ -15,6 +17,9 @@ on:
       - '**/*.md'
       - 'docs/**'
       - 'LICENSE'
+
+permissions:
+  contents: read
 
 # Cancel an in-progress run when a newer commit lands on the same ref,
 # so stacked merges don't each tie up a (10x-priced) macOS runner.
@@ -36,24 +41,28 @@ jobs:
           git config --global url."https://github.com/".insteadOf "git@github.com:"
 
       - name: Build
+        shell: bash
         run: |
+          set -o pipefail
           xcodebuild build \
             -project meetup-ios.xcodeproj \
             -scheme meetup-ios \
             -configuration Debug \
             -destination "generic/platform=iOS Simulator" \
             CODE_SIGNING_ALLOWED=NO \
-            | xcpretty || true
+            | xcpretty
 
       - name: Run unit tests
+        shell: bash
         run: |
+          set -o pipefail
           xcodebuild test \
             -project meetup-ios.xcodeproj \
             -scheme meetup-ios \
             -destination "platform=iOS Simulator,name=iPhone 16" \
             CODE_SIGNING_ALLOWED=NO \
             -resultBundlePath TestResults.xcresult \
-            | xcpretty || true
+            | xcpretty
 
       - name: Upload test results
         if: always()
