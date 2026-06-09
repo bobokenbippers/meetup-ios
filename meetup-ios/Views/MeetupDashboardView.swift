@@ -517,9 +517,13 @@ struct MeetupDashboardView: View {
                 if fresh != participants { participants = fresh }
                 hasLoaded = true
             }
-            if myParticipant?.status == "yes" && meetup.status == "active" {
+            if myParticipant?.status == "yes" && meetup.status == "active" && UserSettingsService.locationSharingEnabled {
                 LocationManager.shared.requestPermission()
                 LocationManager.shared.startTracking(meetup: meetup)
+            } else if !UserSettingsService.locationSharingEnabled,
+                      LocationManager.shared.trackingMeetup?.id == meetup.id {
+                // User turned off location sharing while this meetup is in view.
+                LocationManager.shared.stopTracking()
             }
             // Stop tracking when the view is open and the event window has expired.
             if let target = meetup.targetArrivalAt,
