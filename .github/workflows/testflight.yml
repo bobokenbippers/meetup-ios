@@ -1,17 +1,17 @@
 name: TestFlight
 
+# Betas now ship on demand only. Trigger from the Actions tab (Run workflow)
+# or by pushing a 'beta-*' tag, instead of auto-building on every merge to main.
+# A single afternoon of stacked merges previously archived ~14 macOS builds.
 on:
   workflow_dispatch:
   push:
-    branches:
-      - main
-    paths:
-      - 'meetup-ios/**'
-      - 'meetup-ios.xcodeproj/**'
-      - 'fastlane/**'
-      - 'Gemfile'
-      - 'Gemfile.lock'
-      - '.github/workflows/testflight.yml'
+    tags:
+      - 'beta-*'
+
+concurrency:
+  group: testflight-${{ github.ref }}
+  cancel-in-progress: false
 
 jobs:
   build:
