@@ -12,3 +12,5 @@ __pycache__/
 *.xcworkspace/xcuserdata
 .claude/
 supabase-swift/
+CLAUDE.md
+Secrets.xcconfig
