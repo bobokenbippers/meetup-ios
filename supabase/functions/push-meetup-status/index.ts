@@ -4,10 +4,11 @@ import { sendPush } from "../_shared/apns.ts"
 
 // Triggered by Postgres: AFTER UPDATE ON meetup_participants
 // when status changes to 'accepted', 'declined', or 'arrived'
-// Payload: { participantId: string, newStatus: string }
+// meetup_participants has a composite PK (meetup_id, user_id) — no id column.
+// Payload: { meetupId: string, userId: string, newStatus: string }
 serve(async (req) => {
   try {
-    const { participantId, newStatus } = await req.json()
+    const { meetupId, userId, newStatus } = await req.json()
     if (!["accepted", "declined", "arrived"].includes(newStatus)) {
       return new Response("ignored", { status: 200 })
     }
@@ -17,23 +18,16 @@ serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
     )
 
-    const { data: participant, error: pErr } = await supabase
-      .from("meetup_participants")
-      .select("user_id, meetup_id")
-      .eq("id", participantId)
-      .single()
-    if (pErr || !participant) return new Response("not found", { status: 200 })
-
     const [{ data: meetup }, { data: actor }] = await Promise.all([
       supabase
         .from("meetups")
         .select("destination_name, host_id")
-        .eq("id", participant.meetup_id)
+        .eq("id", meetupId)
         .single(),
       supabase
         .from("profiles")
         .select("display_name")
-        .eq("id", participant.user_id)
+        .eq("id", userId)
         .single(),
     ])
 
@@ -45,9 +39,9 @@ serve(async (req) => {
       const { data: recipients } = await supabase
         .from("meetup_participants")
         .select("user_id, profiles(apns_token)")
-        .eq("meetup_id", participant.meetup_id)
+        .eq("meetup_id", meetupId)
         .in("status", ["accepted", "invited"])
-        .neq("user_id", participant.user_id)
+        .neq("user_id", userId)
 
       // Also notify host if not already in the list
       const recipientIds = new Set((recipients ?? []).map((r: any) => r.user_id))
@@ -74,7 +68,7 @@ serve(async (req) => {
             title: `${actorName} arrived! 🎉`,
             body: `They made it to ${meetupName}`,
             event: "meetup_arrived",
-            meetupId: participant.meetup_id,
+            meetupId: meetupId,
           }),
         ),
       )
@@ -93,7 +87,7 @@ serve(async (req) => {
         title: `${actorName} ${verb}`,
         body: `${actorName} ${verb} your invite to ${meetupName}`,
         event: `meetup_${newStatus}`,
-        meetupId: participant.meetup_id,
+        meetupId: meetupId,
       })
     }
 
