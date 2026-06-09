@@ -16,7 +16,7 @@ struct MeetupDashboardView: View {
     }
 
     @State private var participants: [MeetupParticipant] = []
-    @State private var showEditLocation = false
+    @State private var showEditMeetup = false
     @State private var hasLoaded = false
     @State private var isActing = false
     @State private var error: String?
@@ -162,8 +162,8 @@ struct MeetupDashboardView: View {
                     onAdded: { Task { await load() } }
                 )
             }
-            .sheet(isPresented: $showEditLocation) {
-                EditMeetupLocationView(meetup: meetup) { updated in
+            .sheet(isPresented: $showEditMeetup) {
+                EditMeetupView(meetup: meetup) { updated in
                     meetup = updated
                     LocationManager.shared.updateTrackedDestination(meetup: updated)
                 }
@@ -269,15 +269,15 @@ struct MeetupDashboardView: View {
 
             if myUserId == meetup.hostId && !meetup.isRecap {
                 Button {
-                    showEditLocation = true
+                    showEditMeetup = true
                 } label: {
                     Image(systemName: "pencil.circle.fill")
                         .scaledFont(size: 22)
                         .foregroundStyle(Color.coral)
                 }
                 .buttonStyle(.plain)
-                .accessibilityLabel("Edit location")
-                .accessibilityIdentifier("btn_edit_location")
+                .accessibilityLabel("Edit meetup")
+                .accessibilityIdentifier("btn_edit_meetup")
             }
         }
         .padding(.horizontal, 14)

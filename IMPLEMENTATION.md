@@ -1033,8 +1033,10 @@ create policy "see own meetups"
   );
 
 -- Hardened in migration 20260609_meetup_host_update_policy.sql: WITH CHECK added
--- so the host edit path (e.g. editing the destination/address after creation) is
--- fully covered and the host cannot reassign host_id on update.
+-- so the host edit path (e.g. editing the destination/address or the target arrival
+-- time after creation) is fully covered and the host cannot reassign host_id on update.
+-- The policy is row-scoped (not column-scoped), so editing target_arrival_at rides on
+-- the same policy as the destination edit — no extra migration needed.
 create policy "host can update meetups"
   on public.meetups for update
   using (auth.uid() = host_id)
