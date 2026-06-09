@@ -1,7 +1,7 @@
 import { create, getNumericDate } from "https://deno.land/x/djwt@v3.0.2/mod.ts"
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2"
 
-const TEAM_ID = Deno.env.get("APPLE_TEAM_ID")!
+const TEAM_ID = Deno.env.get("APNS_TEAM_ID")!
 const KEY_ID = Deno.env.get("APNS_KEY_ID")!
 const BUNDLE_ID = "gautamlgtm.meetup-ios"
 const USE_SANDBOX = Deno.env.get("APNS_USE_SANDBOX") === "true"
@@ -28,7 +28,7 @@ async function apnsJwt(): Promise<string> {
   // APNs tokens expire after 60 min; regenerate after 55
   if (_cachedJwt && now - _cachedJwtAt < 55 * 60) return _cachedJwt
 
-  const keyPem = Deno.env.get("APNS_AUTH_KEY")!
+  const keyPem = Deno.env.get("APNS_KEY_P8")!
   const key = await crypto.subtle.importKey(
     "pkcs8",
     pemToDer(keyPem),

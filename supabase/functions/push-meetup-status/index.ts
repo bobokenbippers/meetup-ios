@@ -27,7 +27,7 @@ serve(async (req) => {
     const [{ data: meetup }, { data: actor }] = await Promise.all([
       supabase
         .from("meetups")
-        .select("name, host_id")
+        .select("destination_name, host_id")
         .eq("id", participant.meetup_id)
         .single(),
       supabase
@@ -38,7 +38,7 @@ serve(async (req) => {
     ])
 
     const actorName = actor?.display_name ?? "Someone"
-    const meetupName = meetup?.name ?? "the meetup"
+    const meetupName = meetup?.destination_name ?? "the meetup"
 
     if (newStatus === "arrived") {
       // Notify host + all accepted participants (excluding the one who arrived)

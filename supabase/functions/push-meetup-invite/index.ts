@@ -23,7 +23,7 @@ serve(async (req) => {
     const [{ data: meetup }, { data: invitee }] = await Promise.all([
       supabase
         .from("meetups")
-        .select("name, host_id, destination_name")
+        .select("host_id, destination_name")
         .eq("id", participant.meetup_id)
         .single(),
       supabase
@@ -43,8 +43,8 @@ serve(async (req) => {
       .single()
 
     const hostName = host?.display_name ?? "Someone"
-    const meetupName = meetup?.name ?? "a meetup"
-    const dest = meetup?.destination_name ? ` → ${meetup.destination_name}` : ""
+    const meetupName = meetup?.destination_name ?? "a meetup"
+    const dest = ""
 
     await sendPush(invitee.apns_token, {
       title: `${hostName} invited you`,
