@@ -1,6 +1,16 @@
 # Changelog
 
 ## [Unreleased] - 2026-06-09
+### TestFlight Notes
+Friend DMs are here: open Messages to chat with accepted friends, send text/photo messages, and delete your own messages. Meetup invites now show who sent them, RSVP buttons are ordered Yes/Maybe/No, chat threads have a clearer back button, event suggestions handle location permission better, and the app no longer flashes the meetup screen before auth finishes.
+
+Please test:
+- Create a meetup, invite a friend, and confirm the invite says who sent it.
+- Open the meetup after accepting and confirm the host appears in the participant list.
+- Send text and photo DMs both ways.
+- Delete one of your own messages.
+- Background the app and confirm DM push notifications open the right place.
+
 ### Added
 - Friend direct messages with a Messages tab, inbox, chat threads, realtime updates, unread counts, and push routing.
 - Text and photo messages between accepted friends, backed by the new `message-photos` storage bucket.
