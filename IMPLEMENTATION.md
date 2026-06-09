@@ -656,6 +656,15 @@ iOS surfaces only accepted friends in the invite picker; phone-search / contact 
 non-friend shows **"Send friend request"** (or **"Request pending"** / **"Accept request"**)
 instead of **Add**, via `MeetupService.friendshipStatus(with:)`.
 
+> **Insert ordering (required by this gate):** `MeetupService.createMeetup` must insert
+> the host's own `meetup_participants` row in its **own** statement and then insert each
+> invitee **individually** — never host + invitees in one atomic `insert([...])`. Because
+> `participants_insert` is evaluated per row, a single non-accepted-friend invitee in a
+> batch rolls back the entire insert (host row + every other invite), orphaning the meetup
+> with zero participants so it surfaces for no one — neither the host nor the invitees.
+> Per-row inserts isolate a gate rejection to just that invitee. (Fixed in
+> `fix/invites-not-surfacing`.)
+
 ### M2.2 Profile Phone Number Setup
 
 Add a "complete your profile" flow that runs after first sign-in if `phone_e164` is null. Create `MeetupTracker/Views/ProfileSetupView.swift`:
@@ -1033,8 +1042,10 @@ create policy "see own meetups"
   );
 
 -- Hardened in migration 20260609_meetup_host_update_policy.sql: WITH CHECK added
--- so the host edit path (e.g. editing the destination/address after creation) is
--- fully covered and the host cannot reassign host_id on update.
+-- so the host edit path (e.g. editing the destination/address or the target arrival
+-- time after creation) is fully covered and the host cannot reassign host_id on update.
+-- The policy is row-scoped (not column-scoped), so editing target_arrival_at rides on
+-- the same policy as the destination edit — no extra migration needed.
 create policy "host can update meetups"
   on public.meetups for update
   using (auth.uid() = host_id)
@@ -1593,6 +1604,7 @@ Three Edge Functions live in `supabase/functions/`. They are deployed via:
 ```bash
 supabase functions deploy push-meetup-invite
 supabase functions deploy push-meetup-status
+supabase functions deploy push-meetup-cancelled
 supabase functions deploy push-friend-request
 ```
 
@@ -1693,6 +1705,18 @@ create or replace trigger trg_friendship_push
 ```
 
 > **Note:** `current_setting('app.service_role_key', true)` requires the service role key to be set as a Postgres config var: `alter database postgres set app.service_role_key = '<key>';` — or replace with a hardcoded value during initial setup and rotate to the config var approach before prod.
+
+> **Live trigger wiring:** the documentation above reflects the original design. The triggers that are actually applied live in `supabase/migrations/20260609_push_triggers.sql`, which route through the `public.call_push_function(fn, payload)` helper and read the service-role key from Supabase Vault (`vault.decrypted_secrets where name = 'service_role_key'`) instead of `current_setting`. New push triggers should follow that pattern.
+
+#### Meetup cancelled push (`push-meetup-cancelled`)
+
+When a host cancels a meetup, every still-engaged participant gets a push telling them the event was cancelled (meetup title in the body). Edge function: `supabase/functions/push-meetup-cancelled/index.ts`. Trigger: `supabase/migrations/20260609_cancel_meetup_push.sql`.
+
+- **Trigger:** `trg_notify_meetup_cancelled` — `AFTER UPDATE ON public.meetups`, fires `public.notify_meetup_cancelled()` only when `new.status = 'cancelled' AND old.status IS DISTINCT FROM 'cancelled'`. Auto-expiry sets status to `'ended'`, so it never fires this push.
+- **Payload:** `{ meetupId }`.
+- **Recipients:** all `meetup_participants` for the meetup with status in (`invited`, `accepted`, `arrived`), excluding the host (who performed the cancellation). `declined` participants are skipped.
+- **Notification:** title `Meetup cancelled`, body `<destination_name> has been cancelled`, `event: meetup_cancelled`, `meetupId` for deep-linking.
+- The iOS cancel flow is unchanged: `MeetupService.cancelMeetup(meetupId:)` already updates `meetups.status` to `'cancelled'`, which is what the trigger keys off of.
 
 ### M5.1 Punctuality Computation (Backend)
 
@@ -2262,6 +2286,71 @@ fly deploy
 ```
 
 Update Supabase webhooks and iOS `BACKEND_URL` to the Fly URL.
+
+## M9 — Settings (User Preferences + Account)
+
+Expanded Settings screen (`Views/SettingsView.swift`): ACCOUNT (edit display name, delete account, sign out), APPEARANCE/ACCESSIBILITY (existing, UserDefaults via `AppSettings`), NOTIFICATIONS + PRIVACY (persisted to Supabase via `user_settings`), and ABOUT (bundle version, Terms/Support links).
+
+### M9.1 Schema — `user_settings`
+
+One row per user, keyed by `user_id = auth.uid()`. Notification + privacy preferences. Run in the Supabase SQL editor:
+
+```sql
+create table public.user_settings (
+  user_id                     uuid primary key references public.profiles(id) on delete cascade,
+  push_notifications_enabled  boolean not null default true,
+  event_cancelled_enabled     boolean not null default true,
+  location_sharing_enabled    boolean not null default true,
+  updated_at                  timestamptz not null default now()
+);
+
+alter table public.user_settings enable row level security;
+
+create policy "users can read their own settings"
+  on public.user_settings for select
+  using (auth.uid() = user_id);
+
+create policy "users can insert their own settings"
+  on public.user_settings for insert
+  with check (auth.uid() = user_id);
+
+create policy "users can update their own settings"
+  on public.user_settings for update
+  using (auth.uid() = user_id)
+  with check (auth.uid() = user_id);
+```
+
+The iOS client upserts on `user_id` (`UserSettingsService.save`). `location_sharing_enabled` is mirrored into `UserDefaults` so `MeetupDashboardView` / `LocationManager` can gate live tracking synchronously. The `event_cancelled_enabled` flag is the gate the `feature/cancel-event-push-notifications` branch should read before sending a cancel push (the push backend should `select` this column for the recipient and skip if false).
+
+### M9.2 Account deactivation (soft delete)
+
+`profiles` gains a `deactivated_at` column plus a `security definer` RPC so a user can deactivate their own account without exposing service-role keys. Run:
+
+```sql
+alter table public.profiles
+  add column if not exists deactivated_at timestamptz;
+
+create or replace function public.deactivate_account()
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  update public.profiles
+     set deactivated_at = now(),
+         updated_at = now()
+   where id = auth.uid();
+end;
+$$;
+
+revoke all on function public.deactivate_account() from public;
+grant execute on function public.deactivate_account() to authenticated;
+```
+
+`AuthViewModel.deactivateAndSignOut()` calls the RPC then signs out.
+
+**Placeholder / follow-up (not built in this MVP):** a *hard* delete of the `auth.users` row requires the service-role key and must run server-side. Implement later as a Supabase Edge Function (e.g. `delete-account`) that authenticates the caller's JWT, then calls `auth.admin.deleteUser(uid)` with the service-role key held in the function's secrets — never shipped in the app. The current build does a soft deactivate + sign out.
 
 ## Appendix C — Testing Strategy
 

@@ -138,6 +138,34 @@ final class AuthViewModel {
         try? await supabase.auth.signOut()
     }
 
+    /// Update the current user's display name in Postgres and refresh local/cached state.
+    func updateDisplayName(_ name: String) async {
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty, let userId = supabase.auth.currentUser?.id else { return }
+        do {
+            try await supabase
+                .from("profiles")
+                .update(["display_name": trimmed])
+                .eq("id", value: userId)
+                .execute()
+            profile?.displayName = trimmed
+            if let profile { Self.cacheProfile(profile) }
+        } catch {
+            self.error = error.localizedDescription
+        }
+    }
+
+    /// Soft-delete: flag the profile as deactivated via RPC, then sign out.
+    /// A hard delete of `auth.users` requires a service-role Edge Function (see PR notes).
+    func deactivateAndSignOut() async {
+        do {
+            try await supabase.rpc("deactivate_account").execute()
+        } catch {
+            self.error = error.localizedDescription
+        }
+        try? await supabase.auth.signOut()
+    }
+
     // MARK: - Profile cache
 
     private static let cacheKey = "cachedProfile"

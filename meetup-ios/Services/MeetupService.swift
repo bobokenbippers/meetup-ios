@@ -134,21 +134,43 @@ final class MeetupService {
             }
         }
 
-        var participants = [ParticipantInsert(
-            meetupId: meetupId,
-            userId: hostId,
-            status: "yes",
-            joinedAt: iso.string(from: Date())
-        )]
-        for invitee in invitees {
-            participants.append(ParticipantInsert(
+        // Insert the host's own participant row on its own. It always satisfies the
+        // friendship-gate RLS (`participants_insert`) because user_id == auth.uid().
+        // Keeping it separate from the invitees guarantees a rejected invitee can
+        // never roll it back — an orphaned meetup with no host row is invisible to
+        // everyone, including the host.
+        try await supabase
+            .from("meetup_participants")
+            .insert(ParticipantInsert(
                 meetupId: meetupId,
-                userId: invitee.id,
-                status: "invited",
-                joinedAt: nil
+                userId: hostId,
+                status: "yes",
+                joinedAt: iso.string(from: Date())
             ))
+            .execute()
+
+        // Insert invitees one at a time rather than as a single atomic batch. The
+        // friendship gate rejects any invitee who isn't an accepted friend; in a
+        // batch that one rejection rolls back the whole insert (host row + every
+        // other invite), so legitimate invites never reach their recipients. Per-row
+        // inserts isolate each invitee so valid invites still land and surface.
+        for invitee in invitees {
+            do {
+                try await supabase
+                    .from("meetup_participants")
+                    .insert(ParticipantInsert(
+                        meetupId: meetupId,
+                        userId: invitee.id,
+                        status: "invited",
+                        joinedAt: nil
+                    ))
+                    .execute()
+            } catch is CancellationError {
+                throw CancellationError()
+            } catch {
+                continue
+            }
         }
-        try await supabase.from("meetup_participants").insert(participants).execute()
         return meetupId
     }
 
@@ -254,6 +276,30 @@ final class MeetupService {
                 destinationLat: lat,
                 destinationLng: lng
             ))
+            .eq("id", value: meetupId)
+            .select()
+            .execute()
+            .value
+        guard let meetup = updated.first else { throw MeetupError.meetupNotFound }
+        return meetup
+    }
+
+    /// Update a meetup's scheduled time (target arrival). The push-leave-now and
+    /// expire-meetups cron functions read target_arrival_at live, so they pick up the
+    /// new time automatically — no client-side rescheduling, same as the creation flow.
+    /// RLS ("host can update meetups") restricts this to the host. Returns the updated row.
+    func updateTargetArrival(meetupId: UUID, targetArrivalAt: Date) async throws -> Meetup {
+        struct TargetArrivalUpdate: Encodable {
+            let targetArrivalAt: String
+            enum CodingKeys: String, CodingKey {
+                case targetArrivalAt = "target_arrival_at"
+            }
+        }
+
+        let iso = ISO8601DateFormatter()
+        let updated: [Meetup] = try await supabase
+            .from("meetups")
+            .update(TargetArrivalUpdate(targetArrivalAt: iso.string(from: targetArrivalAt)))
             .eq("id", value: meetupId)
             .select()
             .execute()
