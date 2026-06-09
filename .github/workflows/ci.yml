@@ -58,6 +58,7 @@ jobs:
 
       - name: Run unit tests
         shell: bash
+        timeout-minutes: 10
         run: |
           set -o pipefail
           xcodebuild test \
