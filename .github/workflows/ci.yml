@@ -31,6 +31,7 @@ jobs:
   build-and-test:
     name: Build & Test
     runs-on: macos-26
+    timeout-minutes: 20
 
     steps:
       - name: Checkout
