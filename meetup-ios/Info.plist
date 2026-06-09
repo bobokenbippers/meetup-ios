@@ -56,10 +56,8 @@
 			</array>
 		</dict>
 	</array>
-	<!-- Ticketmaster Discovery API consumer key for "Happening near you" event suggestions.
-	     Replace the placeholder below with a real key from https://developer-acct.ticketmaster.com
-	     (Discovery API -> app -> Consumer Key). Until set, the suggestions section is hidden. -->
-	<key>TicketmasterAPIKey</key>
-	<string>MSBWPJjsn015aOjq9r732wx8wLwIn3fC</string>
+	<!-- TicketmasterAPIKey and GooglePlacesAPIKey are injected at build time from
+	     Secrets.xcconfig (gitignored) via INFOPLIST_KEY_* build settings, so the real
+	     keys never live in the repo. See Secrets.example.xcconfig. -->
 </dict>
 </plist>
