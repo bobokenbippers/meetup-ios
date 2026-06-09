@@ -1,25 +1,30 @@
 import SwiftUI
 import CoreLocation
+import UIKit
 
 /// "Happening near you" — a horizontally-scrolling row of real events near the
 /// user's current location. Tapping a card opens the create-meetup flow pre-filled
-/// with that event's title, date/time, and venue. Renders nothing (quietly) when
-/// there's no location permission, no key configured, or no events nearby.
+/// with that event's title, date/time, and venue.
 struct NearbyEventsView: View {
     /// Hand a pre-fill back up so the parent can present `CreateMeetupView`.
     let onSelect: (EventPrefill) -> Void
 
+    @Environment(\.openURL) private var openURL
     @State private var events: [NearbyEvent] = []
     @State private var phase: Phase = .idle
 
     private var locationManager: LocationManager { .shared }
 
-    private enum Phase { case idle, loading, loaded, hidden }
+    private enum Phase { case idle, loading, loaded, needsLocation, empty, hidden }
 
     // Changing this re-runs the load: "none" until a fix arrives, then the coordinate.
     private var locationKey: String {
         guard let l = locationManager.location else { return "none" }
         return String(format: "%.3f,%.3f", l.coordinate.latitude, l.coordinate.longitude)
+    }
+
+    private var loadKey: String {
+        "\(locationManager.authorizationStatus.rawValue)|\(locationKey)"
     }
 
     var body: some View {
@@ -29,12 +34,15 @@ struct NearbyEventsView: View {
                 content
             case .loading:
                 loadingRow
+            case .needsLocation:
+                locationPromptRow
+            case .empty:
+                emptyRow
             default:
                 EmptyView()
             }
         }
-        .task { locationManager.requestOneShotLocation() }
-        .task(id: locationKey) { await load() }
+        .task(id: loadKey) { await load() }
     }
 
     // MARK: - Content
@@ -87,12 +95,73 @@ struct NearbyEventsView: View {
         .padding(.vertical, 8)
     }
 
+    private var locationPromptRow: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            header
+            HStack(spacing: 10) {
+                Image(systemName: "location")
+                    .scaledFont(size: 14, weight: .semibold)
+                    .foregroundStyle(Color.coral)
+                    .frame(width: 28, height: 28)
+                    .background(Color.coral.opacity(0.12))
+                    .clipShape(Circle())
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Turn on location for local events")
+                        .scaledFont(size: 13, weight: .semibold)
+                        .foregroundStyle(.white)
+                    Text("We'll show ideas near you.")
+                        .scaledFont(size: 11)
+                        .foregroundStyle(Color(white: 0.58))
+                }
+
+                Spacer(minLength: 8)
+
+                Button(action: requestLocation) {
+                    Text(locationManager.authorizationStatus == .notDetermined ? "Enable" : "Settings")
+                        .scaledFont(size: 12, weight: .bold)
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 7)
+                        .background(Color.coral)
+                        .clipShape(Capsule())
+                }
+                .buttonStyle(.plain)
+            }
+            .padding(14)
+            .background(Color.appSurface)
+            .clipShape(RoundedRectangle(cornerRadius: 18))
+            .padding(.horizontal, 16)
+        }
+        .padding(.vertical, 6)
+    }
+
+    private var emptyRow: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            header
+            Text("No nearby events right now")
+                .scaledFont(size: 12, weight: .medium)
+                .foregroundStyle(Color(white: 0.58))
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 8)
+        }
+        .padding(.vertical, 6)
+    }
+
     // MARK: - Data
 
     private func load() async {
         guard let location = locationManager.location else {
-            // No fix yet — stay idle; the location-keyed task re-runs once one arrives.
-            if phase != .loaded { phase = .idle }
+            switch locationManager.authorizationStatus {
+            case .notDetermined, .authorizedWhenInUse, .authorizedAlways:
+                phase = .loading
+                locationManager.requestOneShotLocation()
+            case .denied, .restricted:
+                phase = .needsLocation
+            @unknown default:
+                phase = .needsLocation
+            }
             return
         }
         phase = .loading
@@ -104,12 +173,27 @@ struct NearbyEventsView: View {
             // Only events with a coordinate are actionable (the create flow needs lat/lng).
             let actionable = result.filter { $0.coordinate != nil }
             events = actionable
-            phase = actionable.isEmpty ? .hidden : .loaded
+            phase = actionable.isEmpty ? .empty : .loaded
         } catch is CancellationError {
             return
         } catch {
             // Missing key / network / decode — fail silently and hide the section.
             phase = .hidden
+        }
+    }
+
+    private func requestLocation() {
+        switch locationManager.authorizationStatus {
+        case .notDetermined:
+            locationManager.requestOneShotLocation()
+        case .denied, .restricted:
+            if let url = URL(string: UIApplication.openSettingsURLString) {
+                openURL(url)
+            }
+        case .authorizedWhenInUse, .authorizedAlways:
+            locationManager.requestOneShotLocation()
+        @unknown default:
+            break
         }
     }
 

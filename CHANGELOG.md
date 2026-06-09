@@ -2,7 +2,7 @@
 
 ## [Unreleased] - 2026-06-09
 ### TestFlight Notes
-Friend DMs are here: open Messages to chat with accepted friends, send text/photo messages, and delete your own messages. Meetup invites now show who sent them, RSVP buttons are ordered Yes/Maybe/No, chat threads have a clearer back button, event suggestions handle location permission better, and the app no longer flashes the meetup screen before auth finishes.
+Friend DMs are here: open Messages to chat with accepted friends, send text/photo messages, and delete your own messages. Meetup invites now show who sent them, RSVP buttons are ordered Yes/Maybe/No, chat threads have a clearer back button, event suggestions stay visible while asking for location, and the app no longer flashes the meetup screen before auth finishes.
 
 Please test:
 - Create a meetup, invite a friend, and confirm the invite says who sent it.
@@ -26,6 +26,8 @@ Please test:
 - Invitees can see the meetup host/sender in the participant roster after accepting an invite.
 - Missing host participant rows are backfilled so older meetups can render the inviter.
 - Event suggestions can request location correctly after authorization by adding required iOS location usage strings and a one-shot location fetch.
+- Event suggestions no longer disappear when location permission is pending or unavailable; the Meetups tab now shows a clear location prompt or empty state.
+- Event suggestion API configuration is now included in the app target build settings so release builds can read it reliably.
 - Auth startup no longer flashes the full meetup UI before Supabase finishes resolving the initial session.
 
 ---
