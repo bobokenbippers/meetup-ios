@@ -2,7 +2,7 @@
 
 ## [Unreleased] - 2026-06-09
 ### TestFlight Notes
-Friend DMs are here: open Messages to chat with accepted friends, send text/photo messages, and delete your own messages. Meetup invites now show who sent them, RSVP buttons are ordered Yes/Maybe/No, chat threads have a clearer back button, event suggestions stay visible while asking for location, and the app no longer flashes the meetup screen before auth finishes.
+Friend DMs are here: open Messages to chat with accepted friends, send text/photo messages, and delete your own messages. Meetup invites now show who sent them, RSVP buttons are ordered Yes/Maybe/No, chat threads have a clearer back button, Settings includes a prefilled beta feedback email, event suggestions stay visible while asking for location, and the app no longer flashes the meetup screen before auth finishes.
 
 Please test:
 - Create a meetup, invite a friend, and confirm the invite says who sent it.
@@ -10,12 +10,14 @@ Please test:
 - Send text and photo DMs both ways.
 - Delete one of your own messages.
 - Background the app and confirm DM push notifications open the right place.
+- Open Settings and use Send Feedback to report anything weird.
 
 ### Added
 - Friend direct messages with a Messages tab, inbox, chat threads, realtime updates, unread counts, and push routing.
 - Text and photo messages between accepted friends, backed by the new `message-photos` storage bucket.
 - Delete support for a user's own direct messages.
 - Supabase DM backend: conversations, messages, read-state RPCs, RLS policies, storage policies, and `push-new-message` edge function.
+- Settings beta feedback action with a prefilled email that includes app version, user id, iOS version, and device model.
 
 ### Changed
 - Received meetup invites now show the sender with a `From <name>` line.

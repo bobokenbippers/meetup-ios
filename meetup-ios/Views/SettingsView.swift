@@ -1,8 +1,10 @@
 import SwiftUI
+import UIKit
 
 struct SettingsView: View {
     @Environment(AuthViewModel.self) private var auth
     @Environment(AppSettings.self) private var settings
+    @Environment(\.openURL) private var openURL
 
     // Preferences persisted to Supabase (loaded on appear, saved on change).
     @State private var pushEnabled = true
@@ -138,6 +140,14 @@ struct SettingsView: View {
                         aboutRow("Support")
                     }
                     .listRowBackground(Color.appSurface)
+
+                    Button {
+                        openURL(feedbackURL)
+                    } label: {
+                        aboutRow("Send Feedback", systemImage: "envelope")
+                    }
+                    .buttonStyle(.plain)
+                    .listRowBackground(Color.appSurface)
                 } header: {
                     sectionHeader("ABOUT")
                 }
@@ -186,11 +196,11 @@ struct SettingsView: View {
             .textCase(nil)
     }
 
-    private func aboutRow(_ title: String) -> some View {
+    private func aboutRow(_ title: String, systemImage: String = "arrow.up.right") -> some View {
         HStack {
             Text(title).foregroundStyle(.white)
             Spacer()
-            Image(systemName: "arrow.up.right")
+            Image(systemName: systemImage)
                 .font(.caption)
                 .foregroundStyle(Color(white: 0.4))
         }
@@ -201,6 +211,30 @@ struct SettingsView: View {
         let version = info?["CFBundleShortVersionString"] as? String ?? "—"
         let build = info?["CFBundleVersion"] as? String ?? "—"
         return "\(version) (\(build))"
+    }
+
+    private var feedbackURL: URL {
+        var components = URLComponents()
+        components.scheme = "mailto"
+        components.path = "support@squadbrunch.app"
+        components.queryItems = [
+            URLQueryItem(name: "subject", value: "Squad Brunch Beta Feedback"),
+            URLQueryItem(name: "body", value: feedbackBody)
+        ]
+        return components.url ?? URL(string: "mailto:support@squadbrunch.app")!
+    }
+
+    private var feedbackBody: String {
+        """
+
+
+        ---
+        App: Squad Brunch \(appVersion)
+        User ID: \(auth.profile?.id.uuidString ?? "unknown")
+        Display Name: \(auth.profile?.displayName ?? "unknown")
+        iOS: \(UIDevice.current.systemVersion)
+        Device: \(UIDevice.current.model)
+        """
     }
 
     private func loadPrefs() async {
