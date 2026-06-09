@@ -38,6 +38,13 @@ jobs:
           git config --global url."https://x-access-token:${{ secrets.MATCH_GIT_TOKEN }}@github.com/".insteadOf "https://github.com/"
           git config --global url."https://github.com/".insteadOf "git@github.com:"
 
+      - name: Write Secrets.xcconfig from secrets
+        run: |
+          cat > Secrets.xcconfig <<EOF
+          GOOGLE_PLACES_API_KEY = ${{ secrets.GOOGLE_PLACES_API_KEY }}
+          TICKETMASTER_API_KEY = ${{ secrets.TICKETMASTER_API_KEY }}
+          EOF
+
       - name: Regenerate profiles (enable Push + match --force)
         env:
           MATCH_GIT_URL: ${{ secrets.MATCH_GIT_URL }}

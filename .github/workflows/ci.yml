@@ -40,6 +40,9 @@ jobs:
         run: |
           git config --global url."https://github.com/".insteadOf "git@github.com:"
 
+      - name: Write placeholder Secrets.xcconfig
+        run: cp Secrets.example.xcconfig Secrets.xcconfig
+
       - name: Build
         shell: bash
         run: |
