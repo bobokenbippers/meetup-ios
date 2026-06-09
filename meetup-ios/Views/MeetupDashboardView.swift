@@ -547,7 +547,11 @@ struct MeetupDashboardView: View {
         isGeneratingShareLink = true
         do {
             let token = try await MeetupService.shared.ensureShareToken(for: meetup)
-            let urlString = "https://boyrqhbdkqzffvfokpri.supabase.co/functions/v1/join-meetup/\(token)"
+            // Deep link into the app via the registered custom URL scheme (see Info.plist
+            // CFBundleURLTypes). Must NOT be a raw Supabase API/Edge-Function URL — opening
+            // that in a browser sends no auth header and Supabase returns
+            // UNAUTHORIZED_NO_AUTH_HEADER. The app's onOpenURL handler routes this to JoinMeetupSheet.
+            let urlString = "squadbrunch://join/\(token)"
             if let url = URL(string: urlString) {
                 shareURL = url
             }
