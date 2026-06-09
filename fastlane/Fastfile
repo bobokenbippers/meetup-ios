@@ -16,17 +16,11 @@ platform :ios do
     match(type: "appstore", readonly: is_ci)
   end
 
-  desc "Enable the Push Notifications capability on the App ID and force-regenerate the App Store profile"
+  # Prerequisite: the Push Notifications capability must already be enabled on
+  # the App ID in the Apple Developer portal. (produce can't do it in CI — it
+  # falls back to interactive Apple-ID 2FA auth, which the API key can't satisfy.)
+  desc "Force-regenerate the App Store profile so it picks up the App ID's capabilities"
   lane :regen_profiles do
-    produce(
-      username: ENV["APPLE_ID"],
-      team_id: "KLT4S6K9X8",
-      app_identifier: "gautamlgtm.meetup-ios",
-      skip_itc: true,
-      enable_services: {
-        push_notification: "on"
-      }
-    )
     match(type: "appstore", force: true, readonly: false)
   end
 
