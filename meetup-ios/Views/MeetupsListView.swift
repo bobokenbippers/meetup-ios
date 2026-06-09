@@ -65,6 +65,7 @@ struct MeetupsListView: View {
     @State private var cachedPastByCategory: [(key: String, value: [MyParticipation])] = []
     @Environment(AuthViewModel.self) private var auth
     @Environment(NavigationState.self) private var navState
+    @Environment(\.scenePhase) private var scenePhase
 
     private func isVisible(_ p: MyParticipation) -> Bool {
         !deletedMeetupIds.contains(p.meetup.id) && !permanentlyHiddenIds.contains(p.meetup.id)
@@ -159,6 +160,14 @@ struct MeetupsListView: View {
                 await subscribeToInviteChanges()
             }
             .refreshable { await load() }
+            .onChange(of: scenePhase) { _, phase in
+                // postgres_changes never replays events missed while the socket was
+                // suspended (app backgrounded), and `.task` does not re-run on a warm
+                // foreground — so an invite that arrived while backgrounded would only
+                // surface on manual pull-to-refresh. Reload on foreground so it appears
+                // promptly instead.
+                if phase == .active { Task { await load() } }
+            }
             .onChange(of: deletedMeetupIds) { _, _ in saveHiddenIds(); cachedPastByCategory = buildPastByCategory() }
             .onChange(of: permanentlyHiddenIds) { _, _ in saveHiddenIds(); cachedPastByCategory = buildPastByCategory() }
             .alert("Error", isPresented: Binding(get: { error != nil }, set: { if !$0 { error = nil } })) {
@@ -364,18 +373,44 @@ struct MeetupsListView: View {
 
     private func subscribeToInviteChanges() async {
         guard let userId = SupabaseManager.shared.client.auth.currentUser?.id else { return }
-        let channel = SupabaseManager.shared.client.realtimeV2.channel("my-participations-\(userId)")
-        let changes = channel.postgresChange(AnyAction.self, schema: "public", table: "meetup_participants")
-        do {
-            try await channel.subscribeWithError()
-        } catch {
-            return
-        }
-        for await _ in changes {
-            guard !Task.isCancelled else { break }
+
+        // Reconnect loop: a transient subscribe failure or a dropped stream used to
+        // leave the feed permanently silent (the old code returned on the first
+        // error and never re-subscribed), so incoming invites only resurfaced on a
+        // manual pull-to-refresh — the "big delay" recipients reported. Re-subscribe
+        // until the owning .task is cancelled (view torn down).
+        while !Task.isCancelled {
+            let channel = SupabaseManager.shared.client.realtimeV2.channel("my-participations-\(userId)")
+            // Scope to this user's own participant rows so a freshly-inserted
+            // "invited" row (user_id == me) pushes live, without waking the feed on
+            // unrelated participant churn in meetups this user merely hosts.
+            let changes = channel.postgresChange(
+                AnyAction.self,
+                schema: "public",
+                table: "meetup_participants",
+                filter: "user_id=eq.\(userId.uuidString.lowercased())"
+            )
+            do {
+                try await channel.subscribeWithError()
+            } catch is CancellationError {
+                await SupabaseManager.shared.client.realtimeV2.removeChannel(channel)
+                return
+            } catch {
+                await SupabaseManager.shared.client.realtimeV2.removeChannel(channel)
+                do { try await Task.sleep(for: .seconds(2)) } catch { return }
+                continue
+            }
+
+            // Reload once the subscription is live to catch any invite that landed in
+            // the gap between the initial load and the channel becoming ready.
             await load()
+
+            for await _ in changes {
+                guard !Task.isCancelled else { break }
+                await load()
+            }
+            await SupabaseManager.shared.client.realtimeV2.removeChannel(channel)
         }
-        await SupabaseManager.shared.client.realtimeV2.removeChannel(channel)
     }
 
     private func deleteParticipations(_ array: [MyParticipation], at indices: IndexSet) async {
