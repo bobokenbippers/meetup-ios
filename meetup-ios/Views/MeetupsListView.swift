@@ -57,6 +57,7 @@ struct MeetupsListView: View {
     @State private var hasLoaded = false
     @State private var error: String?
     @State private var showCreate = false
+    @State private var eventPrefill: EventPrefill?
     @State private var selectedMeetup: Meetup?
     @State private var selectedRecap: MyParticipation?
     @State private var deletedMeetupIds: Set<UUID> = []
@@ -120,7 +121,13 @@ struct MeetupsListView: View {
                     ProgressView()
                         .tint(Color.coral)
                 } else if invited.isEmpty && active.isEmpty && past.isEmpty && deleted.isEmpty {
-                    MeetupsEmptyState { showCreate = true }
+                    ScrollView {
+                        VStack(spacing: 0) {
+                            NearbyEventsView(onSelect: openCreate(prefill:))
+                            MeetupsEmptyState { showCreate = true }
+                                .frame(minHeight: 480)
+                        }
+                    }
                 } else {
                     meetupsList
                 }
@@ -143,8 +150,8 @@ struct MeetupsListView: View {
                 .accessibilityLabel("Create Meetup")
                 .accessibilityIdentifier("btn_create_meetup")
             }
-            .sheet(isPresented: $showCreate, onDismiss: { Task { await load() } }) {
-                CreateMeetupView()
+            .sheet(isPresented: $showCreate, onDismiss: { eventPrefill = nil; Task { await load() } }) {
+                CreateMeetupView(prefill: eventPrefill)
             }
             .sheet(item: $selectedMeetup) { meetup in
                 MeetupDashboardView(meetup: meetup)
@@ -181,6 +188,11 @@ struct MeetupsListView: View {
                 .listRowBackground(Color.clear)
                 .listRowSeparator(.hidden)
                 .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
+
+            NearbyEventsView(onSelect: openCreate(prefill:))
+                .listRowBackground(Color.clear)
+                .listRowSeparator(.hidden)
+                .listRowInsets(EdgeInsets(top: 0, leading: 0, bottom: 8, trailing: 0))
 
             if !invited.isEmpty {
                 Section {
@@ -326,6 +338,11 @@ struct MeetupsListView: View {
                 }
             }
         }
+    }
+
+    private func openCreate(prefill: EventPrefill) {
+        eventPrefill = prefill
+        showCreate = true
     }
 
     // MARK: - Data

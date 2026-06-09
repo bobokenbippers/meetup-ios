@@ -46,6 +46,25 @@ struct CreateMeetupView: View {
     @State private var showingCustomCategory = false
     @State private var error: String?
 
+    /// Opens blank by default; pass a `prefill` (e.g. from a tapped nearby-event card)
+    /// to seed the destination, time, and category from a real event.
+    init(prefill: EventPrefill? = nil) {
+        guard let prefill else { return }
+        let effectiveTime = prefill.date ?? CreateMeetupView.defaultPickerTime
+        let hour = Calendar.current.component(.hour, from: effectiveTime)
+        _selectedPlace = State(initialValue: prefill.place)
+        _setTargetTime = State(initialValue: prefill.date != nil)
+        _targetTime = State(initialValue: effectiveTime)
+        _pickerHour = State(initialValue: hour % 12 == 0 ? 12 : hour % 12)
+        _pickerMinute = State(initialValue: Calendar.current.component(.minute, from: effectiveTime))
+        _pickerAmPm = State(initialValue: hour < 12 ? 0 : 1)
+
+        let isPreset = CategoryOption.presets.contains { $0.title == prefill.title }
+        _selectedCategory = State(initialValue: prefill.title)
+        _customCategoryText = State(initialValue: isPreset ? "" : prefill.title)
+        _showingCustomCategory = State(initialValue: !isPreset)
+    }
+
     var body: some View {
         NavigationStack {
             Form {
