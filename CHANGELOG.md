@@ -27,6 +27,7 @@ Please test:
 ### Fixed
 - Invitees can see the meetup host/sender in the participant roster after accepting an invite.
 - Missing host participant rows are backfilled so older meetups can render the inviter.
+- Settings feedback now sends to `gautam.pappu@utexas.edu` instead of the unregistered `support@squadbrunch.app` address.
 - Event suggestions can request location correctly after authorization by adding required iOS location usage strings and a one-shot location fetch.
 - Event suggestions no longer disappear when location permission is pending or unavailable; the Meetups tab now shows a clear location prompt or empty state.
 - Event suggestion API configuration is now included in the app target build settings so release builds can read it reliably.

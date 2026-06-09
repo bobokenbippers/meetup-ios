@@ -216,12 +216,12 @@ struct SettingsView: View {
     private var feedbackURL: URL {
         var components = URLComponents()
         components.scheme = "mailto"
-        components.path = "support@squadbrunch.app"
+        components.path = "gautam.pappu@utexas.edu"
         components.queryItems = [
             URLQueryItem(name: "subject", value: "Squad Brunch Beta Feedback"),
             URLQueryItem(name: "body", value: feedbackBody)
         ]
-        return components.url ?? URL(string: "mailto:support@squadbrunch.app")!
+        return components.url ?? URL(string: "mailto:gautam.pappu@utexas.edu")!
     }
 
     private var feedbackBody: String {
