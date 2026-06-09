@@ -665,22 +665,6 @@ instead of **Add**, via `MeetupService.friendshipStatus(with:)`.
 > Per-row inserts isolate a gate rejection to just that invitee. (Fixed in
 > `fix/invites-not-surfacing`.)
 
-> **Invite delivery latency (live feed):** `MeetupsListView` subscribes to
-> `postgres_changes` on `meetup_participants` (channel `my-participations-<userId>`),
-> scoped with `filter: "user_id=eq.<userId>"` so a freshly-inserted `"invited"` row for
-> the recipient pushes live. `meetup_participants` **is already a member of the
-> `supabase_realtime` publication** (verified against the project DB) and the
-> `participants_select` policy (`auth.uid() = user_id OR is_meetup_host(meetup_id)`)
-> lets the recipient see their own row, so Realtime delivers it — **no publication or RLS
-> change is required.** The reported delay was purely client-side refresh: the old
-> subscription returned permanently on the first transient error (no reconnect), and
-> `postgres_changes` never replays events missed while the socket is suspended
-> (app backgrounded), while `.task` does not re-run on a warm foreground. Fixes:
-> a reconnect loop around the subscription (explicitly catching `CancellationError` for
-> clean teardown) plus a `scenePhase == .active` reload so invites that arrived while
-> backgrounded surface immediately instead of only on pull-to-refresh. (Fixed in
-> `fix/invites-not-surfacing`.)
-
 ### M2.2 Profile Phone Number Setup
 
 Add a "complete your profile" flow that runs after first sign-in if `phone_e164` is null. Create `MeetupTracker/Views/ProfileSetupView.swift`:
