@@ -66,6 +66,7 @@ final class LocationManager: NSObject {
     private var uploadTask: Task<Void, Never>?
     private var expiryTimer: Timer?
     private(set) var location: CLLocation?
+    private(set) var authorizationStatus: CLAuthorizationStatus = .notDetermined
     private var motionMode: MotionMode = .unknown
     private(set) var currentTier: LocationTier = .stationary
 
@@ -74,6 +75,7 @@ final class LocationManager: NSObject {
     override private init() {
         super.init()
         clManager.delegate = self
+        authorizationStatus = clManager.authorizationStatus
         applyTier(.stationary)
     }
 
@@ -87,8 +89,17 @@ final class LocationManager: NSObject {
     func requestOneShotLocation() {
         guard location == nil else { return }
         let status = clManager.authorizationStatus
-        guard status == .authorizedWhenInUse || status == .authorizedAlways else { return }
-        clManager.requestLocation()
+        authorizationStatus = status
+        switch status {
+        case .notDetermined:
+            clManager.requestWhenInUseAuthorization()
+        case .authorizedWhenInUse, .authorizedAlways:
+            clManager.requestLocation()
+        case .denied, .restricted:
+            return
+        @unknown default:
+            return
+        }
     }
 
     func startTracking(meetup: Meetup) {
@@ -224,6 +235,7 @@ extension LocationManager: CLLocationManagerDelegate {
     }
 
     func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
+        authorizationStatus = manager.authorizationStatus
         guard location == nil else { return }
         let status = manager.authorizationStatus
         guard status == .authorizedWhenInUse || status == .authorizedAlways else { return }
