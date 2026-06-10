@@ -1,14 +1,8 @@
 name: CodeQL
 
+# Never runs on PRs — analysis happens on main pushes, the weekly schedule,
+# and on demand via the Actions tab (Run workflow).
 on:
-  pull_request:
-    branches:
-      - main
-    # PRs only run the fast edge-function analysis; Swift analysis is
-    # gated off PRs entirely (see analyze-swift below).
-    paths:
-      - "supabase/functions/**"
-      - ".github/workflows/codeql.yml"
   push:
     branches:
       - main
@@ -33,10 +27,7 @@ concurrency:
 jobs:
   analyze-swift:
     name: Analyze Swift
-    # The Swift analysis needs a full traced rebuild (~30 min on a macOS
-    # runner), so it runs only on pushes to main, the weekly schedule, and
-    # manual dispatch — never on PRs. Edge-function analysis stays on PRs.
-    if: github.event_name != 'pull_request'
+    # Needs a full traced rebuild — ~30 min on a macOS runner.
     runs-on: macos-26
     timeout-minutes: 45
 
