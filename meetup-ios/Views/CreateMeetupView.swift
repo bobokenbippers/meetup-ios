@@ -357,6 +357,8 @@ private struct DestinationSection: View {
 private struct InviteSection: View {
     @Binding var invitees: [FoundUser]
 
+    @Environment(AppSettings.self) private var settings
+
     @State private var inviteePhone = ""
     @State private var foundUser: FoundUser?
     @State private var foundUserStatus: FriendshipStatus = .none
@@ -382,6 +384,10 @@ private struct InviteSection: View {
                     .foregroundStyle(.white)
                     .tint(Color.coral)
                     .onChange(of: inviteePhone) { _, v in
+                        guard settings.contactsEnabled else {
+                            contactSuggestions = []
+                            return
+                        }
                         // Single pass — no write-back to inviteePhone, so one render per keystroke.
                         let query: String
                         if v.contains(where: { $0.isLetter }) {
@@ -444,10 +450,22 @@ private struct InviteSection: View {
                 .foregroundStyle(Color(white: 0.4))
                 .textCase(nil)
         }
-        .task { await contactsManager.load() }
+        .task { await loadContactsIfEnabled() }
+        .onChange(of: settings.contactsEnabled) { _, _ in
+            Task { await loadContactsIfEnabled() }
+        }
         .alert("Error", isPresented: Binding(get: { error != nil }, set: { if !$0 { error = nil } })) {
             Button("OK") { error = nil }
         } message: { Text(error ?? "") }
+    }
+
+    private func loadContactsIfEnabled() async {
+        guard settings.contactsEnabled else {
+            contactsManager.clear()
+            contactSuggestions = []
+            return
+        }
+        await contactsManager.load()
     }
 
     @ViewBuilder
