@@ -127,7 +127,7 @@ struct NearbyEventsView: View {
                 Spacer(minLength: 8)
 
                 Button(action: requestLocation) {
-                    Text(locationManager.authorizationStatus == .notDetermined ? "Enable" : "Settings")
+                    Text(locationButtonTitle)
                         .scaledFont(size: 12, weight: .bold)
                         .foregroundStyle(.white)
                         .padding(.horizontal, 12)
@@ -143,6 +143,19 @@ struct NearbyEventsView: View {
             .padding(.horizontal, 16)
         }
         .padding(.vertical, 6)
+    }
+
+    private var locationButtonTitle: String {
+        switch locationManager.authorizationStatus {
+        case .notDetermined:
+            return "Enable"
+        case .authorizedWhenInUse, .authorizedAlways:
+            return "Retry"
+        case .denied, .restricted:
+            return "Settings"
+        @unknown default:
+            return "Settings"
+        }
     }
 
     private var emptyRow: some View {
@@ -207,9 +220,15 @@ struct NearbyEventsView: View {
     private func load() async {
         guard let location = locationManager.location else {
             switch locationManager.authorizationStatus {
-            case .notDetermined, .authorizedWhenInUse, .authorizedAlways:
+            case .notDetermined:
+                phase = .needsLocation
+            case .authorizedWhenInUse, .authorizedAlways:
                 phase = .loading
                 locationManager.requestOneShotLocation()
+                try? await Task.sleep(for: .seconds(4))
+                if !Task.isCancelled, locationManager.location == nil {
+                    phase = .needsLocation
+                }
             case .denied, .restricted:
                 phase = .needsLocation
             @unknown default:
