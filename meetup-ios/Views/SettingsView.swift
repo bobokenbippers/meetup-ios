@@ -134,18 +134,6 @@ struct SettingsView: View {
                             .foregroundStyle(Color(white: 0.55))
                             .listRowBackground(Color.appSurface)
                     }
-
-                    if contactsManager.needsSettingsForAccess {
-                        Button {
-                            if let url = URL(string: UIApplication.openSettingsURLString) {
-                                openURL(url)
-                            }
-                        } label: {
-                            aboutRow("Open iOS Settings", systemImage: "gear")
-                        }
-                        .buttonStyle(.plain)
-                        .listRowBackground(Color.appSurface)
-                    }
                 } header: {
                     sectionHeader("PRIVACY")
                 } footer: {
