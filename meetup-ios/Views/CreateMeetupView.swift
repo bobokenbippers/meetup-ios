@@ -357,15 +357,10 @@ private struct DestinationSection: View {
     private func runSearch() async {
         guard selectedPlace == nil, searchQuery.count >= 2 else { predictions = []; return }
         let q = searchQuery
-        guard GooglePlacesService.shared.isConfigured else {
-            predictions = []
-            searchError = GooglePlacesService.shared.unavailableMessage
-            return
-        }
         let results = await GooglePlacesService.shared.autocomplete(query: q)
         guard !Task.isCancelled, searchQuery == q else { return }
-        searchError = nil
         predictions = results
+        searchError = results.isEmpty ? GooglePlacesService.shared.unavailableMessage : nil
     }
 }
 
