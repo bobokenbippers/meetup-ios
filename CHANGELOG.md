@@ -12,6 +12,8 @@ Please test:
 - Delete one of your own messages.
 - Background the app and confirm DM push notifications open the right place.
 - Open Settings and use Send Feedback to report anything weird.
+- Confirm event suggestions show either events, a location prompt, an empty state, or a retryable error instead of disappearing.
+- Try sending a DM photo and tap retry if an image bubble fails to load.
 
 ### Added
 - Friend direct messages with a Messages tab, inbox, chat threads, realtime updates, unread counts, and push routing.
@@ -37,7 +39,9 @@ Please test:
 - Event suggestions no longer disappear when location permission is pending or unavailable; the Meetups tab now shows a clear location prompt or empty state.
 - Event suggestion API configuration is now included in the app target build settings so release builds can read it reliably.
 - Chat photo selection now reliably prepares the selected image before sending and resizes uploads for faster delivery.
+- Chat photo failures now show inline recovery instead of silent broken/loading states, and message photo links stay valid longer.
 - Open chat threads now refresh while you stay in the conversation, even if realtime misses a message event.
+- Event suggestions now keep the section visible with a retry action when the event provider or network request fails.
 - Auth startup no longer flashes the full meetup UI before Supabase finishes resolving the initial session.
 
 ---
