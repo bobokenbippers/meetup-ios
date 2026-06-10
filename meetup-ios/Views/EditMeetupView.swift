@@ -2,7 +2,7 @@ import SwiftUI
 import CoreLocation
 
 /// Host-only sheet to change an existing meetup's destination and/or scheduled time.
-/// Re-selecting a place via Google Places carries name + address + coordinates together,
+/// Re-selecting a place carries name + address + coordinates together,
 /// so the map pin and directions stay consistent — matching the creation flow. Editing the
 /// time writes target_arrival_at, which the cron push/expiry functions read live.
 struct EditMeetupView: View {
@@ -182,7 +182,7 @@ struct EditMeetupView: View {
 private struct EditDestinationSection: View {
     @Binding var selectedPlace: SelectedPlace?
     @State private var searchQuery = ""
-    @State private var predictions: [GooglePlacePrediction] = []
+    @State private var predictions: [PlaceSearchResult] = []
     @State private var isLoadingDetails = false
 
     var body: some View {
@@ -216,7 +216,7 @@ private struct EditDestinationSection: View {
                         .listRowBackground(Color.appSurface)
                 }
                 ForEach(predictions) { prediction in
-                    Button(action: { Task { await selectPrediction(prediction) } }) {
+                    Button(action: { selectPrediction(prediction) }) {
                         VStack(alignment: .leading, spacing: 2) {
                             Text(prediction.mainText).foregroundStyle(.white)
                             if !prediction.secondaryText.isEmpty {
@@ -240,19 +240,17 @@ private struct EditDestinationSection: View {
         }
     }
 
-    private func selectPrediction(_ prediction: GooglePlacePrediction) async {
-        isLoadingDetails = true
+    private func selectPrediction(_ prediction: PlaceSearchResult) {
         predictions = []
-        if let place = await GooglePlacesService.shared.details(for: prediction) {
-            selectedPlace = place
-        }
-        isLoadingDetails = false
+        selectedPlace = prediction.place
     }
 
     private func runSearch() async {
         guard selectedPlace == nil, searchQuery.count >= 2 else { predictions = []; return }
         let q = searchQuery
-        let results = await GooglePlacesService.shared.autocomplete(query: q)
+        isLoadingDetails = true
+        defer { isLoadingDetails = false }
+        let results = await PlaceSearchService.shared.search(query: q, near: LocationManager.shared.location)
         guard !Task.isCancelled, searchQuery == q else { return }
         predictions = results
     }

@@ -41,9 +41,9 @@ jobs:
       - name: Write Secrets.xcconfig from secrets
         run: |
           cat > Secrets.xcconfig <<EOF
-          GOOGLE_PLACES_API_KEY = ${{ secrets.GOOGLE_PLACES_API_KEY }}
           TICKETMASTER_API_KEY = ${{ secrets.TICKETMASTER_API_KEY }}
           EOF
+          test -n "${{ secrets.TICKETMASTER_API_KEY }}" || (echo "TICKETMASTER_API_KEY is required for TestFlight builds" && exit 1)
 
       - name: Regenerate profiles (enable Push + match --force)
         env:

@@ -273,7 +273,7 @@ struct CreateMeetupView: View {
 private struct DestinationSection: View {
     @Binding var selectedPlace: SelectedPlace?
     @State private var searchQuery = ""
-    @State private var predictions: [GooglePlacePrediction] = []
+    @State private var predictions: [PlaceSearchResult] = []
     @State private var isLoadingDetails = false
 
     var body: some View {
@@ -307,7 +307,7 @@ private struct DestinationSection: View {
                         .listRowBackground(Color.appSurface)
                 }
                 ForEach(predictions) { prediction in
-                    Button(action: { Task { await selectPrediction(prediction) } }) {
+                    Button(action: { selectPrediction(prediction) }) {
                         VStack(alignment: .leading, spacing: 2) {
                             Text(prediction.mainText).foregroundStyle(.white)
                             if !prediction.secondaryText.isEmpty {
@@ -331,19 +331,17 @@ private struct DestinationSection: View {
         }
     }
 
-    private func selectPrediction(_ prediction: GooglePlacePrediction) async {
-        isLoadingDetails = true
+    private func selectPrediction(_ prediction: PlaceSearchResult) {
         predictions = []
-        if let place = await GooglePlacesService.shared.details(for: prediction) {
-            selectedPlace = place
-        }
-        isLoadingDetails = false
+        selectedPlace = prediction.place
     }
 
     private func runSearch() async {
         guard selectedPlace == nil, searchQuery.count >= 2 else { predictions = []; return }
         let q = searchQuery
-        let results = await GooglePlacesService.shared.autocomplete(query: q)
+        isLoadingDetails = true
+        defer { isLoadingDetails = false }
+        let results = await PlaceSearchService.shared.search(query: q, near: LocationManager.shared.location)
         guard !Task.isCancelled, searchQuery == q else { return }
         predictions = results
     }
@@ -382,15 +380,7 @@ private struct InviteSection: View {
                     .foregroundStyle(.white)
                     .tint(Color.coral)
                     .onChange(of: inviteePhone) { _, v in
-                        // Single pass — no write-back to inviteePhone, so one render per keystroke.
-                        let query: String
-                        if v.contains(where: { $0.isLetter }) {
-                            query = v
-                        } else {
-                            let raw = v.hasPrefix("+1") ? String(v.dropFirst(2)) : v
-                            query = raw.filter(\.isNumber)
-                        }
-                        contactSuggestions = query.isEmpty ? [] : Array(contactsManager.search(query).prefix(5))
+                        refreshContactSuggestions(for: v)
                     }
                 if isSearchingUser {
                     ProgressView()
@@ -444,7 +434,10 @@ private struct InviteSection: View {
                 .foregroundStyle(Color(white: 0.4))
                 .textCase(nil)
         }
-        .task { await contactsManager.load() }
+        .task {
+            await contactsManager.load(requestsAccess: false)
+            refreshContactSuggestions(for: inviteePhone)
+        }
         .alert("Error", isPresented: Binding(get: { error != nil }, set: { if !$0 { error = nil } })) {
             Button("OK") { error = nil }
         } message: { Text(error ?? "") }
@@ -486,6 +479,18 @@ private struct InviteSection: View {
         case .pendingIncoming: return "They sent you a friend request — accept it to invite them."
         case .none: return "You can only invite friends. Send a request first; they'll be invitable once accepted."
         }
+    }
+
+    private func refreshContactSuggestions(for value: String) {
+        // Single pass with no write-back to inviteePhone, so typing causes one render per keystroke.
+        let query: String
+        if value.contains(where: { $0.isLetter }) {
+            query = value
+        } else {
+            let raw = value.hasPrefix("+1") ? String(value.dropFirst(2)) : value
+            query = raw.filter(\.isNumber)
+        }
+        contactSuggestions = query.isEmpty ? [] : Array(contactsManager.search(query).prefix(5))
     }
 
     private func searchUser() async {

@@ -8,7 +8,6 @@
 
 /* Begin PBXBuildFile section */
 		BA2864C12FB8EFBE00BD5B1C /* Supabase in Frameworks */ = {isa = PBXBuildFile; productRef = BA2864C02FB8EFBE00BD5B1C /* Supabase */; };
-		BA777700000100009C8E0001 /* GooglePlacesSwift in Frameworks */ = {isa = PBXBuildFile; productRef = BA777700000100009C8E0003 /* GooglePlacesSwift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -73,7 +72,6 @@
 			buildActionMask = 2147483647;
 			files = (
 				BA2864C12FB8EFBE00BD5B1C /* Supabase in Frameworks */,
-				BA777700000100009C8E0001 /* GooglePlacesSwift in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -146,7 +144,6 @@
 			name = "meetup-ios";
 			packageProductDependencies = (
 				BA2864C02FB8EFBE00BD5B1C /* Supabase */,
-				BA777700000100009C8E0003 /* GooglePlacesSwift */,
 			);
 			productName = "meetup-ios";
 			productReference = BA2864B12FB8EFA000BD5B1C /* meetup-ios.app */;
@@ -228,7 +225,6 @@
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
 				BA53CC082FB8F39F00A19C8E /* XCRemoteSwiftPackageReference "supabase-swift" */,
-				BA777700000100009C8E0002 /* XCRemoteSwiftPackageReference "ios-places-sdk" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = BA2864B22FB8EFA000BD5B1C /* Products */;
@@ -471,8 +467,6 @@
 				INFOPLIST_KEY_NSContactsUsageDescription = "Used to find which of your contacts are on this app so you can add them as friends or invite them to meetups.";
 				INFOPLIST_KEY_NSLocationAlwaysAndWhenInUseUsageDescription = "Your location is shared in the background during a meetup so participants can track your arrival even when the app is closed.";
 				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Your location is shared with meetup participants so everyone can see who's on their way and when they'll arrive.";
-				INFOPLIST_KEY_GooglePlacesAPIKey = "$(GOOGLE_PLACES_API_KEY)";
-				INFOPLIST_KEY_TicketmasterAPIKey = "$(TICKETMASTER_API_KEY)";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -515,8 +509,6 @@
 				INFOPLIST_KEY_NSContactsUsageDescription = "Used to find which of your contacts are on this app so you can add them as friends or invite them to meetups.";
 				INFOPLIST_KEY_NSLocationAlwaysAndWhenInUseUsageDescription = "Your location is shared in the background during a meetup so participants can track your arrival even when the app is closed.";
 				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Your location is shared with meetup participants so everyone can see who's on their way and when they'll arrive.";
-				INFOPLIST_KEY_GooglePlacesAPIKey = "$(GOOGLE_PLACES_API_KEY)";
-				INFOPLIST_KEY_TicketmasterAPIKey = "$(TICKETMASTER_API_KEY)";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -655,14 +647,6 @@
 				minimumVersion = 2.5.1;
 			};
 		};
-		BA777700000100009C8E0002 /* XCRemoteSwiftPackageReference "ios-places-sdk" */ = {
-			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/googlemaps/ios-places-sdk";
-			requirement = {
-				kind = upToNextMajorVersion;
-				minimumVersion = 9.0.0;
-			};
-		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -670,11 +654,6 @@
 			isa = XCSwiftPackageProductDependency;
 			package = BA53CC082FB8F39F00A19C8E /* XCRemoteSwiftPackageReference "supabase-swift" */;
 			productName = Supabase;
-		};
-		BA777700000100009C8E0003 /* GooglePlacesSwift */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = BA777700000100009C8E0002 /* XCRemoteSwiftPackageReference "ios-places-sdk" */;
-			productName = GooglePlacesSwift;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

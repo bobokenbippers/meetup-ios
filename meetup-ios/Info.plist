@@ -39,6 +39,8 @@
 	<string>Squad Brunch uses background location only during active meetups so friends can see your live ETA.</string>
 	<key>NSMotionUsageDescription</key>
 	<string>Used to adapt location updates to save battery during active meetups.</string>
+	<key>TicketmasterAPIKey</key>
+	<string>$(TICKETMASTER_API_KEY)</string>
 	<key>LSApplicationQueriesSchemes</key>
 	<array>
 		<string>comgooglemaps</string>
@@ -56,8 +58,8 @@
 			</array>
 		</dict>
 	</array>
-	<!-- TicketmasterAPIKey and GooglePlacesAPIKey are injected at build time from
-	     Secrets.xcconfig (gitignored) via INFOPLIST_KEY_* build settings, so the real
+	<!-- TicketmasterAPIKey is injected at build time from
+	     Secrets.xcconfig (gitignored) via build setting substitution, so the real
 	     keys never live in the repo. See Secrets.example.xcconfig. -->
 </dict>
 </plist>

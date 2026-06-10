@@ -285,7 +285,7 @@ final class MeetupService {
     }
 
     /// Update a meetup's destination. Name/address/coordinates move together so the map
-    /// pin and directions stay consistent — same bundle Google Places returns at creation.
+    /// pin and directions stay consistent with the place selected at creation.
     /// RLS ("host can update meetups") restricts this to the host. Returns the updated row.
     func updateDestination(
         meetupId: UUID,

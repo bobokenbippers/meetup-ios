@@ -14,11 +14,12 @@ final class ContactsManager {
     var contacts: [DeviceContact] = []
     var authStatus: CNAuthorizationStatus = .notDetermined
 
-    func load() async {
+    func load(requestsAccess: Bool = true) async {
         guard contacts.isEmpty else { return }
 
         authStatus = CNContactStore.authorizationStatus(for: .contacts)
         if authStatus == .notDetermined {
+            guard requestsAccess else { return }
             _ = try? await CNContactStore().requestAccess(for: .contacts)
             authStatus = CNContactStore.authorizationStatus(for: .contacts)
         }
@@ -63,9 +64,10 @@ final class ContactsManager {
 
     func search(_ query: String) -> [DeviceContact] {
         guard !query.isEmpty else { return [] }
-        let q = query.lowercased()
+        let q = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !q.isEmpty else { return [] }
         return contacts.filter {
-            $0.displayName.lowercased().contains(q) ||
+            $0.displayName.localizedStandardContains(q) ||
             $0.phones.contains { $0.contains(q) }
         }
     }

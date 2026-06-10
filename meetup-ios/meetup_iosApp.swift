@@ -2,20 +2,12 @@ import SwiftUI
 import UserNotifications
 import CoreLocation
 import Supabase
-import GooglePlacesSwift
 
 class AppDelegate: NSObject, UIApplicationDelegate {
     func application(
         _ application: UIApplication,
         didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
     ) -> Bool {
-        // Google Places key is injected at build time from Secrets.xcconfig
-        // (gitignored) into Info.plist, never hardcoded. Empty in builds without
-        // the secret — Places search simply won't work there.
-        if let placesKey = Bundle.main.object(forInfoDictionaryKey: "GooglePlacesAPIKey") as? String,
-           !placesKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            _ = PlacesClient.provideAPIKey(placesKey)
-        }
         // Force white navigation titles globally — must set all three appearances
         // (standard, compact, scrollEdge) so large titles are white in SwiftUI NavigationStack
         let navAppearance = UINavigationBarAppearance()
