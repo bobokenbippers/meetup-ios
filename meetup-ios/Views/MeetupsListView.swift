@@ -52,41 +52,147 @@ func meetupCategoryEmoji(_ category: String?) -> String {
 
 // MARK: - Meetups List
 
+private enum MeetupsSheet: Identifiable {
+    case create
+    case meetup(Meetup)
+    case recap(MyParticipation)
+    case recapFolder
+
+    var id: String {
+        switch self {
+        case .create:
+            return "create"
+        case .meetup(let meetup):
+            return "meetup-\(meetup.id)"
+        case .recap(let participation):
+            return "recap-\(participation.meetup.id)"
+        case .recapFolder:
+            return "recap-folder"
+        }
+    }
+}
+
+enum MeetupListFilters {
+    static func eventSortDate(_ meetup: Meetup) -> Date {
+        meetup.targetArrivalAt ?? meetup.startsAt
+    }
+
+    static func isExpired(_ participation: MyParticipation, now: Date = Date()) -> Bool {
+        let meetup = participation.meetup
+        if let target = meetup.targetArrivalAt {
+            return now > target.addingTimeInterval(1.5 * 3600)
+        }
+        return meetup.endsAt < now || now > meetup.createdAt.addingTimeInterval(6 * 3600)
+    }
+
+    static func invited(
+        _ participations: [MyParticipation],
+        deletedMeetupIds: Set<UUID> = [],
+        permanentlyHiddenIds: Set<UUID> = [],
+        now: Date = Date()
+    ) -> [MyParticipation] {
+        participations
+            .filter {
+                isVisible($0, deletedMeetupIds: deletedMeetupIds, permanentlyHiddenIds: permanentlyHiddenIds) &&
+                $0.status == "invited" &&
+                $0.meetup.status == "active" &&
+                !isExpired($0, now: now)
+            }
+            .sorted { eventSortDate($0.meetup) < eventSortDate($1.meetup) }
+    }
+
+    static func active(
+        _ participations: [MyParticipation],
+        deletedMeetupIds: Set<UUID> = [],
+        permanentlyHiddenIds: Set<UUID> = [],
+        now: Date = Date()
+    ) -> [MyParticipation] {
+        participations
+            .filter {
+                isVisible($0, deletedMeetupIds: deletedMeetupIds, permanentlyHiddenIds: permanentlyHiddenIds) &&
+                $0.status != "invited" &&
+                $0.meetup.status == "active" &&
+                !isExpired($0, now: now)
+            }
+            .sorted { eventSortDate($0.meetup) < eventSortDate($1.meetup) }
+    }
+
+    static func past(
+        _ participations: [MyParticipation],
+        deletedMeetupIds: Set<UUID> = [],
+        permanentlyHiddenIds: Set<UUID> = [],
+        now: Date = Date()
+    ) -> [MyParticipation] {
+        participations.filter {
+            isVisible($0, deletedMeetupIds: deletedMeetupIds, permanentlyHiddenIds: permanentlyHiddenIds) &&
+            (($0.meetup.status != "active" && $0.meetup.status != "cancelled") ||
+             ($0.meetup.status == "active" && isExpired($0, now: now)))
+        }
+    }
+
+    static func pastByCategory(_ past: [MyParticipation]) -> [(key: String, value: [MyParticipation])] {
+        let grouped = Dictionary(grouping: past) { $0.meetup.category ?? "" }
+        return grouped
+            .sorted { a, b in
+                if a.key.isEmpty { return false }
+                if b.key.isEmpty { return true }
+                let aLatest = a.value.map { eventSortDate($0.meetup) }.max() ?? .distantPast
+                let bLatest = b.value.map { eventSortDate($0.meetup) }.max() ?? .distantPast
+                return aLatest > bLatest
+            }
+            .map { key, value in
+                let sorted = value.sorted {
+                    eventSortDate($0.meetup) > eventSortDate($1.meetup)
+                }
+                return (key: key, value: sorted)
+            }
+    }
+
+    private static func isVisible(
+        _ participation: MyParticipation,
+        deletedMeetupIds: Set<UUID>,
+        permanentlyHiddenIds: Set<UUID>
+    ) -> Bool {
+        !deletedMeetupIds.contains(participation.meetup.id) &&
+        !permanentlyHiddenIds.contains(participation.meetup.id)
+    }
+}
+
 struct MeetupsListView: View {
     @State private var participations: [MyParticipation] = []
     @State private var hasLoaded = false
     @State private var error: String?
-    @State private var showCreate = false
     @State private var eventPrefill: EventPrefill?
-    @State private var selectedMeetup: Meetup?
-    @State private var selectedRecap: MyParticipation?
+    @State private var presentedSheet: MeetupsSheet?
     @State private var deletedMeetupIds: Set<UUID> = []
     @State private var permanentlyHiddenIds: Set<UUID> = []
-    // Memoized: dictionary-group + sort runs only when participations/hidden sets change.
-    @State private var cachedPastByCategory: [(key: String, value: [MyParticipation])] = []
     @Environment(AuthViewModel.self) private var auth
     @Environment(NavigationState.self) private var navState
 
-    private func isVisible(_ p: MyParticipation) -> Bool {
-        !deletedMeetupIds.contains(p.meetup.id) && !permanentlyHiddenIds.contains(p.meetup.id)
+    private var invited: [MyParticipation] {
+        MeetupListFilters.invited(
+            participations,
+            deletedMeetupIds: deletedMeetupIds,
+            permanentlyHiddenIds: permanentlyHiddenIds
+        )
     }
 
-    private var invited: [MyParticipation] {
-        participations.filter { isVisible($0) && $0.status == "invited" && $0.meetup.status == "active" }
-    }
-    private func isExpired(_ p: MyParticipation) -> Bool {
-        p.meetup.endsAt.addingTimeInterval(2 * 3600) < Date()
-    }
     private var active: [MyParticipation] {
-        participations.filter { isVisible($0) && $0.status != "invited" && $0.meetup.status == "active" && !isExpired($0) }
+        MeetupListFilters.active(
+            participations,
+            deletedMeetupIds: deletedMeetupIds,
+            permanentlyHiddenIds: permanentlyHiddenIds
+        )
     }
+
     private var past: [MyParticipation] {
-        participations.filter {
-            isVisible($0) &&
-            (($0.meetup.status != "active" && $0.meetup.status != "cancelled") ||
-             ($0.meetup.status == "active" && isExpired($0)))
-        }
+        MeetupListFilters.past(
+            participations,
+            deletedMeetupIds: deletedMeetupIds,
+            permanentlyHiddenIds: permanentlyHiddenIds
+        )
     }
+
     private var deleted: [MyParticipation] {
         participations.filter {
             deletedMeetupIds.contains($0.meetup.id) &&
@@ -95,23 +201,12 @@ struct MeetupsListView: View {
         }
     }
 
-    private func buildPastByCategory() -> [(key: String, value: [MyParticipation])] {
-        let grouped = Dictionary(grouping: past) { $0.meetup.category ?? "" }
-        return grouped
-            .sorted { a, b in
-                if a.key.isEmpty { return false }
-                if b.key.isEmpty { return true }
-                let aLatest = a.value.compactMap { $0.meetup.targetArrivalAt }.max() ?? .distantPast
-                let bLatest = b.value.compactMap { $0.meetup.targetArrivalAt }.max() ?? .distantPast
-                return aLatest > bLatest
-            }
-            .map { key, value in
-                let sorted = value.sorted {
-                    ($0.meetup.targetArrivalAt ?? $0.meetup.createdAt) >
-                    ($1.meetup.targetArrivalAt ?? $1.meetup.createdAt)
-                }
-                return (key: key, value: sorted)
-            }
+    private var liveMeetupsForCreate: [Meetup] {
+        (invited + active).map(\.meetup)
+    }
+
+    private var pastByCategory: [(key: String, value: [MyParticipation])] {
+        MeetupListFilters.pastByCategory(past)
     }
 
     var body: some View {
@@ -124,7 +219,7 @@ struct MeetupsListView: View {
                     ScrollView {
                         VStack(spacing: 0) {
                             NearbyEventsView(onSelect: openCreate(prefill:))
-                            MeetupsEmptyState { showCreate = true }
+                            MeetupsEmptyState { presentedSheet = .create }
                                 .frame(minHeight: 480)
                         }
                     }
@@ -138,7 +233,7 @@ struct MeetupsListView: View {
             .navigationTitle("")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                Button(action: { showCreate = true }) {
+                Button(action: { presentedSheet = .create }) {
                     Image(systemName: "plus")
                         .scaledFont(size: 17, weight: .semibold)
                         .foregroundStyle(.white)
@@ -150,15 +245,20 @@ struct MeetupsListView: View {
                 .accessibilityLabel("Create Meetup")
                 .accessibilityIdentifier("btn_create_meetup")
             }
-            .sheet(isPresented: $showCreate, onDismiss: { eventPrefill = nil; Task { await load() } }) {
-                CreateMeetupView(prefill: eventPrefill)
-            }
-            .sheet(item: $selectedMeetup) { meetup in
-                MeetupDashboardView(meetup: meetup)
-            }
-            .sheet(item: $selectedRecap) { p in
-                RecapView(meetup: p.meetup)
-                    .environment(auth)
+            .sheet(item: $presentedSheet, onDismiss: handleSheetDismiss) { sheet in
+                switch sheet {
+                case .create:
+                    CreateMeetupView(prefill: eventPrefill, liveMeetups: liveMeetupsForCreate)
+                case .meetup(let meetup):
+                    MeetupDashboardView(meetup: meetup)
+                case .recap(let participation):
+                    RecapView(meetup: participation.meetup)
+                        .environment(auth)
+                case .recapFolder:
+                    RecapFolderView(groups: pastByCategory) { participation in
+                        presentedSheet = .recap(participation)
+                    }
+                }
             }
             .task {
                 loadHiddenIds()
@@ -166,8 +266,8 @@ struct MeetupsListView: View {
                 await subscribeToInviteChanges()
             }
             .refreshable { await load() }
-            .onChange(of: deletedMeetupIds) { _, _ in saveHiddenIds(); cachedPastByCategory = buildPastByCategory() }
-            .onChange(of: permanentlyHiddenIds) { _, _ in saveHiddenIds(); cachedPastByCategory = buildPastByCategory() }
+            .onChange(of: deletedMeetupIds) { _, _ in saveHiddenIds() }
+            .onChange(of: permanentlyHiddenIds) { _, _ in saveHiddenIds() }
             .alert("Error", isPresented: Binding(get: { error != nil }, set: { if !$0 { error = nil } })) {
                 Button("OK") { error = nil }
             } message: {
@@ -187,19 +287,14 @@ struct MeetupsListView: View {
                 .foregroundStyle(.white)
                 .listRowBackground(Color.clear)
                 .listRowSeparator(.hidden)
-                .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
-
-            NearbyEventsView(onSelect: openCreate(prefill:))
-                .listRowBackground(Color.clear)
-                .listRowSeparator(.hidden)
-                .listRowInsets(EdgeInsets(top: 0, leading: 0, bottom: 8, trailing: 0))
+                .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 8, trailing: 16))
 
             if !invited.isEmpty {
                 Section {
                     ForEach(invited, id: \.meetup.id) { p in
                         RSVPInviteCard(
                             participation: p,
-                            onOpen: { selectedMeetup = p.meetup },
+                            onOpen: { presentedSheet = .meetup(p.meetup) },
                             onRespond: { status in await rsvp(p, status: status) }
                         )
                         .accessibilityLabel("RSVP to \(p.meetup.destinationName)")
@@ -226,7 +321,7 @@ struct MeetupsListView: View {
             if !active.isEmpty {
                 Section {
                     ForEach(active, id: \.meetup.id) { p in
-                        Button { selectedMeetup = p.meetup } label: {
+                        Button { presentedSheet = .meetup(p.meetup) } label: {
                             MeetupRowCard(participation: p)
                         }
                         .buttonStyle(.plain)
@@ -242,27 +337,29 @@ struct MeetupsListView: View {
                 .listSectionSeparator(.hidden)
             }
 
-            ForEach(cachedPastByCategory, id: \.key) { group in
+            if !past.isEmpty {
                 Section {
-                    ForEach(group.value, id: \.meetup.id) { p in
-                        Button {
-                            if p.meetup.isRecap {
-                                selectedRecap = p
-                            } else {
-                                selectedMeetup = p.meetup
+                    Button { presentedSheet = .recapFolder } label: {
+                        RecapFolderCard(recapCount: past.count, latestMeetup: past.sorted {
+                            MeetupListFilters.eventSortDate($0.meetup) > MeetupListFilters.eventSortDate($1.meetup)
+                        }.first?.meetup)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Open recaps")
+                    .listRowBackground(Color.clear)
+                    .listRowSeparator(.hidden)
+                    .listRowInsets(EdgeInsets(top: 5, leading: 16, bottom: 5, trailing: 16))
+                    .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                        Button(role: .destructive) {
+                            for participation in past {
+                                deletedMeetupIds.insert(participation.meetup.id)
                             }
                         } label: {
-                            MeetupRowCard(participation: p)
+                            Label("Hide", systemImage: "archivebox")
                         }
-                        .buttonStyle(.plain)
-                        .accessibilityLabel("Open \(p.meetup.destinationName)")
-                        .listRowBackground(Color.clear)
-                        .listRowSeparator(.hidden)
-                        .listRowInsets(EdgeInsets(top: 5, leading: 16, bottom: 5, trailing: 16))
                     }
-                    .onDelete { indices in Task { await deleteParticipations(group.value, at: indices) } }
                 } header: {
-                    sectionHeader(group.key.isEmpty ? "Past" : group.key)
+                    sectionHeader("Recaps")
                 }
                 .listSectionSeparator(.hidden)
             }
@@ -277,6 +374,7 @@ struct MeetupsListView: View {
                                 .font(.caption.weight(.semibold))
                                 .foregroundStyle(Color.coral)
                         }
+                        .buttonStyle(.plain)
                         .listRowBackground(Color.clear)
                         .listRowSeparator(.hidden)
                         .listRowInsets(EdgeInsets(top: 5, leading: 16, bottom: 5, trailing: 16))
@@ -328,12 +426,12 @@ struct MeetupsListView: View {
         var found: MyParticipation?
         for p in participations where p.meetup.id == meetupId { found = p; break }
         if let p = found {
-            selectedMeetup = p.meetup
+            presentedSheet = .meetup(p.meetup)
         } else {
             Task {
                 await load()
                 for p in participations where p.meetup.id == meetupId {
-                    selectedMeetup = p.meetup
+                    presentedSheet = .meetup(p.meetup)
                     break
                 }
             }
@@ -342,7 +440,12 @@ struct MeetupsListView: View {
 
     private func openCreate(prefill: EventPrefill) {
         eventPrefill = prefill
-        showCreate = true
+        presentedSheet = .create
+    }
+
+    private func handleSheetDismiss() {
+        eventPrefill = nil
+        Task { await load() }
     }
 
     // MARK: - Data
@@ -354,7 +457,6 @@ struct MeetupsListView: View {
                 if result != participations { participations = result }
                 hasLoaded = true
             }
-            cachedPastByCategory = buildPastByCategory()
         } catch is CancellationError {
             return
         } catch {
@@ -473,6 +575,139 @@ private struct MeetupsEmptyState: View {
         .padding(32)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color.appBackground)
+    }
+}
+
+// MARK: - Recap Folder
+
+private struct RecapFolderCard: View {
+    let recapCount: Int
+    let latestMeetup: Meetup?
+
+    var body: some View {
+        HStack(spacing: 14) {
+            ZStack {
+                RoundedRectangle(cornerRadius: 14)
+                    .fill(Color.coral.opacity(0.16))
+                    .frame(width: 48, height: 48)
+                Image(systemName: "folder.fill")
+                    .scaledFont(size: 23, weight: .semibold)
+                    .foregroundStyle(Color.coral)
+            }
+
+            VStack(alignment: .leading, spacing: 3) {
+                Text("Recaps")
+                    .scaledFont(size: 15, weight: .bold)
+                    .foregroundStyle(.white)
+                if let latestMeetup {
+                    Text("Latest: \(latestMeetup.destinationName)")
+                        .scaledFont(size: 11)
+                        .foregroundStyle(Color(white: 0.58))
+                        .lineLimit(1)
+                } else {
+                    Text("Past meetups")
+                        .scaledFont(size: 11)
+                        .foregroundStyle(Color(white: 0.58))
+                }
+            }
+
+            Spacer()
+
+            Text("\(recapCount)")
+                .scaledFont(size: 12, weight: .bold)
+                .foregroundStyle(.white)
+                .padding(.horizontal, 9)
+                .padding(.vertical, 5)
+                .background(Color.appSurface)
+                .clipShape(Capsule())
+
+            Image(systemName: "chevron.right")
+                .scaledFont(size: 12, weight: .semibold)
+                .foregroundStyle(Color(white: 0.36))
+        }
+        .padding(.vertical, 14)
+        .padding(.horizontal, 16)
+        .background(Color.appSurface)
+        .clipShape(RoundedRectangle(cornerRadius: 18))
+        .overlay(
+            RoundedRectangle(cornerRadius: 18)
+                .strokeBorder(Color(white: 0.15), lineWidth: 1)
+        )
+    }
+}
+
+private struct RecapFolderView: View {
+    let groups: [(key: String, value: [MyParticipation])]
+    let onSelect: (MyParticipation) -> Void
+
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationStack {
+            List {
+                Text("Recaps")
+                    .scaledFont(size: 34, weight: .bold)
+                    .foregroundStyle(.white)
+                    .listRowBackground(Color.clear)
+                    .listRowSeparator(.hidden)
+                    .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 8, trailing: 16))
+
+                ForEach(groups, id: \.key) { group in
+                    Section {
+                        ForEach(group.value, id: \.meetup.id) { participation in
+                            Button {
+                                onSelect(participation)
+                            } label: {
+                                MeetupRowCard(participation: participation)
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityLabel("Open recap for \(participation.meetup.destinationName)")
+                            .listRowBackground(Color.clear)
+                            .listRowSeparator(.hidden)
+                            .listRowInsets(EdgeInsets(top: 5, leading: 16, bottom: 5, trailing: 16))
+                        }
+                    } header: {
+                        HStack(spacing: 6) {
+                            sectionHeader(group.key.isEmpty ? "Past" : group.key)
+                            Text("\(group.value.count)")
+                                .scaledFont(size: 10, weight: .bold)
+                                .foregroundStyle(.white)
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 2)
+                                .background(Color.appSurface)
+                                .clipShape(Capsule())
+                        }
+                    }
+                    .listSectionSeparator(.hidden)
+                }
+
+                Color.clear.frame(height: 24)
+                    .listRowBackground(Color.clear)
+                    .listRowSeparator(.hidden)
+                    .listRowInsets(EdgeInsets())
+            }
+            .listStyle(.plain)
+            .contentMargins(.top, 0, for: .scrollContent)
+            .scrollContentBackground(.hidden)
+            .background(Color.appBackground)
+            .navigationTitle("")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Close") { dismiss() }
+                }
+            }
+        }
+        .preferredColorScheme(.dark)
+    }
+
+    private func sectionHeader(_ title: String) -> some View {
+        Text(title.uppercased())
+            .scaledFont(size: 10, weight: .bold)
+            .foregroundStyle(Color(white: 0.45))
+            .textCase(nil)
+            .padding(.leading, 4)
+            .padding(.top, 8)
     }
 }
 

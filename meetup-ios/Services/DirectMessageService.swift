@@ -95,6 +95,32 @@ final class DirectMessageService {
             .value
     }
 
+    func listReactionSummaries(conversationId: UUID) async throws -> [UUID: [MessageReactionSummary]] {
+        let summaries: [MessageReactionSummary] = try await supabase
+            .rpc("list_message_reactions", params: ["p_conversation_id": conversationId.uuidString])
+            .execute()
+            .value
+
+        return Dictionary(grouping: summaries, by: \.messageId)
+            .mapValues { reactions in
+                reactions.sorted {
+                    if $0.reactionCount == $1.reactionCount {
+                        return $0.emoji < $1.emoji
+                    }
+                    return $0.reactionCount > $1.reactionCount
+                }
+            }
+    }
+
+    func toggleReaction(messageId: UUID, emoji: String) async throws {
+        try await supabase
+            .rpc("toggle_message_reaction", params: [
+                "p_message_id": messageId.uuidString,
+                "p_emoji": emoji
+            ])
+            .execute()
+    }
+
     func sendText(_ body: String, conversationId: UUID) async throws {
         let trimmed = body.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
@@ -141,6 +167,34 @@ final class DirectMessageService {
         try await supabase
             .from("messages")
             .delete()
+            .eq("id", value: message.id.uuidString)
+            .eq("sender_id", value: myId.uuidString)
+            .execute()
+    }
+
+    func editMessage(_ message: Message, body: String) async throws {
+        guard let myId = supabase.auth.currentUser?.id else { throw DirectMessageError.notSignedIn }
+        guard message.senderId == myId else { return }
+
+        let trimmed = body.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty || message.imagePath != nil else { return }
+
+        struct MessageUpdate: Encodable {
+            let body: String?
+            let editedAt: String
+
+            enum CodingKeys: String, CodingKey {
+                case body
+                case editedAt = "edited_at"
+            }
+        }
+
+        try await supabase
+            .from("messages")
+            .update(MessageUpdate(
+                body: trimmed.isEmpty ? nil : trimmed,
+                editedAt: ISO8601DateFormatter().string(from: Date())
+            ))
             .eq("id", value: message.id.uuidString)
             .eq("sender_id", value: myId.uuidString)
             .execute()

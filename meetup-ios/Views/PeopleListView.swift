@@ -19,6 +19,7 @@ struct PeopleListView: View {
     @State private var smartSuggestions: [ProfileSuggestion] = []
     @State private var selectedSuggestion: ProfileSuggestion?
     @State private var selectedDirectMessage: DirectMessageRoute?
+    @State private var selectedFriendProfile: FriendProfileRoute?
     @Environment(NavigationState.self) private var navState
     @Environment(AppSettings.self) private var settings
 
@@ -112,6 +113,13 @@ struct PeopleListView: View {
                                     person: person,
                                     contactName: contactNameOverrides[person.id],
                                     isPending: isPending,
+                                    onOpenProfile: {
+                                        selectedFriendProfile = FriendProfileRoute(
+                                            profile: person,
+                                            displayName: displayName(for: person),
+                                            isPending: isPending
+                                        )
+                                    },
                                     onMessage: isPending ? nil : {
                                         Task { await openDirectMessage(with: person) }
                                     }
@@ -200,6 +208,21 @@ struct PeopleListView: View {
                     MessageThreadView(conversationId: route.id, friend: route.friend)
                 }
             }
+            .sheet(item: $selectedFriendProfile) { route in
+                FriendProfileView(
+                    profile: route.profile,
+                    displayName: route.displayName,
+                    isPending: route.isPending,
+                    onMessage: route.isPending ? nil : {
+                        selectedFriendProfile = nil
+                        Task { await openDirectMessage(with: route.profile) }
+                    },
+                    onRemove: {
+                        selectedFriendProfile = nil
+                        Task { await removePerson(route.profile) }
+                    }
+                )
+            }
             .onChange(of: navState.showFriendRequests) { _, show in
                 guard show else { return }
                 navState.showFriendRequests = false
@@ -219,6 +242,10 @@ struct PeopleListView: View {
     }
 
     // MARK: - Sub-views
+
+    private func displayName(for person: Profile) -> String {
+        contactNameOverrides[person.id] ?? person.displayName ?? "Unknown"
+    }
 
     private var searchBar: some View {
         HStack(spacing: 10) {
@@ -686,6 +713,14 @@ private struct DirectMessageRoute: Identifiable {
     let friend: Profile
 }
 
+private struct FriendProfileRoute: Identifiable {
+    let profile: Profile
+    let displayName: String
+    let isPending: Bool
+
+    var id: UUID { profile.id }
+}
+
 // MARK: - Suggestion Card
 
 private struct SuggestionCard: View {
@@ -832,6 +867,7 @@ private struct PersonCard: View {
     let person: Profile
     let contactName: String?
     let isPending: Bool
+    let onOpenProfile: () -> Void
     let onMessage: (() -> Void)?
     let onRemove: () -> Void
 
@@ -839,12 +875,14 @@ private struct PersonCard: View {
         person: Profile,
         contactName: String?,
         isPending: Bool = false,
+        onOpenProfile: @escaping () -> Void,
         onMessage: (() -> Void)? = nil,
         onRemove: @escaping () -> Void
     ) {
         self.person = person
         self.contactName = contactName
         self.isPending = isPending
+        self.onOpenProfile = onOpenProfile
         self.onMessage = onMessage
         self.onRemove = onRemove
     }
@@ -855,23 +893,30 @@ private struct PersonCard: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            ProfileAvatarView(
-                displayName: displayedName,
-                avatarUrl: person.avatarUrl,
-                userId: person.id,
-                size: 38,
-                fontSize: 15
-            )
+            Button(action: onOpenProfile) {
+                HStack(spacing: 12) {
+                    ProfileAvatarView(
+                        displayName: displayedName,
+                        avatarUrl: person.avatarUrl,
+                        userId: person.id,
+                        size: 38,
+                        fontSize: 15
+                    )
 
-            VStack(alignment: .leading, spacing: 2) {
-                Text(displayedName)
-                    .scaledFont(size: 13, weight: .semibold)
-                if let phone = person.phoneE164 {
-                    Text(phone)
-                        .scaledFont(size: 11)
-                        .foregroundStyle(.secondary)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(displayedName)
+                            .scaledFont(size: 13, weight: .semibold)
+                            .foregroundStyle(.white)
+                        if let phone = person.phoneE164 {
+                            Text(phone)
+                                .scaledFont(size: 11)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
                 }
             }
+            .buttonStyle(.plain)
+            .accessibilityLabel("View \(displayedName)'s profile")
 
             Spacer()
 

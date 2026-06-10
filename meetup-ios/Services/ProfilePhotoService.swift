@@ -33,7 +33,7 @@ final class ProfilePhotoService {
             throw ProfilePhotoError.compressionFailed
         }
 
-        let path = "\(userId.uuidString)/\(UUID().uuidString).jpg"
+        let path = "\(userId.uuidString.lowercased())/\(UUID().uuidString.lowercased()).jpg"
         try await supabase.storage
             .from(bucket)
             .upload(path: path, file: jpeg, options: FileOptions(contentType: "image/jpeg", upsert: false))
