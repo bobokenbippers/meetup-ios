@@ -195,4 +195,75 @@ struct ReceiptParserTests {
         #expect(receipt.items.count == 1)
         #expect(receipt.items[0].price == 3.50)
     }
+
+    @Test("last price on a line wins for totals and surcharge percentages")
+    func lastPriceWinsWhenLineContainsPercentOrUnitPrice() {
+        let lines = [
+            "Gls STARR PINOT NOIR (2 @21.00) 42.00",
+            "Credit Card",
+            "$1.87",
+            "Surcharge (2.67%)",
+            "Credit Card Surcharge (2.67%) $1.87",
+            "Total $43.87",
+        ]
+        let receipt = ReceiptParser.parseText(lines)
+        #expect(receipt.items.count == 1)
+        #expect(receipt.items[0].price == 42.00)
+        #expect(receipt.surcharge == 1.87)
+        #expect(receipt.total == 43.87)
+    }
+
+    @Test("tip suggestions and post-total promo prices are ignored")
+    func ignoresTipSuggestionsAndPostTotalPromos() {
+        let lines = [
+            "Fight Milk $19.00",
+            "Subtotal $19.00",
+            "Tax $1.69",
+            "Total $20.69",
+            "$7 mini martinis!",
+            "Tip Suggestions",
+            "18% $3.42",
+        ]
+        let receipt = ReceiptParser.parseText(lines)
+        #expect(receipt.items.count == 1)
+        #expect(receipt.items[0].name == "Fight Milk")
+        #expect(receipt.tip == 0)
+        #expect(receipt.total == 20.69)
+    }
+
+    @Test("receipt lines with x quantity prefixes are expanded")
+    func expandsXQuantityPrefixes() {
+        let lines = [
+            "4x Raj Spiced Old Fashioned $76.00",
+            "Subtotal $76.00",
+            "Total $76.00",
+        ]
+        let receipt = ReceiptParser.parseText(lines)
+        #expect(receipt.items.count == 4)
+        #expect(receipt.items.allSatisfy { $0.name == "Raj Spiced Old Fashioned" })
+        #expect(receipt.items.allSatisfy { $0.price == 19.00 })
+    }
+
+    @Test("real receipt summary with non-cash total and payment tip")
+    func parsesNonCashPaymentReceiptSummary() {
+        let lines = [
+            "1x Captain Coconut Mussels $39.00",
+            "1x Kashmiri Rogan Josh $28.00",
+            "1x Garlic Naan $5.00",
+            "1x Bombay Lamb Biryani $29.00",
+            "Subtotal $101.00",
+            "Tax $8.96",
+            "Total (Cash) $109.96",
+            "Total (Non-Cash) $113.26",
+            "Payment Amount $113.26",
+            "Tip $17.00",
+            "Payment Total $130.26",
+        ]
+        let receipt = ReceiptParser.parseText(lines)
+        #expect(receipt.items.count == 4)
+        #expect(receipt.subtotal == 101.00)
+        #expect(receipt.tax == 8.96)
+        #expect(receipt.tip == 17.00)
+        #expect(receipt.total == 130.26)
+    }
 }
