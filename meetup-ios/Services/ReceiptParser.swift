@@ -219,18 +219,26 @@ struct ReceiptParser {
                     }
                 }
 
-                // Strip leading all-consonant OCR noise tokens (e.g. "nll "),
-                // then leading single-letter artifacts (e.g. "I " misread from "1 "),
-                // then leading quantity digits (e.g. "1 ", "2 ") — capture qty before stripping
-                name = name.replacingOccurrences(of: #"^([^aeiouAEIOU\s]{1,5}\s+)+"#, with: "", options: .regularExpression)
-                name = name.replacingOccurrences(of: #"^[A-Za-z]\s+"#, with: "", options: .regularExpression)
+                // Capture quantity prefixes ("2 ", "4x ") BEFORE the OCR noise
+                // strippers run — "4x " is 1-5 consonants + space, so the noise
+                // stripper would otherwise eat it. A second capture afterwards
+                // handles quantities hidden behind noise (e.g. "I 2 Tacos").
                 var quantity = 1
                 let quantityPattern = #"^(\d+)\s*[xX]?\s+"#
-                if let qRange = name.range(of: quantityPattern, options: .regularExpression),
-                   let qInt = Int(name[qRange].filter(\.isNumber)),
-                   qInt >= 2, qInt <= 20 {
-                    quantity = qInt
+                func captureQuantity() {
+                    if let qRange = name.range(of: quantityPattern, options: .regularExpression),
+                       let qInt = Int(name[qRange].filter(\.isNumber)),
+                       qInt >= 2, qInt <= 20 {
+                        quantity = qInt
+                        name = String(name[qRange.upperBound...])
+                    }
                 }
+                captureQuantity()
+                // Strip leading all-consonant OCR noise tokens (e.g. "nll "),
+                // then leading single-letter artifacts (e.g. "I " misread from "1 ")
+                name = name.replacingOccurrences(of: #"^([^aeiouAEIOU\s]{1,5}\s+)+"#, with: "", options: .regularExpression)
+                name = name.replacingOccurrences(of: #"^[A-Za-z]\s+"#, with: "", options: .regularExpression)
+                if quantity == 1 { captureQuantity() }
                 name = name.replacingOccurrences(of: quantityPattern, with: "", options: .regularExpression)
                 name = name.trimmingCharacters(in: .whitespaces)
 
