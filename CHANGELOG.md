@@ -15,6 +15,7 @@ Please test:
 - Confirm event suggestions show either events, a location prompt, an empty state, or a retryable error instead of disappearing.
 - Try sending a DM photo and tap retry if an image bubble fails to load.
 - Toggle Settings → Sync Contacts and confirm iOS asks for contact access, then People/Create Meetup contact suggestions follow that setting.
+- Type a destination in New Meetup/Edit Meetup and confirm location search does not crash.
 
 ### Added
 - Friend direct messages with a Messages tab, inbox, chat threads, realtime updates, unread counts, and push routing.
@@ -40,6 +41,7 @@ Please test:
 - Event suggestions no longer disappear when location permission is pending or unavailable; the Meetups tab now shows a clear location prompt or empty state.
 - Event suggestion API configuration is now included in the app target build settings so release builds can read it reliably.
 - Settings → Sync Contacts now actually requests contact permission, reports sync status, and gates contact suggestions throughout the app.
+- Destination search now guards Google Places configuration so typing a meetup location cannot crash when Places is unavailable.
 - Chat photo selection now reliably prepares the selected image before sending and resizes uploads for faster delivery.
 - Chat photo failures now show inline recovery instead of silent broken/loading states, and message photo links stay valid longer.
 - Open chat threads now refresh while you stay in the conversation, even if realtime misses a message event.
