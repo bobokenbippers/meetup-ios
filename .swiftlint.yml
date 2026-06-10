@@ -1,0 +1,23 @@
+included:
+  - meetup-ios
+  - meetup-iosTests
+  - meetup-iosUITests
+
+# Warning-only rollout: the noisiest style rules are disabled so the
+# initial report is actionable. Tighten incrementally once the count is low.
+disabled_rules:
+  - line_length
+  - file_length
+  - type_body_length
+  - function_body_length
+  - cyclomatic_complexity
+  - identifier_name
+  - todo
+  - trailing_whitespace
+  - vertical_whitespace
+
+nesting:
+  type_level: 3
+
+force_cast: warning
+force_try: warning
