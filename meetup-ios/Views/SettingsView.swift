@@ -14,6 +14,9 @@ struct SettingsView: View {
 
     @State private var showSignOutConfirm = false
     @State private var showDeleteConfirm = false
+    @State private var contactsManager = ContactsManager()
+    @State private var isSyncingContacts = false
+    @State private var contactSyncMessage: String?
 
     var body: some View {
         @Bindable var settings = settings
@@ -108,14 +111,33 @@ struct SettingsView: View {
                             if !newValue { LocationManager.shared.stopTracking() }
                             persist()
                         }
-                    Toggle("Sync Contacts", isOn: $settings.contactsEnabled)
+                    Toggle(isOn: Binding(
+                        get: { settings.contactsEnabled },
+                        set: { setContactSyncEnabled($0) }
+                    )) {
+                        HStack(spacing: 10) {
+                            Text("Sync Contacts")
+                            if isSyncingContacts {
+                                ProgressView()
+                                    .controlSize(.small)
+                                    .tint(Color.coral)
+                            }
+                        }
+                    }
                         .tint(Color.coral)
                         .foregroundStyle(.white)
                         .listRowBackground(Color.appSurface)
+
+                    if let contactSyncMessage {
+                        Text(contactSyncMessage)
+                            .font(.caption2)
+                            .foregroundStyle(Color(white: 0.55))
+                            .listRowBackground(Color.appSurface)
+                    }
                 } header: {
                     sectionHeader("PRIVACY")
                 } footer: {
-                    Text("When off, your live location and ETA are never shared during meetups.")
+                    Text("When off, your live location and ETA are never shared during meetups. Contact sync only reads your device contacts locally to suggest people you may know.")
                         .font(.caption2)
                         .foregroundStyle(Color(white: 0.4))
                 }
@@ -170,7 +192,10 @@ struct SettingsView: View {
             .navigationTitle("Settings")
             .preferredColorScheme(.dark)
         }
-        .task { await loadPrefs() }
+        .task {
+            await loadPrefs()
+            refreshContactSyncState()
+        }
         .confirmationDialog("Sign out of Squad Brunch?", isPresented: $showSignOutConfirm, titleVisibility: .visible) {
             Button("Sign Out", role: .destructive) {
                 Task { await auth.signOut() }
@@ -262,6 +287,43 @@ struct SettingsView: View {
             locationSharingEnabled: locationSharingEnabled
         )
         Task { try? await UserSettingsService.shared.save(snapshot) }
+    }
+
+    private func refreshContactSyncState() {
+        contactsManager.refreshAuthorizationStatus()
+        guard settings.contactsEnabled else {
+            contactSyncMessage = nil
+            return
+        }
+        if contactsManager.needsSettingsForAccess {
+            settings.contactsEnabled = false
+            contactSyncMessage = "Contacts permission is off. Enable it in iOS Settings to sync contacts."
+        }
+    }
+
+    private func setContactSyncEnabled(_ enabled: Bool) {
+        if enabled {
+            settings.contactsEnabled = true
+            contactSyncMessage = nil
+            isSyncingContacts = true
+            Task {
+                await contactsManager.load(force: true)
+                isSyncingContacts = false
+                if contactsManager.hasContactsAccess {
+                    let count = contactsManager.contacts.count
+                    contactSyncMessage = count == 0
+                        ? "Contacts synced, but no phone numbers were found."
+                        : "Synced \(count) contacts."
+                } else {
+                    settings.contactsEnabled = false
+                    contactSyncMessage = "Contacts permission is off. Enable it in iOS Settings to sync contacts."
+                }
+            }
+        } else {
+            settings.contactsEnabled = false
+            contactsManager.clear()
+            contactSyncMessage = "Contact sync is off."
+        }
     }
 }
 

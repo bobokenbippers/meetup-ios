@@ -14,15 +14,31 @@ final class ContactsManager {
     var contacts: [DeviceContact] = []
     var authStatus: CNAuthorizationStatus = .notDetermined
 
-    func load() async {
-        guard contacts.isEmpty else { return }
+    var hasContactsAccess: Bool {
+        authStatus.rawValue >= CNAuthorizationStatus.authorized.rawValue
+    }
+
+    var needsSettingsForAccess: Bool {
+        authStatus == .denied || authStatus == .restricted
+    }
+
+    func refreshAuthorizationStatus() {
+        authStatus = CNContactStore.authorizationStatus(for: .contacts)
+    }
+
+    func clear() {
+        contacts = []
+    }
+
+    func load(force: Bool = false) async {
+        guard force || contacts.isEmpty else { return }
 
         authStatus = CNContactStore.authorizationStatus(for: .contacts)
         if authStatus == .notDetermined {
             _ = try? await CNContactStore().requestAccess(for: .contacts)
             authStatus = CNContactStore.authorizationStatus(for: .contacts)
         }
-        guard authStatus != .denied && authStatus != .restricted && authStatus != .notDetermined else { return }
+        guard hasContactsAccess else { return }
 
         // CNContactStore() init triggers IPC to contactsd — keep it off the main thread.
         let loaded: [DeviceContact] = await Task.detached(priority: .userInitiated) {
