@@ -6,12 +6,13 @@ final class MeetupPhotoService {
     static let shared = MeetupPhotoService()
     private var supabase: SupabaseClient { SupabaseManager.shared.client }
     private let bucket = "meetup-photos"
-    // Signed URLs expire in 1 hour — long enough for a recap session.
+    // Signed URLs expire, so the database stores storage paths and fetches
+    // regenerate signed URLs for the current viewing session.
     private let signedURLExpiry: Int = 3600
 
     // MARK: - Storage
 
-    /// Compress `image` to JPEG, upload to storage, return the public URL string.
+    /// Compress `image` to JPEG, upload to storage, return the storage path.
     func uploadPhoto(image: UIImage, meetupId: UUID) async throws -> String {
         guard let jpeg = image.jpegData(compressionQuality: 0.8) else {
             throw PhotoServiceError.compressionFailed
@@ -20,11 +21,7 @@ final class MeetupPhotoService {
         try await supabase.storage
             .from(bucket)
             .upload(path: path, file: jpeg, options: FileOptions(contentType: "image/jpeg", upsert: false))
-        let signedURL = try await supabase.storage
-            .from(bucket)
-            .createSignedURL(path: path, expiresIn: signedURLExpiry)
-        // Store the path so we can regenerate signed URLs later; return a string URL.
-        return signedURL.absoluteString
+        return path
     }
 
     // MARK: - Database
@@ -55,7 +52,51 @@ final class MeetupPhotoService {
             .order("created_at", ascending: true)
             .execute()
             .value
-        return photos
+        return await refreshPhotoURLs(photos)
+    }
+
+    private func refreshPhotoURLs(_ photos: [MeetupPhoto]) async -> [MeetupPhoto] {
+        var refreshed: [MeetupPhoto] = []
+        refreshed.reserveCapacity(photos.count)
+
+        for photo in photos {
+            guard let signedURL = await signedURLString(forStoredPhotoURL: photo.photoUrl) else {
+                refreshed.append(photo)
+                continue
+            }
+            refreshed.append(photo.replacingPhotoUrl(signedURL))
+        }
+
+        return refreshed
+    }
+
+    private func signedURLString(forStoredPhotoURL storedPhotoURL: String) async -> String? {
+        guard let path = Self.storagePath(from: storedPhotoURL) else { return nil }
+        guard let signedURL = try? await supabase.storage
+            .from(bucket)
+            .createSignedURL(path: path, expiresIn: signedURLExpiry) else {
+            return nil
+        }
+        return signedURL.absoluteString
+    }
+
+    static func storagePath(from storedPhotoURL: String) -> String? {
+        let trimmed = storedPhotoURL.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+
+        if !trimmed.localizedCaseInsensitiveContains("://") {
+            return trimmed
+        }
+
+        guard let url = URL(string: trimmed) else { return nil }
+        let pathComponents = url.pathComponents
+        guard let bucketIndex = pathComponents.firstIndex(of: "meetup-photos") else { return nil }
+        let storageComponents = pathComponents.dropFirst(bucketIndex + 1)
+        guard !storageComponents.isEmpty else { return nil }
+
+        return storageComponents
+            .joined(separator: "/")
+            .removingPercentEncoding
     }
 
     // MARK: - Legacy storage-list helper (kept for backward compat with RecapView)

@@ -28,6 +28,18 @@ struct MeetupPhoto: Codable, Identifiable {
         case photoUrl = "photo_url"
         case createdAt = "created_at"
     }
+
+    func replacingPhotoUrl(_ photoUrl: String) -> MeetupPhoto {
+        MeetupPhoto(
+            id: id,
+            meetupId: meetupId,
+            uploaderUserId: uploaderUserId,
+            photoUrl: photoUrl,
+            caption: caption,
+            createdAt: createdAt,
+            profiles: profiles
+        )
+    }
 }
 
 /// Lightweight row used for inserting into meetup_photos.
