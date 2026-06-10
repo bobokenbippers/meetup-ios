@@ -15,6 +15,7 @@ Please test:
 - Confirm event suggestions show either events, a location prompt, an empty state, or a retryable error instead of disappearing.
 - Try sending a DM photo and tap retry if an image bubble fails to load.
 - Toggle Settings → Sync Contacts and confirm iOS asks for contact access, then People/Create Meetup contact suggestions follow that setting.
+- Add a friend from People when the searched user appears and confirm the request sends without an RLS error.
 - Type a destination in New Meetup/Edit Meetup and confirm location suggestions appear.
 
 ### Added
@@ -41,6 +42,7 @@ Please test:
 - Event suggestions no longer disappear when location permission is pending or unavailable; the Meetups tab now shows a clear location prompt or empty state.
 - Event suggestion API configuration is now included in the app target build settings so release builds can read it reliably.
 - Settings → Sync Contacts now actually requests contact permission, reports sync status, and gates contact suggestions throughout the app.
+- Friend requests now insert under the canonical friendship RLS policy regardless of UUID ordering.
 - Destination search now guards Google Places configuration so typing a meetup location cannot crash when Places is unavailable.
 - Destination search now falls back to Apple MapKit so meetup location suggestions still work if Google Places is unavailable.
 - Chat photo selection now reliably prepares the selected image before sending and resizes uploads for faster delivery.
