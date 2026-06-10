@@ -219,11 +219,6 @@ struct ReceiptParser {
                     }
                 }
 
-                // Strip leading all-consonant OCR noise tokens (e.g. "nll "),
-                // then leading single-letter artifacts (e.g. "I " misread from "1 "),
-                // then leading quantity digits (e.g. "1 ", "2 ") — capture qty before stripping
-                name = name.replacingOccurrences(of: #"^([^aeiouAEIOU\s]{1,5}\s+)+"#, with: "", options: .regularExpression)
-                name = name.replacingOccurrences(of: #"^[A-Za-z]\s+"#, with: "", options: .regularExpression)
                 var quantity = 1
                 let quantityPattern = #"^(\d+)\s*[xX]?\s+"#
                 if let qRange = name.range(of: quantityPattern, options: .regularExpression),
@@ -232,6 +227,10 @@ struct ReceiptParser {
                     quantity = qInt
                 }
                 name = name.replacingOccurrences(of: quantityPattern, with: "", options: .regularExpression)
+                // Strip leading all-consonant OCR noise tokens (e.g. "nll "),
+                // then leading single-letter artifacts (e.g. "I " misread from "1 ").
+                name = name.replacingOccurrences(of: #"^([^aeiouAEIOU\s]{1,5}\s+)+"#, with: "", options: .regularExpression)
+                name = name.replacingOccurrences(of: #"^[A-Za-z]\s+"#, with: "", options: .regularExpression)
                 name = name.trimmingCharacters(in: .whitespaces)
 
                 // Skip modifier lines like "**w.Salad"
