@@ -184,6 +184,7 @@ private struct EditDestinationSection: View {
     @State private var searchQuery = ""
     @State private var predictions: [GooglePlacePrediction] = []
     @State private var isLoadingDetails = false
+    @State private var searchError: String?
 
     var body: some View {
         Section {
@@ -215,6 +216,12 @@ private struct EditDestinationSection: View {
                     ProgressView().frame(maxWidth: .infinity)
                         .listRowBackground(Color.appSurface)
                 }
+                if let searchError {
+                    Text(searchError)
+                        .font(.caption)
+                        .foregroundStyle(Color(white: 0.6))
+                        .listRowBackground(Color.appSurface)
+                }
                 ForEach(predictions) { prediction in
                     Button(action: { Task { await selectPrediction(prediction) } }) {
                         VStack(alignment: .leading, spacing: 2) {
@@ -234,7 +241,11 @@ private struct EditDestinationSection: View {
                 .textCase(nil)
         }
         .task(id: searchQuery) {
-            guard searchQuery.count >= 2 else { predictions = []; return }
+            guard searchQuery.count >= 2 else {
+                predictions = []
+                searchError = nil
+                return
+            }
             do { try await Task.sleep(for: .milliseconds(300)) } catch { return }
             await runSearch()
         }
@@ -242,9 +253,12 @@ private struct EditDestinationSection: View {
 
     private func selectPrediction(_ prediction: GooglePlacePrediction) async {
         isLoadingDetails = true
+        searchError = nil
         predictions = []
         if let place = await GooglePlacesService.shared.details(for: prediction) {
             selectedPlace = place
+        } else {
+            searchError = "Couldn't load that place. Try another result."
         }
         isLoadingDetails = false
     }
@@ -252,8 +266,14 @@ private struct EditDestinationSection: View {
     private func runSearch() async {
         guard selectedPlace == nil, searchQuery.count >= 2 else { predictions = []; return }
         let q = searchQuery
+        guard GooglePlacesService.shared.isConfigured else {
+            predictions = []
+            searchError = GooglePlacesService.shared.unavailableMessage
+            return
+        }
         let results = await GooglePlacesService.shared.autocomplete(query: q)
         guard !Task.isCancelled, searchQuery == q else { return }
+        searchError = nil
         predictions = results
     }
 }
