@@ -265,14 +265,13 @@ struct PeopleListView: View {
 
     private func foundUserCard(_ user: FoundUser) -> some View {
         HStack(spacing: 12) {
-            Circle()
-                .fill(Color.coral.opacity(0.15))
-                .frame(width: 42, height: 42)
-                .overlay {
-                    Text(String(user.displayName.prefix(1)).uppercased())
-                        .scaledFont(size: 17, weight: .bold)
-                        .foregroundStyle(Color.coral)
-                }
+            ProfileAvatarView(
+                displayName: user.displayName,
+                avatarUrl: user.avatarUrl,
+                userId: user.id,
+                size: 42,
+                fontSize: 17
+            )
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(user.displayName)
@@ -346,14 +345,7 @@ struct PeopleListView: View {
 
     private func incomingRequestCard(_ request: IncomingFriendRequest) -> some View {
         HStack(spacing: 12) {
-            Circle()
-                .fill(Color.coral.opacity(0.15))
-                .frame(width: 42, height: 42)
-                .overlay {
-                    Text(String((request.requester.displayName ?? "?").prefix(1)).uppercased())
-                        .scaledFont(size: 17, weight: .bold)
-                        .foregroundStyle(Color.coral)
-                }
+            ProfileAvatarView(profile: request.requester, size: 42, fontSize: 17)
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(request.requester.displayName ?? "Unknown")
@@ -531,7 +523,12 @@ struct PeopleListView: View {
                         ? (contactsManager.name(forPhone: e164) ?? user.displayName)
                         : user.displayName
                     foundUserStatus = try await MeetupService.shared.friendshipStatus(with: user.id)
-                    foundUser = FoundUser(id: user.id, displayName: resolvedName, phone: user.phone)
+                    foundUser = FoundUser(
+                        id: user.id,
+                        displayName: resolvedName,
+                        phone: user.phone,
+                        avatarUrl: user.avatarUrl
+                    )
                 }
             } else {
                 error = "No user found with that number"
@@ -561,7 +558,12 @@ struct PeopleListView: View {
                     ? contact.displayName
                     : user.displayName
                 foundUserStatus = (try? await MeetupService.shared.friendshipStatus(with: user.id)) ?? .none
-                foundUser = FoundUser(id: user.id, displayName: resolvedName, phone: user.phone)
+                foundUser = FoundUser(
+                    id: user.id,
+                    displayName: resolvedName,
+                    phone: user.phone,
+                    avatarUrl: user.avatarUrl
+                )
             }
         } else {
             error = "\(contact.displayName) isn't on the app yet"
@@ -703,21 +705,10 @@ private struct SuggestionCard: View {
         }
     }
 
-    private func avatarColor(for id: UUID) -> Color {
-        Color.participantPalette[abs(id.hashValue) % Color.participantPalette.count]
-    }
-
     var body: some View {
         Button(action: onTap) {
             HStack(spacing: 12) {
-                Circle()
-                    .fill(avatarColor(for: suggestion.profile.id).opacity(0.7))
-                    .frame(width: 42, height: 42)
-                    .overlay {
-                        Text(String(displayedName.prefix(1)).uppercased())
-                            .scaledFont(size: 17, weight: .bold)
-                            .foregroundStyle(.white)
-                    }
+                ProfileAvatarView(profile: suggestion.profile, size: 42, fontSize: 17)
 
                 VStack(alignment: .leading, spacing: 2) {
                     Text(displayedName)
@@ -767,10 +758,6 @@ private struct SuggestionProfileSheet: View {
         }
     }
 
-    private func avatarColor(for id: UUID) -> Color {
-        Color.participantPalette[abs(id.hashValue) % Color.participantPalette.count]
-    }
-
     var body: some View {
         VStack(spacing: 0) {
             // Drag indicator
@@ -781,14 +768,7 @@ private struct SuggestionProfileSheet: View {
                 .padding(.bottom, 24)
 
             // Avatar
-            Circle()
-                .fill(avatarColor(for: suggestion.profile.id).opacity(0.7))
-                .frame(width: 80, height: 80)
-                .overlay {
-                    Text(String(displayedName.prefix(1)).uppercased())
-                        .scaledFont(size: 32, weight: .bold)
-                        .foregroundStyle(.white)
-                }
+            ProfileAvatarView(profile: suggestion.profile, size: 80, fontSize: 32)
                 .padding(.bottom, 16)
 
             // Name
@@ -875,14 +855,13 @@ private struct PersonCard: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            Circle()
-                .fill(personColor(for: person.id).opacity(0.7))
-                .frame(width: 38, height: 38)
-                .overlay {
-                    Text(String(displayedName.prefix(1)).uppercased())
-                        .scaledFont(size: 15, weight: .bold)
-                        .foregroundStyle(.white)
-                }
+            ProfileAvatarView(
+                displayName: displayedName,
+                avatarUrl: person.avatarUrl,
+                userId: person.id,
+                size: 38,
+                fontSize: 15
+            )
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(displayedName)
@@ -948,9 +927,5 @@ private struct PersonCard: View {
                 Label(isPending ? "Cancel Request" : "Remove", systemImage: isPending ? "xmark" : "trash")
             }
         }
-    }
-
-    private func personColor(for id: UUID) -> Color {
-        Color.participantPalette[abs(id.hashValue) % Color.participantPalette.count]
     }
 }

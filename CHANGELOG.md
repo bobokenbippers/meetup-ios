@@ -17,6 +17,7 @@ Please test:
 - Toggle Settings → Sync Contacts and confirm iOS asks for contact access, then People/Create Meetup contact suggestions follow that setting.
 - Add a friend from People when the searched user appears and confirm the request sends without an RLS error.
 - Type a destination in New Meetup/Edit Meetup and confirm location suggestions appear.
+- Upload a profile photo from Settings and confirm it appears in People, DMs, and meetup participant rows.
 
 ### Added
 - Friend direct messages with a Messages tab, inbox, chat threads, realtime updates, unread counts, and push routing.
@@ -25,6 +26,7 @@ Please test:
 - Supabase DM backend: conversations, messages, read-state RPCs, RLS policies, storage policies, and `push-new-message` edge function.
 - Settings beta feedback action with a prefilled email that includes app version, user id, iOS version, and device model.
 - Shareable meetup invite links now use a web fallback page that redirects into the app for installed beta testers.
+- Profile photo upload from Settings, backed by the new `profile-photos` storage bucket and `profiles.avatar_url`.
 
 ### Changed
 - Received meetup invites now show the sender with a `From <name>` line.

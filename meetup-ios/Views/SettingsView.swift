@@ -1,5 +1,6 @@
 import SwiftUI
 import UIKit
+import PhotosUI
 
 struct SettingsView: View {
     @Environment(AuthViewModel.self) private var auth
@@ -17,6 +18,9 @@ struct SettingsView: View {
     @State private var contactsManager = ContactsManager()
     @State private var isSyncingContacts = false
     @State private var contactSyncMessage: String?
+    @State private var selectedProfilePhoto: PhotosPickerItem?
+    @State private var isUploadingProfilePhoto = false
+    @State private var profilePhotoMessage: String?
 
     var body: some View {
         @Bindable var settings = settings
@@ -24,6 +28,38 @@ struct SettingsView: View {
             List {
                 // MARK: Account
                 Section {
+                    HStack(spacing: 12) {
+                        ProfileAvatarView(profile: auth.profile, size: 54, fontSize: 20)
+                            .overlay(
+                                Circle()
+                                    .strokeBorder(Color.coral.opacity(0.35), lineWidth: 1)
+                            )
+
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Profile Photo")
+                                .foregroundStyle(.white)
+                            if isUploadingProfilePhoto {
+                                Text("Uploading...")
+                                    .font(.caption)
+                                    .foregroundStyle(Color(white: 0.6))
+                            } else if let profilePhotoMessage {
+                                Text(profilePhotoMessage)
+                                    .font(.caption)
+                                    .foregroundStyle(Color(white: 0.6))
+                            }
+                        }
+
+                        Spacer()
+
+                        PhotosPicker(selection: $selectedProfilePhoto, matching: .images) {
+                            Text(auth.profile?.avatarUrl == nil ? "Upload" : "Change")
+                                .font(.subheadline.weight(.semibold))
+                                .foregroundStyle(isUploadingProfilePhoto ? Color(white: 0.45) : Color.coral)
+                        }
+                        .disabled(isUploadingProfilePhoto)
+                    }
+                    .listRowBackground(Color.appSurface)
+
                     NavigationLink {
                         EditDisplayNameView(currentName: auth.profile?.displayName ?? "")
                     } label: {
@@ -196,6 +232,10 @@ struct SettingsView: View {
             await loadPrefs()
             refreshContactSyncState()
         }
+        .onChange(of: selectedProfilePhoto) { _, item in
+            guard let item else { return }
+            Task { await uploadProfilePhoto(item) }
+        }
         .confirmationDialog("Sign out of Squad Brunch?", isPresented: $showSignOutConfirm, titleVisibility: .visible) {
             Button("Sign Out", role: .destructive) {
                 Task { await auth.signOut() }
@@ -323,6 +363,32 @@ struct SettingsView: View {
             settings.contactsEnabled = false
             contactsManager.clear()
             contactSyncMessage = "Contact sync is off."
+        }
+    }
+
+    private func uploadProfilePhoto(_ item: PhotosPickerItem) async {
+        isUploadingProfilePhoto = true
+        profilePhotoMessage = nil
+        defer {
+            isUploadingProfilePhoto = false
+            selectedProfilePhoto = nil
+        }
+        do {
+            guard let data = try await item.loadTransferable(type: Data.self),
+                  let image = UIImage(data: data) else {
+                profilePhotoMessage = "Couldn't load that photo."
+                return
+            }
+            let didUpdate = await auth.updateProfilePhoto(image)
+            if didUpdate {
+                profilePhotoMessage = "Profile photo updated."
+            } else {
+                profilePhotoMessage = auth.error ?? "Couldn't upload that photo."
+            }
+        } catch is CancellationError {
+            return
+        } catch {
+            profilePhotoMessage = "Couldn't load that photo."
         }
     }
 }
