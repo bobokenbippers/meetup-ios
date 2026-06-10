@@ -75,8 +75,29 @@ struct TicketmasterEventSource: EventSource {
 
     func fetchNearbyEvents(latitude: Double, longitude: Double, radiusMiles: Int) async throws -> [NearbyEvent] {
         guard let apiKey else { throw EventSourceError.missingAPIKey }
-        let startDateTime = ISO8601DateFormatter().string(from: Date())
 
+        let url = Self.discoveryURL(
+            apiKey: apiKey,
+            latitude: latitude,
+            longitude: longitude,
+            radiusMiles: radiusMiles
+        )
+
+        let (data, response) = try await session.data(from: url)
+        guard let http = response as? HTTPURLResponse else { throw EventSourceError.badResponse }
+        guard (200..<300).contains(http.statusCode) else { throw EventSourceError.requestFailed(http.statusCode) }
+
+        let decoded = try JSONDecoder().decode(TMResponse.self, from: data)
+        return (decoded.embedded?.events ?? []).compactMap(Self.map)
+    }
+
+    static func discoveryURL(
+        apiKey: String,
+        latitude: Double,
+        longitude: Double,
+        radiusMiles: Int,
+        now: Date = Date()
+    ) -> URL {
         var components = URLComponents(string: "https://app.ticketmaster.com/discovery/v2/events.json")!
         components.queryItems = [
             URLQueryItem(name: "apikey", value: apiKey),
@@ -85,16 +106,9 @@ struct TicketmasterEventSource: EventSource {
             URLQueryItem(name: "unit", value: "miles"),
             URLQueryItem(name: "size", value: "20"),
             URLQueryItem(name: "sort", value: "date,asc"),
-            URLQueryItem(name: "startDateTime", value: startDateTime),
+            URLQueryItem(name: "startDateTime", value: ISO8601DateFormatter().string(from: now)),
         ]
-        guard let url = components.url else { throw EventSourceError.badResponse }
-
-        let (data, response) = try await session.data(from: url)
-        guard let http = response as? HTTPURLResponse else { throw EventSourceError.badResponse }
-        guard (200..<300).contains(http.statusCode) else { throw EventSourceError.requestFailed(http.statusCode) }
-
-        let decoded = try JSONDecoder().decode(TMResponse.self, from: data)
-        return (decoded.embedded?.events ?? []).compactMap(Self.map)
+        return components.url!
     }
 
     // MARK: Mapping
