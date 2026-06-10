@@ -68,8 +68,7 @@ jobs:
             -destination-timeout 60 \
             CODE_SIGNING_ALLOWED=NO \
             -only-testing:meetup-iosTests \
-            -resultBundlePath TestResults.xcresult \
-            | xcpretty
+            -resultBundlePath TestResults.xcresult
 
       - name: Upload test results
         if: always()
