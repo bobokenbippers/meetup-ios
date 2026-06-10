@@ -8,6 +8,7 @@ struct Message: Codable, Identifiable, Equatable {
     let body: String?
     let imagePath: String?
     let createdAt: Date
+    let editedAt: Date?
 
     enum CodingKeys: String, CodingKey {
         case id, body
@@ -15,6 +16,24 @@ struct Message: Codable, Identifiable, Equatable {
         case senderId = "sender_id"
         case imagePath = "image_path"
         case createdAt = "created_at"
+        case editedAt = "edited_at"
+    }
+}
+
+/// Aggregated reaction state for one message emoji.
+struct MessageReactionSummary: Codable, Identifiable, Equatable {
+    var id: String { emoji }
+
+    let messageId: UUID
+    let emoji: String
+    let reactionCount: Int
+    let reactedByMe: Bool
+
+    enum CodingKeys: String, CodingKey {
+        case messageId = "message_id"
+        case emoji
+        case reactionCount = "reaction_count"
+        case reactedByMe = "reacted_by_me"
     }
 }
 

@@ -5,7 +5,13 @@ import Foundation
 @Suite("Meetup list filtering")
 struct MeetupFilteringTests {
 
-    private func makeMeetup(status: String = "active") -> Meetup {
+    private func makeMeetup(
+        status: String = "active",
+        targetArrivalAt: Date? = nil,
+        startsAt: Date = Date(),
+        endsAt: Date = Date().addingTimeInterval(7200),
+        createdAt: Date = Date()
+    ) -> Meetup {
         Meetup(
             id: UUID(),
             hostId: UUID(),
@@ -13,30 +19,46 @@ struct MeetupFilteringTests {
             destinationAddress: nil,
             destinationLat: 0,
             destinationLng: 0,
-            targetArrivalAt: nil,
-            startsAt: Date(),
-            endsAt: Date().addingTimeInterval(7200),
+            targetArrivalAt: targetArrivalAt,
+            startsAt: startsAt,
+            endsAt: endsAt,
             status: status,
             shareToken: UUID().uuidString,
-            createdAt: Date(),
+            createdAt: createdAt,
             category: nil
         )
     }
 
-    private func makeParticipation(meetupStatus: String = "active", myStatus: String) -> MyParticipation {
-        MyParticipation(status: myStatus, meetup: makeMeetup(status: meetupStatus))
+    private func makeParticipation(
+        meetupStatus: String = "active",
+        myStatus: String,
+        targetArrivalAt: Date? = nil,
+        startsAt: Date = Date(),
+        endsAt: Date = Date().addingTimeInterval(7200),
+        createdAt: Date = Date()
+    ) -> MyParticipation {
+        MyParticipation(
+            status: myStatus,
+            meetup: makeMeetup(
+                status: meetupStatus,
+                targetArrivalAt: targetArrivalAt,
+                startsAt: startsAt,
+                endsAt: endsAt,
+                createdAt: createdAt
+            )
+        )
     }
 
-    // Mirrors the filtering logic in MeetupsListView
     private func filter(_ participations: [MyParticipation]) -> (
         invited: [MyParticipation],
         active: [MyParticipation],
         past: [MyParticipation]
     ) {
-        let invited = participations.filter { $0.status == "invited" && $0.meetup.status == "active" }
-        let active  = participations.filter { $0.status != "invited" && $0.meetup.status == "active" }
-        let past    = participations.filter { $0.meetup.status != "active" && $0.meetup.status != "cancelled" }
-        return (invited, active, past)
+        (
+            MeetupListFilters.invited(participations),
+            MeetupListFilters.active(participations),
+            MeetupListFilters.past(participations)
+        )
     }
 
     @Test("invited participation appears only in invited bucket")
@@ -88,6 +110,46 @@ struct MeetupFilteringTests {
         #expect(result.invited.isEmpty)
         #expect(result.active.isEmpty)
         #expect(result.past.isEmpty)
+    }
+
+    @Test("expired active meetup moves to past bucket")
+    func expiredActiveMovesToPast() {
+        let p = makeParticipation(
+            myStatus: "accepted",
+            startsAt: Date().addingTimeInterval(-8 * 3600),
+            endsAt: Date().addingTimeInterval(-4 * 3600)
+        )
+        let result = filter([p])
+        #expect(result.invited.isEmpty)
+        #expect(result.active.isEmpty)
+        #expect(result.past.count == 1)
+    }
+
+    @Test("expired invite moves to past bucket")
+    func expiredInviteMovesToPast() {
+        let p = makeParticipation(
+            myStatus: "invited",
+            startsAt: Date().addingTimeInterval(-8 * 3600),
+            endsAt: Date().addingTimeInterval(-4 * 3600)
+        )
+        let result = filter([p])
+        #expect(result.invited.isEmpty)
+        #expect(result.active.isEmpty)
+        #expect(result.past.count == 1)
+    }
+
+    @Test("target-arrival meetup moves to past when recap-ready")
+    func targetArrivalRecapReadyMovesToPast() {
+        let p = makeParticipation(
+            myStatus: "accepted",
+            targetArrivalAt: Date().addingTimeInterval(-2 * 3600),
+            startsAt: Date().addingTimeInterval(-3 * 3600),
+            endsAt: Date().addingTimeInterval(2 * 3600)
+        )
+        let result = filter([p])
+        #expect(result.invited.isEmpty)
+        #expect(result.active.isEmpty)
+        #expect(result.past.count == 1)
     }
 
     @Test("mixed participations are distributed correctly")

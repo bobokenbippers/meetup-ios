@@ -16,6 +16,7 @@ struct CategoryOption: Identifiable {
 
 struct CreateMeetupView: View {
     @Environment(\.dismiss) private var dismiss
+    private let liveMeetups: [Meetup]
 
     // Only state needed at create() time lives here.
     // Keyboard-driven state (search query, phone, contacts) lives in sub-views
@@ -44,11 +45,13 @@ struct CreateMeetupView: View {
     @State private var selectedCategory: String? = nil
     @State private var customCategoryText = ""
     @State private var showingCustomCategory = false
+    @State private var conflictingMeetup: Meetup?
     @State private var error: String?
 
     /// Opens blank by default; pass a `prefill` (e.g. from a tapped nearby-event card)
     /// to seed the destination, time, and category from a real event.
-    init(prefill: EventPrefill? = nil) {
+    init(prefill: EventPrefill? = nil, liveMeetups: [Meetup] = []) {
+        self.liveMeetups = liveMeetups
         guard let prefill else { return }
         let effectiveTime = prefill.date ?? CreateMeetupView.defaultPickerTime
         let hour = Calendar.current.component(.hour, from: effectiveTime)
@@ -207,7 +210,7 @@ struct CreateMeetupView: View {
                                 .padding(.vertical, 20)
                         } else {
                             Button {
-                                Task { await create() }
+                                createTapped()
                             } label: {
                                 Text("Create")
                                     .font(.headline)
@@ -232,6 +235,23 @@ struct CreateMeetupView: View {
             .alert("Error", isPresented: Binding(get: { error != nil }, set: { if !$0 { error = nil } })) {
                 Button("OK") { error = nil }
             } message: { Text(error ?? "") }
+            .alert("Possible conflict", isPresented: Binding(
+                get: { conflictingMeetup != nil },
+                set: { if !$0 { conflictingMeetup = nil } }
+            )) {
+                Button("Cancel", role: .cancel) { conflictingMeetup = nil }
+                Button("Create Anyway") {
+                    let meetup = conflictingMeetup
+                    conflictingMeetup = nil
+                    Task { await create(allowConflict: true, conflictToIgnore: meetup?.id) }
+                }
+            } message: {
+                if let conflictingMeetup {
+                    Text("You already have \(conflictingMeetup.destinationName) live around this time.")
+                } else {
+                    Text("You already have a live meetup around this time.")
+                }
+            }
         }
     }
 
@@ -245,8 +265,33 @@ struct CreateMeetupView: View {
         if let date = cal.date(from: comps) { targetTime = date }
     }
 
-    private func create() async {
+    private func createTapped() {
+        if let conflict = findConflict(), conflict.id != conflictingMeetup?.id {
+            conflictingMeetup = conflict
+            return
+        }
+        Task { await create() }
+    }
+
+    private func findConflict(ignoring ignoredId: UUID? = nil) -> Meetup? {
+        let proposedTime = setTargetTime ? targetTime : Date()
+        let proposedStart = setTargetTime ? proposedTime.addingTimeInterval(-2 * 3600) : proposedTime
+        let proposedEnd = setTargetTime ? proposedTime.addingTimeInterval(2 * 3600) : proposedTime.addingTimeInterval(4 * 3600)
+        return liveMeetups.first { meetup in
+            guard meetup.id != ignoredId else { return false }
+            guard meetup.status == "active", Date() <= meetup.endsAt.addingTimeInterval(2 * 3600) else { return false }
+            let liveStart = meetup.startsAt
+            let liveEnd = meetup.endsAt.addingTimeInterval(2 * 3600)
+            return proposedStart <= liveEnd && proposedEnd >= liveStart
+        }
+    }
+
+    private func create(allowConflict: Bool = false, conflictToIgnore: UUID? = nil) async {
         guard let place = selectedPlace else { return }
+        if !allowConflict, let conflict = findConflict(ignoring: conflictToIgnore) {
+            conflictingMeetup = conflict
+            return
+        }
         isCreating = true
         error = nil
         do {

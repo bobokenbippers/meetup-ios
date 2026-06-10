@@ -286,6 +286,29 @@ final class MeetupService {
 
     func updateParticipantStatus(meetupId: UUID, status: String) async throws {
         guard let userId = supabase.auth.currentUser?.id else { return }
+        if status == "arrived" {
+            struct ArrivedStatusUpdate: Encodable {
+                let status: String
+                let arrivedAt: String
+
+                enum CodingKeys: String, CodingKey {
+                    case status
+                    case arrivedAt = "arrived_at"
+                }
+            }
+
+            try await supabase
+                .from("meetup_participants")
+                .update(ArrivedStatusUpdate(
+                    status: status,
+                    arrivedAt: ISO8601DateFormatter().string(from: Date())
+                ))
+                .eq("meetup_id", value: meetupId)
+                .eq("user_id", value: userId)
+                .execute()
+            return
+        }
+
         try await supabase
             .from("meetup_participants")
             .update(["status": status])

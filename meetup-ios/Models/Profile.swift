@@ -15,3 +15,15 @@ struct Profile: Codable, Identifiable, Equatable {
         case avatarUrl = "avatar_url"
     }
 }
+
+struct FriendProfileStats: Codable, Equatable {
+    let totalEvents: Int
+    let onTimeCount: Int
+    let lateCount: Int
+
+    enum CodingKeys: String, CodingKey {
+        case totalEvents = "total_events"
+        case onTimeCount = "on_time_count"
+        case lateCount = "late_count"
+    }
+}

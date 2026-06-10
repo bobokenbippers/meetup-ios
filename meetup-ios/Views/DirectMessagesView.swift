@@ -161,12 +161,17 @@ struct MessageThreadView: View {
     @Environment(\.dismiss) private var dismiss
 
     @State private var messages: [Message] = []
+    @State private var reactionSummaries: [UUID: [MessageReactionSummary]] = [:]
     @State private var draft = ""
     @State private var selectedPhoto: PhotosPickerItem?
     @State private var selectedImage: UIImage?
     @State private var isPreparingPhoto = false
     @State private var isSending = false
     @State private var failedPhotoSelection: String?
+    @State private var presentedPhoto: MessagePhotoPreview?
+    @State private var isShowingFriendProfile = false
+    @State private var editingMessage: Message?
+    @State private var editDraft = ""
     @State private var lastMarkedReadMessageId: UUID?
     @State private var error: String?
 
@@ -182,6 +187,20 @@ struct MessageThreadView: View {
                             MessageBubble(
                                 message: message,
                                 isMine: message.senderId == myId,
+                                reactionSummaries: reactionSummaries[message.id] ?? [],
+                                onOpenPhoto: { url in
+                                    presentedPhoto = MessagePhotoPreview(
+                                        url: url,
+                                        caption: message.body?.isEmpty == false ? message.body : nil
+                                    )
+                                },
+                                onToggleReaction: { emoji in
+                                    Task { await toggleReaction(emoji, for: message) }
+                                },
+                                onEdit: {
+                                    editingMessage = message
+                                    editDraft = message.body ?? ""
+                                },
                                 onDelete: { Task { await delete(message) } }
                             )
                             .id(message.id)
@@ -215,6 +234,19 @@ struct MessageThreadView: View {
                 .foregroundStyle(Color.coral)
                 .accessibilityLabel("Back to messages")
             }
+            ToolbarItem(placement: .navigationBarTrailing) {
+                Button {
+                    isShowingFriendProfile = true
+                } label: {
+                    ProfileAvatarView(profile: friend, size: 30, fontSize: 12)
+                        .overlay {
+                            Circle()
+                                .strokeBorder(.white.opacity(0.16), lineWidth: 1)
+                        }
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("View \(friendName)'s profile")
+            }
         }
         .preferredColorScheme(.dark)
         .task(id: conversationId) {
@@ -228,6 +260,29 @@ struct MessageThreadView: View {
         .onChange(of: selectedPhoto) { _, item in
             guard let item else { return }
             Task { await loadSelectedPhoto(item) }
+        }
+        .sheet(item: $presentedPhoto) { photo in
+            MessagePhotoPreviewView(photo: photo)
+        }
+        .sheet(isPresented: $isShowingFriendProfile) {
+            FriendProfileView(
+                profile: friend,
+                displayName: friendName,
+                isPending: false,
+                onMessage: nil,
+                onRemove: nil
+            )
+        }
+        .alert("Edit Message", isPresented: Binding(get: { editingMessage != nil }, set: { if !$0 { editingMessage = nil } })) {
+            TextField("Message", text: $editDraft, axis: .vertical)
+            Button("Cancel", role: .cancel) {
+                editingMessage = nil
+                editDraft = ""
+            }
+            Button("Save") {
+                guard let editingMessage else { return }
+                Task { await edit(editingMessage, body: editDraft) }
+            }
         }
         .alert("Error", isPresented: Binding(get: { error != nil }, set: { if !$0 { error = nil } })) {
             Button("OK") { error = nil }
@@ -346,16 +401,34 @@ struct MessageThreadView: View {
     private func load() async -> Bool {
         do {
             let next = try await DirectMessageService.shared.listMessages(conversationId: conversationId)
+            let nextReactions = try await DirectMessageService.shared.listReactionSummaries(conversationId: conversationId)
+            var changed = false
             if messages != next {
                 messages = next
-                return true
+                changed = true
             }
+            if reactionSummaries != nextReactions {
+                reactionSummaries = nextReactions
+                changed = true
+            }
+            return changed
         } catch is CancellationError {
             return false
         } catch {
             self.error = error.localizedDescription
         }
         return false
+    }
+
+    private func toggleReaction(_ emoji: String, for message: Message) async {
+        do {
+            try await DirectMessageService.shared.toggleReaction(messageId: message.id, emoji: emoji)
+            await load()
+        } catch is CancellationError {
+            return
+        } catch {
+            self.error = error.localizedDescription
+        }
     }
 
     private func loadSelectedPhoto(_ item: PhotosPickerItem) async {
@@ -405,6 +478,20 @@ struct MessageThreadView: View {
         do {
             try await DirectMessageService.shared.deleteMessage(message)
             messages.removeAll { $0.id == message.id }
+            reactionSummaries[message.id] = nil
+        } catch is CancellationError {
+            return
+        } catch {
+            self.error = error.localizedDescription
+        }
+    }
+
+    private func edit(_ message: Message, body: String) async {
+        do {
+            try await DirectMessageService.shared.editMessage(message, body: body)
+            editingMessage = nil
+            editDraft = ""
+            await load()
         } catch is CancellationError {
             return
         } catch {
@@ -469,14 +556,20 @@ struct MessageThreadView: View {
 private struct MessageBubble: View {
     let message: Message
     let isMine: Bool
+    let reactionSummaries: [MessageReactionSummary]
+    let onOpenPhoto: (URL) -> Void
+    let onToggleReaction: (String) -> Void
+    let onEdit: () -> Void
     let onDelete: () -> Void
+
+    private static let availableReactions = ["❤️", "😂", "😮", "😢", "🔥", "👍"]
 
     var body: some View {
         HStack {
             if isMine { Spacer(minLength: 46) }
             VStack(alignment: isMine ? .trailing : .leading, spacing: 6) {
                 if let path = message.imagePath {
-                    MessageImage(path: path)
+                    MessageImage(path: path, onOpen: onOpenPhoto)
                 }
                 if let body = message.body, !body.isEmpty {
                     Text(body)
@@ -487,13 +580,31 @@ private struct MessageBubble: View {
                 Text(message.createdAt, format: .dateTime.hour().minute())
                     .scaledFont(size: 9, weight: .medium)
                     .foregroundStyle(.white.opacity(0.45))
+                if message.editedAt != nil {
+                    Text("Edited")
+                        .scaledFont(size: 9, weight: .medium)
+                        .foregroundStyle(.white.opacity(0.42))
+                }
+                if !reactionSummaries.isEmpty {
+                    reactionRow
+                }
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 9)
             .background(isMine ? Color.coral : Color.appSurface)
             .clipShape(RoundedRectangle(cornerRadius: 16))
             .contextMenu {
+                ForEach(Self.availableReactions, id: \.self) { emoji in
+                    Button {
+                        onToggleReaction(emoji)
+                    } label: {
+                        Text(emoji)
+                    }
+                }
                 if isMine {
+                    Button(action: onEdit) {
+                        Label("Edit", systemImage: "pencil")
+                    }
                     Button(role: .destructive, action: onDelete) {
                         Label("Delete", systemImage: "trash")
                     }
@@ -502,10 +613,31 @@ private struct MessageBubble: View {
             if !isMine { Spacer(minLength: 46) }
         }
     }
+
+    private var reactionRow: some View {
+        HStack(spacing: 5) {
+            ForEach(reactionSummaries) { reaction in
+                Button {
+                    onToggleReaction(reaction.emoji)
+                } label: {
+                    Text("\(reaction.emoji) \(reaction.reactionCount)")
+                        .scaledFont(size: 11, weight: .semibold)
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 7)
+                        .padding(.vertical, 4)
+                        .background(reaction.reactedByMe ? Color.white.opacity(0.24) : Color.black.opacity(0.16))
+                        .clipShape(Capsule())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("\(reaction.reactionCount) \(reaction.emoji) reactions")
+            }
+        }
+    }
 }
 
 private struct MessageImage: View {
     let path: String
+    let onOpen: (URL) -> Void
 
     @State private var url: URL?
     @State private var failedToLoad = false
@@ -538,6 +670,13 @@ private struct MessageImage: View {
         .frame(width: 220, height: 170)
         .background(Color.black.opacity(0.18))
         .clipShape(RoundedRectangle(cornerRadius: 12))
+        .contentShape(RoundedRectangle(cornerRadius: 12))
+        .onTapGesture {
+            guard let url, !failedToLoad else { return }
+            onOpen(url)
+        }
+        .accessibilityAddTraits(.isButton)
+        .accessibilityLabel(url == nil || failedToLoad ? "Message photo" : "Open message photo")
         .task(id: path) {
             await loadSignedURL()
         }
@@ -569,5 +708,77 @@ private struct MessageImage: View {
         } catch {
             failedToLoad = true
         }
+    }
+}
+
+private struct MessagePhotoPreview: Identifiable {
+    let id = UUID()
+    let url: URL
+    let caption: String?
+}
+
+private struct MessagePhotoPreviewView: View {
+    let photo: MessagePhotoPreview
+
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        ZStack(alignment: .topTrailing) {
+            Color.black.ignoresSafeArea()
+
+            VStack(spacing: 0) {
+                AsyncImage(url: photo.url) { phase in
+                    switch phase {
+                    case .empty:
+                        ProgressView()
+                            .tint(Color.coral)
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    case .success(let image):
+                        image
+                            .resizable()
+                            .scaledToFit()
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    case .failure:
+                        VStack(spacing: 10) {
+                            Image(systemName: "photo.badge.exclamationmark")
+                                .scaledFont(size: 44)
+                            Text("Couldn't load photo")
+                                .scaledFont(size: 14, weight: .semibold)
+                        }
+                        .foregroundStyle(.white.opacity(0.7))
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    @unknown default:
+                        EmptyView()
+                    }
+                }
+
+                if let caption = photo.caption {
+                    Text(caption)
+                        .scaledFont(size: 15)
+                        .foregroundStyle(.white)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.horizontal, 20)
+                        .padding(.vertical, 16)
+                        .background(
+                            LinearGradient(
+                                colors: [.black.opacity(0), .black.opacity(0.7)],
+                                startPoint: .top,
+                                endPoint: .bottom
+                            )
+                        )
+                }
+            }
+
+            Button {
+                dismiss()
+            } label: {
+                Image(systemName: "xmark.circle.fill")
+                    .scaledFont(size: 28)
+                    .foregroundStyle(.white.opacity(0.82))
+                    .padding(20)
+            }
+            .accessibilityLabel("Close photo")
+        }
+        .preferredColorScheme(.dark)
     }
 }

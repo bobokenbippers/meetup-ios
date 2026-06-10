@@ -2411,12 +2411,13 @@ grant execute on function public.deactivate_account() to authenticated;
 
 ### M9.3 Friend direct messages
 
-Direct messages are 1:1 conversations between accepted friends. The canonical migration is `supabase/migrations/20260609_direct_messages.sql`; run it in Supabase before shipping the iOS UI.
+Direct messages are 1:1 conversations between accepted friends. The canonical migration is `supabase/migrations/20260609_direct_messages.sql`; run it in Supabase before shipping the iOS UI. Message reactions are added by `supabase/migrations/20260610153000_message_reactions.sql`, friend profile recap stats are added by `supabase/migrations/20260610153500_friend_profile_stats.sql`, and sender-only message edits are added by `supabase/migrations/20260610154000_edit_direct_messages.sql`.
 
 Schema:
 
 - `conversations`: one canonical row per friend pair (`user_a_id < user_b_id`), with `last_message_at`, `last_read_a`, and `last_read_b`.
-- `messages`: text and/or image messages with `conversation_id`, `sender_id`, `body`, `image_path`, and `created_at`.
+- `messages`: text and/or image messages with `conversation_id`, `sender_id`, `body`, `image_path`, `created_at`, and `edited_at`.
+- `message_reactions`: emoji reactions keyed by `message_id`, `user_id`, and `emoji`, with one row per user's reaction.
 - `message-photos` storage bucket: private bucket for DM images, stored at `<conversation_id>/<uuid>.jpg` and read through signed URLs.
 
 RPCs:
@@ -2424,12 +2425,17 @@ RPCs:
 - `get_or_create_conversation(p_other_user_id uuid)`: returns the existing accepted-friend conversation or creates one.
 - `list_conversation_summaries()`: inbox feed with the other participant, last message preview, and unread count.
 - `mark_conversation_read(p_conversation_id uuid)`: updates the caller's read timestamp.
+- `list_message_reactions(p_conversation_id uuid)`: returns per-message emoji counts and whether the caller reacted.
+- `toggle_message_reaction(p_message_id uuid, p_emoji text)`: adds or removes the caller's reaction for one message.
+- `get_friend_profile_stats(p_profile_id uuid)`: returns attended event count plus on-time and late counts for the caller or an accepted friend.
 
 RLS:
 
 - Conversation reads/inserts/updates are limited to participants and accepted friends.
 - Message reads/sends are limited to accepted friends in the conversation.
+- Message edits are limited to the sender of the message.
 - Message deletes are limited to the sender of the message.
+- Reaction reads/writes are limited to accepted friends in the conversation, and deletes are limited to the user who reacted.
 - Storage object read/upload/delete policies are scoped to conversation participants by the first storage path segment.
 
 Push:

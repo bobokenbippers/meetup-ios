@@ -51,7 +51,7 @@ create policy "users upload own profile photos"
   on storage.objects for insert
   with check (
     bucket_id = 'profile-photos'
-    and auth.uid()::text = (storage.foldername(name))[1]
+    and auth.uid()::text = lower((storage.foldername(name))[1])
   );
 
 drop policy if exists "users update own profile photos" on storage.objects;
@@ -59,11 +59,11 @@ create policy "users update own profile photos"
   on storage.objects for update
   using (
     bucket_id = 'profile-photos'
-    and auth.uid()::text = (storage.foldername(name))[1]
+    and auth.uid()::text = lower((storage.foldername(name))[1])
   )
   with check (
     bucket_id = 'profile-photos'
-    and auth.uid()::text = (storage.foldername(name))[1]
+    and auth.uid()::text = lower((storage.foldername(name))[1])
   );
 
 drop policy if exists "users delete own profile photos" on storage.objects;
@@ -71,7 +71,7 @@ create policy "users delete own profile photos"
   on storage.objects for delete
   using (
     bucket_id = 'profile-photos'
-    and auth.uid()::text = (storage.foldername(name))[1]
+    and auth.uid()::text = lower((storage.foldername(name))[1])
   );
 
 -- Search RPCs include avatar_url so add-friend and invite flows can render
