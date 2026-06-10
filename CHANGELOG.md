@@ -12,6 +12,7 @@ Please test:
 - Delete one of your own messages.
 - Background the app and confirm DM push notifications open the right place.
 - Open Settings and use Send Feedback to report anything weird.
+- Toggle Settings → Sync Contacts and confirm iOS asks for contact access, then People/Create Meetup contact suggestions follow that setting.
 
 ### Added
 - Friend direct messages with a Messages tab, inbox, chat threads, realtime updates, unread counts, and push routing.
@@ -36,6 +37,7 @@ Please test:
 - Event suggestions can request location correctly after authorization by adding required iOS location usage strings and a one-shot location fetch.
 - Event suggestions no longer disappear when location permission is pending or unavailable; the Meetups tab now shows a clear location prompt or empty state.
 - Event suggestion API configuration is now included in the app target build settings so release builds can read it reliably.
+- Settings → Sync Contacts now actually requests contact permission, reports sync status, and gates contact suggestions throughout the app.
 - Chat photo selection now reliably prepares the selected image before sending and resizes uploads for faster delivery.
 - Open chat threads now refresh while you stay in the conversation, even if realtime misses a message event.
 - Auth startup no longer flashes the full meetup UI before Supabase finishes resolving the initial session.

@@ -19,6 +19,7 @@ struct PeopleListView: View {
     @State private var selectedSuggestion: ProfileSuggestion?
     @State private var selectedDirectMessage: DirectMessageRoute?
     @Environment(NavigationState.self) private var navState
+    @Environment(AppSettings.self) private var settings
 
     private var isSearchEnabled: Bool {
         let raw = phoneSearch.hasPrefix("+1") ? String(phoneSearch.dropFirst(2)) : phoneSearch
@@ -169,11 +170,19 @@ struct PeopleListView: View {
             .preferredColorScheme(.dark)
             .task {
                 await load()
-                await contactsManager.load()
+                await loadContactsIfEnabled()
                 enrichWithContactNames()
                 refreshSuggestions()
                 await loadSmartSuggestions()
                 await startFriendRequestRealtime()
+            }
+            .onChange(of: settings.contactsEnabled) { _, _ in
+                Task {
+                    await loadContactsIfEnabled()
+                    enrichWithContactNames()
+                    refreshSuggestions()
+                    await loadSmartSuggestions()
+                }
             }
             .sheet(item: $selectedSuggestion) { suggestion in
                 SuggestionProfileSheet(
@@ -221,7 +230,9 @@ struct PeopleListView: View {
                 .autocorrectionDisabled()
                 .onChange(of: phoneSearch) { _, v in
                     if v.contains(where: { $0.isLetter }) {
-                        contactSuggestions = Array(contactsManager.search(v).prefix(5))
+                        contactSuggestions = settings.contactsEnabled
+                            ? Array(contactsManager.search(v).prefix(5))
+                            : []
                     } else {
                         let raw = v.hasPrefix("+1") ? String(v.dropFirst(2)) : v
                         let digitsOnly = String(raw.filter { $0.isNumber }.prefix(10))
@@ -229,7 +240,9 @@ struct PeopleListView: View {
                         if phoneSearch != formatted {
                             phoneSearch = formatted
                         } else {
-                            contactSuggestions = Array(contactsManager.search(digitsOnly).prefix(5))
+                            contactSuggestions = settings.contactsEnabled
+                                ? Array(contactsManager.search(digitsOnly).prefix(5))
+                                : []
                         }
                     }
                 }
@@ -372,6 +385,10 @@ struct PeopleListView: View {
     }
 
     private func enrichWithContactNames() {
+        guard settings.contactsEnabled else {
+            contactNameOverrides = [:]
+            return
+        }
         var overrides: [UUID: String] = [:]
         for person in people {
             let needsEnrichment = person.displayName.map { isPlaceholderName($0) } ?? true
@@ -384,6 +401,7 @@ struct PeopleListView: View {
     }
 
     private func refreshSuggestions() {
+        guard settings.contactsEnabled else { contactSuggestions = []; return }
         guard !phoneSearch.isEmpty else { contactSuggestions = []; return }
         if phoneSearch.contains(where: { $0.isLetter }) {
             contactSuggestions = Array(contactsManager.search(phoneSearch).prefix(5))
@@ -392,6 +410,16 @@ struct PeopleListView: View {
             let digits = raw.filter { $0.isNumber }
             contactSuggestions = digits.isEmpty ? [] : Array(contactsManager.search(digits).prefix(5))
         }
+    }
+
+    private func loadContactsIfEnabled() async {
+        guard settings.contactsEnabled else {
+            contactsManager.clear()
+            contactSuggestions = []
+            contactNameOverrides = [:]
+            return
+        }
+        await contactsManager.load()
     }
 
     private func load() async {
@@ -568,10 +596,15 @@ struct PeopleListView: View {
     private func loadSmartSuggestions() async {
         let existingIds = Set(people.map { $0.id })
         do {
-            let results = try await SuggestionsService.shared.fetchSuggestions(
-                contactsManager: contactsManager,
-                existingFriendIds: existingIds
-            )
+            let results: [ProfileSuggestion]
+            if settings.contactsEnabled {
+                results = try await SuggestionsService.shared.fetchSuggestions(
+                    contactsManager: contactsManager,
+                    existingFriendIds: existingIds
+                )
+            } else {
+                results = try await SuggestionsService.shared.fetchFriendsOfFriends(existingFriendIds: existingIds)
+            }
             smartSuggestions = results
         } catch is CancellationError {
             return
