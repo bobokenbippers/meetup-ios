@@ -69,7 +69,14 @@ struct AddParticipantsSheet: View {
 
                     if let user = foundUser {
                         VStack(alignment: .leading, spacing: 6) {
-                            HStack {
+                            HStack(spacing: 10) {
+                                ProfileAvatarView(
+                                    displayName: user.displayName,
+                                    avatarUrl: user.avatarUrl,
+                                    userId: user.id,
+                                    size: 38,
+                                    fontSize: 15
+                                )
                                 VStack(alignment: .leading, spacing: 2) {
                                     Text(user.displayName)
                                         .font(.subheadline)
@@ -241,10 +248,6 @@ private struct AddFriendChip: View {
     let friend: Profile
     let onTap: () -> Void
 
-    private var initial: String {
-        String((friend.displayName ?? "?").prefix(1)).uppercased()
-    }
-
     private var shortName: String {
         let name = friend.displayName ?? "Unknown"
         let first = name.split(separator: " ").first.map(String.init) ?? name
@@ -254,14 +257,8 @@ private struct AddFriendChip: View {
     var body: some View {
         Button(action: onTap) {
             VStack(spacing: 5) {
-                Circle()
-                    .fill(Color.coral.opacity(0.12))
-                    .frame(width: 44, height: 44)
-                    .overlay {
-                        Text(initial)
-                            .scaledFont(size: 16, weight: .bold)
-                            .foregroundStyle(Color.coral)
-                    }
+                ProfileAvatarView(profile: friend, size: 44, fontSize: 16)
+                    .overlay(Circle().strokeBorder(Color.coral.opacity(0.35), lineWidth: 1))
                 Text(shortName)
                     .scaledFont(size: 11, weight: .medium)
                     .foregroundStyle(Color(white: 0.6))

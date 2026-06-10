@@ -3,6 +3,7 @@ import AuthenticationServices
 import Supabase
 import Observation
 import CryptoKit
+import UIKit
 
 @Observable
 final class AuthViewModel {
@@ -161,6 +162,32 @@ final class AuthViewModel {
             if let profile { Self.cacheProfile(profile) }
         } catch {
             self.error = error.localizedDescription
+        }
+    }
+
+    @discardableResult
+    func updateProfilePhoto(_ image: UIImage) async -> Bool {
+        guard let userId = supabase.auth.currentUser?.id else { return false }
+        do {
+            error = nil
+            let avatarUrl = try await ProfilePhotoService.shared.uploadProfilePhoto(image)
+            struct AvatarUpdate: Encodable {
+                let avatarUrl: String
+                enum CodingKeys: String, CodingKey {
+                    case avatarUrl = "avatar_url"
+                }
+            }
+            try await supabase
+                .from("profiles")
+                .update(AvatarUpdate(avatarUrl: avatarUrl))
+                .eq("id", value: userId)
+                .execute()
+            profile?.avatarUrl = avatarUrl
+            if let profile { Self.cacheProfile(profile) }
+            return true
+        } catch {
+            self.error = error.localizedDescription
+            return false
         }
     }
 

@@ -418,7 +418,14 @@ private struct InviteSection: View {
             }
             if let user = foundUser {
                 VStack(alignment: .leading, spacing: 6) {
-                    HStack {
+                    HStack(spacing: 10) {
+                        ProfileAvatarView(
+                            displayName: user.displayName,
+                            avatarUrl: user.avatarUrl,
+                            userId: user.id,
+                            size: 38,
+                            fontSize: 15
+                        )
                         VStack(alignment: .leading, spacing: 2) {
                             Text(user.displayName).font(.subheadline).foregroundStyle(.white)
                             Text(user.phone).font(.caption).foregroundStyle(Color(white: 0.6))
@@ -435,7 +442,14 @@ private struct InviteSection: View {
                 .listRowBackground(Color.appSurface)
             }
             ForEach(invitees, id: \.id) { invitee in
-                HStack {
+                HStack(spacing: 10) {
+                    ProfileAvatarView(
+                        displayName: invitee.displayName,
+                        avatarUrl: invitee.avatarUrl,
+                        userId: invitee.id,
+                        size: 34,
+                        fontSize: 13
+                    )
                     Text(invitee.displayName).foregroundStyle(.white)
                     Spacer()
                     Text(invitee.phone).font(.caption).foregroundStyle(Color(white: 0.6))
@@ -632,7 +646,8 @@ private struct FriendSuggestionsRow: View {
         let user = FoundUser(
             id: friend.id,
             displayName: friend.displayName ?? "Unknown",
-            phone: friend.phoneE164 ?? ""
+            phone: friend.phoneE164 ?? "",
+            avatarUrl: friend.avatarUrl
         )
         if let idx = invitees.firstIndex(where: { $0.id == friend.id }) {
             invitees.remove(at: idx)
@@ -649,10 +664,6 @@ private struct FriendChip: View {
     let isInvited: Bool
     let onTap: () -> Void
 
-    private var initial: String {
-        String((friend.displayName ?? "?").prefix(1)).uppercased()
-    }
-
     private var shortName: String {
         let name = friend.displayName ?? "Unknown"
         let first = name.split(separator: " ").first.map(String.init) ?? name
@@ -663,17 +674,16 @@ private struct FriendChip: View {
         Button(action: onTap) {
             VStack(spacing: 5) {
                 ZStack {
-                    Circle()
-                        .fill(isInvited ? Color.coral : Color.coral.opacity(0.12))
-                        .frame(width: 44, height: 44)
+                    ProfileAvatarView(profile: friend, size: 44, fontSize: 16)
                     if isInvited {
+                        Circle()
+                            .fill(Color.black.opacity(0.35))
                         Image(systemName: "checkmark")
                             .scaledFont(size: 14, weight: .bold)
                             .foregroundStyle(.white)
                     } else {
-                        Text(initial)
-                            .scaledFont(size: 16, weight: .bold)
-                            .foregroundStyle(Color.coral)
+                        Circle()
+                            .strokeBorder(Color.coral.opacity(0.35), lineWidth: 1)
                     }
                 }
                 Text(shortName)

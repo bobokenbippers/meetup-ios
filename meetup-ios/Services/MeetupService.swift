@@ -5,6 +5,7 @@ struct FoundUser {
     let id: UUID
     let displayName: String
     let phone: String
+    let avatarUrl: String?
 }
 
 /// Friendship relationship between the current user and another user.
@@ -39,10 +40,12 @@ final class MeetupService {
             let id: UUID
             let displayName: String?
             let phoneE164: String?
+            let avatarUrl: String?
             enum CodingKeys: String, CodingKey {
                 case id
                 case displayName = "display_name"
                 case phoneE164 = "phone_e164"
+                case avatarUrl = "avatar_url"
             }
         }
         let rows: [Row] = try await supabase
@@ -50,7 +53,12 @@ final class MeetupService {
             .execute()
             .value
         guard let row = rows.first else { return nil }
-        return FoundUser(id: row.id, displayName: row.displayName ?? "Unknown", phone: row.phoneE164 ?? "")
+        return FoundUser(
+            id: row.id,
+            displayName: row.displayName ?? "Unknown",
+            phone: row.phoneE164 ?? "",
+            avatarUrl: row.avatarUrl
+        )
     }
 
     func findUserByPhone(_ phone: String) async throws -> FoundUser? {
@@ -58,10 +66,12 @@ final class MeetupService {
             let id: UUID
             let displayName: String?
             let phoneE164: String?
+            let avatarUrl: String?
             enum CodingKeys: String, CodingKey {
                 case id
                 case displayName = "display_name"
                 case phoneE164 = "phone_e164"
+                case avatarUrl = "avatar_url"
             }
         }
         let rows: [Row] = try await supabase
@@ -69,7 +79,12 @@ final class MeetupService {
             .execute()
             .value
         guard let row = rows.first else { return nil }
-        return FoundUser(id: row.id, displayName: row.displayName ?? "Unknown", phone: row.phoneE164 ?? phone)
+        return FoundUser(
+            id: row.id,
+            displayName: row.displayName ?? "Unknown",
+            phone: row.phoneE164 ?? phone,
+            avatarUrl: row.avatarUrl
+        )
     }
 
     func createMeetup(
@@ -178,7 +193,7 @@ final class MeetupService {
         guard let myId = supabase.auth.currentUser?.id else { return [] }
         return try await supabase
             .from("meetup_participants")
-            .select("status, meetups(*, host_profile:profiles!meetups_host_id_fkey(id, display_name, phone_e164, email))")
+            .select("status, meetups(*, host_profile:profiles!meetups_host_id_fkey(id, display_name, phone_e164, email, avatar_url))")
             .eq("user_id", value: myId)
             .execute()
             .value
@@ -196,6 +211,7 @@ final class MeetupService {
             let locationUpdatedAt: Date?
             let displayName: String?
             let phoneE164: String?
+            let avatarUrl: String?
 
             enum CodingKeys: String, CodingKey {
                 case meetupId = "meetup_id"
@@ -206,6 +222,7 @@ final class MeetupService {
                 case locationUpdatedAt = "location_updated_at"
                 case displayName = "display_name"
                 case phoneE164 = "phone_e164"
+                case avatarUrl = "avatar_url"
             }
         }
 
@@ -226,7 +243,8 @@ final class MeetupService {
                 locationUpdatedAt: row.locationUpdatedAt,
                 profiles: MeetupParticipant.ParticipantProfile(
                     displayName: row.displayName,
-                    phoneE164: row.phoneE164
+                    phoneE164: row.phoneE164,
+                    avatarUrl: row.avatarUrl
                 )
             )
         }

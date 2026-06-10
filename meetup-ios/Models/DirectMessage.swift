@@ -58,6 +58,7 @@ struct ConversationSummary: Identifiable, Equatable {
             && lhs.unreadCount == rhs.unreadCount
             && lhs.friend.id == rhs.friend.id
             && lhs.friend.displayName == rhs.friend.displayName
+            && lhs.friend.avatarUrl == rhs.friend.avatarUrl
     }
 
     /// One-line preview for the inbox row.

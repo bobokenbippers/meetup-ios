@@ -110,14 +110,7 @@ private struct ConversationRow: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            Circle()
-                .fill(avatarColor(for: summary.friend.id).opacity(0.72))
-                .frame(width: 46, height: 46)
-                .overlay {
-                    Text(String(displayName.prefix(1)).uppercased())
-                        .scaledFont(size: 17, weight: .bold)
-                        .foregroundStyle(.white)
-                }
+            ProfileAvatarView(profile: summary.friend, size: 46, fontSize: 17)
 
             VStack(alignment: .leading, spacing: 4) {
                 HStack {
@@ -158,10 +151,6 @@ private struct ConversationRow: View {
             RoundedRectangle(cornerRadius: 14)
                 .strokeBorder(.white.opacity(0.08), lineWidth: 1)
         }
-    }
-
-    private func avatarColor(for id: UUID) -> Color {
-        Color.participantPalette[abs(id.hashValue) % Color.participantPalette.count]
     }
 }
 

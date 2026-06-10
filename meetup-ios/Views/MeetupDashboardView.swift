@@ -654,10 +654,6 @@ struct DashboardParticipantPin: View {
         return .statusLive
     }
 
-    private var avatarColor: Color {
-        pinColor(for: participant.userId)
-    }
-
     var body: some View {
         if isMe {
             // Blue pulsing "You" dot
@@ -673,16 +669,14 @@ struct DashboardParticipantPin: View {
             }
         } else {
             HStack(spacing: 4) {
-                // Avatar circle
-                Circle()
-                    .fill(avatarColor)
-                    .frame(width: 34, height: 34)
-                    .overlay(Circle().strokeBorder(.white, lineWidth: 2.5))
-                    .overlay {
-                        Text(String((participant.displayName ?? "?").prefix(1)).uppercased())
-                            .scaledFont(size: 13, weight: .bold)
-                            .foregroundStyle(.white)
-                    }
+                ProfileAvatarView(
+                    displayName: participant.displayName,
+                    avatarUrl: participant.avatarUrl,
+                    userId: participant.userId,
+                    size: 34,
+                    fontSize: 13
+                )
+                .overlay(Circle().strokeBorder(.white, lineWidth: 2.5))
                     .shadow(radius: 3)
 
                 // Callout bubble
@@ -706,14 +700,6 @@ struct DashboardParticipantPin: View {
         }
     }
 }
-
-private enum ParticipantPalette {
-    static func color(for userId: UUID) -> Color {
-        Color.participantPalette[abs(userId.hashValue) % Color.participantPalette.count]
-    }
-}
-
-private func pinColor(for userId: UUID) -> Color { ParticipantPalette.color(for: userId) }
 
 // MARK: - Participant Row (in bottom panel)
 
@@ -770,20 +756,22 @@ private struct DashboardParticipantRow: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            Circle()
-                .fill(pinColor(for: participant.userId).opacity(0.8))
-                .frame(width: 30, height: 30)
-                .overlay {
-                    if participant.status == "arrived" {
-                        Image(systemName: "checkmark")
-                            .scaledFont(size: 12, weight: .bold)
-                            .foregroundStyle(.white)
-                    } else {
-                        Text(String((participant.displayName ?? "?").prefix(1)).uppercased())
-                            .scaledFont(size: 12, weight: .bold)
-                            .foregroundStyle(.white)
-                    }
+            ProfileAvatarView(
+                displayName: participant.displayName,
+                avatarUrl: participant.avatarUrl,
+                userId: participant.userId,
+                size: 30,
+                fontSize: 12
+            )
+            .overlay {
+                if participant.status == "arrived" {
+                    Circle()
+                        .fill(Color.black.opacity(0.35))
+                    Image(systemName: "checkmark")
+                        .scaledFont(size: 12, weight: .bold)
+                        .foregroundStyle(.white)
                 }
+            }
 
             VStack(alignment: .leading, spacing: 1) {
                 HStack(spacing: 4) {

@@ -59,14 +59,24 @@ struct MeetupParticipant: Codable, Identifiable, Equatable {
     struct ParticipantProfile: Codable, Equatable {
         let displayName: String?
         let phoneE164: String?
+        let avatarUrl: String?
+
+        init(displayName: String?, phoneE164: String?, avatarUrl: String? = nil) {
+            self.displayName = displayName
+            self.phoneE164 = phoneE164
+            self.avatarUrl = avatarUrl
+        }
+
         enum CodingKeys: String, CodingKey {
             case displayName = "display_name"
             case phoneE164 = "phone_e164"
+            case avatarUrl = "avatar_url"
         }
     }
 
     var id: UUID { userId }
     var displayName: String? { profiles?.displayName }
+    var avatarUrl: String? { profiles?.avatarUrl }
 
     enum CodingKeys: String, CodingKey {
         case meetupId = "meetup_id"

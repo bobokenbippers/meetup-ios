@@ -2436,6 +2436,31 @@ Push:
 
 - `push-new-message` is called by the `trg_on_new_message` database trigger and sends `event: new_message`, `conversationId`, and `senderId` through APNs.
 
+### M9.4 Profile photos
+
+Users can upload a profile photo from Settings. The canonical migration is
+`supabase/migrations/20260610030500_profile_photos.sql`.
+
+Schema/storage:
+
+- `profiles.avatar_url text`: stores the current public profile-photo URL.
+- `profile-photos` storage bucket: public-read bucket for avatar images, stored under
+  `<user_id>/<uuid>.jpg`.
+
+RLS:
+
+- Profile row updates still use the existing `profiles` own-row update policy.
+- Accepted friends can read each other's profile rows, including `avatar_url`.
+- Storage object uploads/updates/deletes are limited to the signed-in user's own folder.
+- Storage object reads are public so `AsyncImage` can render avatars without signed URL churn.
+
+iOS:
+
+- `ProfilePhotoService` resizes and uploads the selected image.
+- `AuthViewModel.updateProfilePhoto(_:)` writes `avatar_url` and updates the cached profile.
+- `ProfileAvatarView` renders uploaded photos with initials as fallback across Settings,
+  People, DMs, meetup creation/invites, and meetup dashboard participants.
+
 ## Appendix C — Testing Strategy
 
 - **Unit tests (backend):** `pytest`. Focus on `services/punctuality.py`, `services/routing.py` ETA caching logic.
