@@ -177,6 +177,7 @@ struct MessageThreadView: View {
     @State private var selectedImage: UIImage?
     @State private var isPreparingPhoto = false
     @State private var isSending = false
+    @State private var failedPhotoSelection: String?
     @State private var lastMarkedReadMessageId: UUID?
     @State private var error: String?
 
@@ -280,6 +281,25 @@ struct MessageThreadView: View {
                     Spacer()
                 }
                 .padding(.horizontal, 12)
+            } else if let failedPhotoSelection {
+                HStack(spacing: 10) {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .scaledFont(size: 15, weight: .semibold)
+                        .foregroundStyle(Color.coral)
+                    Text(failedPhotoSelection)
+                        .scaledFont(size: 12, weight: .medium)
+                        .foregroundStyle(Color(white: 0.65))
+                    Spacer()
+                    Button {
+                        self.failedPhotoSelection = nil
+                    } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .scaledFont(size: 20)
+                            .foregroundStyle(Color(white: 0.55))
+                    }
+                    .buttonStyle(.plain)
+                }
+                .padding(.horizontal, 12)
             }
 
             HStack(spacing: 10) {
@@ -351,18 +371,22 @@ struct MessageThreadView: View {
 
     private func loadSelectedPhoto(_ item: PhotosPickerItem) async {
         isPreparingPhoto = true
+        failedPhotoSelection = nil
         defer {
             isPreparingPhoto = false
             selectedPhoto = nil
         }
         do {
             guard let data = try await item.loadTransferable(type: Data.self),
-                  let image = UIImage(data: data) else { return }
+                  let image = UIImage(data: data) else {
+                failedPhotoSelection = "Couldn't prepare that photo."
+                return
+            }
             selectedImage = image
         } catch is CancellationError {
             return
         } catch {
-            self.error = error.localizedDescription
+            failedPhotoSelection = "Couldn't prepare that photo."
         }
     }
 
@@ -495,10 +519,13 @@ private struct MessageImage: View {
     let path: String
 
     @State private var url: URL?
+    @State private var failedToLoad = false
 
     var body: some View {
         Group {
-            if let url {
+            if failedToLoad {
+                retryContent
+            } else if let url {
                 AsyncImage(url: url) { phase in
                     switch phase {
                     case .empty:
@@ -509,9 +536,7 @@ private struct MessageImage: View {
                             .resizable()
                             .scaledToFill()
                     case .failure:
-                        Image(systemName: "photo")
-                            .scaledFont(size: 24)
-                            .foregroundStyle(.white.opacity(0.55))
+                        retryContent
                     @unknown default:
                         EmptyView()
                     }
@@ -525,7 +550,35 @@ private struct MessageImage: View {
         .background(Color.black.opacity(0.18))
         .clipShape(RoundedRectangle(cornerRadius: 12))
         .task(id: path) {
-            url = try? await DirectMessageService.shared.signedImageURL(for: path)
+            await loadSignedURL()
+        }
+    }
+
+    private var retryContent: some View {
+        Button {
+            Task { await loadSignedURL() }
+        } label: {
+            VStack(spacing: 8) {
+                Image(systemName: "photo.badge.exclamationmark")
+                    .scaledFont(size: 24)
+                Text("Tap to retry photo")
+                    .scaledFont(size: 11, weight: .semibold)
+            }
+            .foregroundStyle(.white.opacity(0.65))
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func loadSignedURL() async {
+        failedToLoad = false
+        url = nil
+        do {
+            url = try await DirectMessageService.shared.signedImageURL(for: path)
+        } catch is CancellationError {
+            return
+        } catch {
+            failedToLoad = true
         }
     }
 }

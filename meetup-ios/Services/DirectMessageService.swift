@@ -5,6 +5,7 @@ import UIKit
 enum DirectMessageError: LocalizedError {
     case notSignedIn
     case imageCompressionFailed
+    case imageUploadFailed
 
     var errorDescription: String? {
         switch self {
@@ -12,6 +13,8 @@ enum DirectMessageError: LocalizedError {
             return "You must be signed in to message friends."
         case .imageCompressionFailed:
             return "Failed to prepare the image."
+        case .imageUploadFailed:
+            return "Couldn't upload that photo. Please try again."
         }
     }
 }
@@ -21,7 +24,7 @@ final class DirectMessageService {
 
     private let supabase = SupabaseManager.shared.client
     private let photoBucket = "message-photos"
-    private let signedURLExpiry = 3600
+    private let signedURLExpiry = 60 * 60 * 24
 
     private init() {}
 
@@ -104,9 +107,13 @@ final class DirectMessageService {
             throw DirectMessageError.imageCompressionFailed
         }
         let path = "\(conversationId.uuidString)/\(UUID().uuidString).jpg"
-        try await supabase.storage
-            .from(photoBucket)
-            .upload(path: path, file: jpeg, options: FileOptions(contentType: "image/jpeg", upsert: false))
+        do {
+            try await supabase.storage
+                .from(photoBucket)
+                .upload(path: path, file: jpeg, options: FileOptions(contentType: "image/jpeg", upsert: false))
+        } catch {
+            throw DirectMessageError.imageUploadFailed
+        }
 
         let trimmed = caption?.trimmingCharacters(in: .whitespacesAndNewlines)
         try await insertMessage(
