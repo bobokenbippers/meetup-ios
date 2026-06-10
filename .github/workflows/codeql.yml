@@ -4,9 +4,9 @@ on:
   pull_request:
     branches:
       - main
+    # PRs only run the fast edge-function analysis; Swift analysis is
+    # gated off PRs entirely (see analyze-swift below).
     paths:
-      - "meetup-ios/**"
-      - "meetup-ios.xcodeproj/**"
       - "supabase/functions/**"
       - ".github/workflows/codeql.yml"
   push:
@@ -33,8 +33,12 @@ concurrency:
 jobs:
   analyze-swift:
     name: Analyze Swift
+    # The Swift analysis needs a full traced rebuild (~30 min on a macOS
+    # runner), so it runs only on pushes to main, the weekly schedule, and
+    # manual dispatch — never on PRs. Edge-function analysis stays on PRs.
+    if: github.event_name != 'pull_request'
     runs-on: macos-26
-    timeout-minutes: 25
+    timeout-minutes: 45
 
     steps:
       - name: Checkout
