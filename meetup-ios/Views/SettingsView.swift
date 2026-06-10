@@ -1,6 +1,7 @@
 import SwiftUI
 import UIKit
 import PhotosUI
+import UserNotifications
 
 struct SettingsView: View {
     @Environment(AuthViewModel.self) private var auth
@@ -12,6 +13,7 @@ struct SettingsView: View {
     @State private var eventCancelledEnabled = true
     @State private var locationSharingEnabled = true
     @State private var prefsLoaded = false
+    @State private var notificationMessage: String?
 
     @State private var showSignOutConfirm = false
     @State private var showDeleteConfirm = false
@@ -84,36 +86,18 @@ struct SettingsView: View {
                     sectionHeader("ACCOUNT")
                 }
 
-                // MARK: Appearance
-                Section {
-                    Picker("", selection: $settings.themePreference) {
-                        Text("Light").tag(ThemePreference.light)
-                        Text("Dark").tag(ThemePreference.dark)
-                        Text("System").tag(ThemePreference.system)
-                    }
-                    .pickerStyle(.segmented)
-                    .tint(Color.coral)
-                    .listRowBackground(Color.appSurface)
-                } header: {
-                    sectionHeader("APPEARANCE")
-                }
-
                 // MARK: Accessibility
                 Section {
-                    Toggle("Bold Text", isOn: $settings.boldText)
-                        .tint(Color.coral)
-                        .foregroundStyle(.white)
-                        .listRowBackground(Color.appSurface)
-                    Toggle("Larger Text", isOn: $settings.largerText)
-                        .tint(Color.coral)
-                        .foregroundStyle(.white)
-                        .listRowBackground(Color.appSurface)
                     Toggle("Reduce Motion", isOn: $settings.reduceMotion)
                         .tint(Color.coral)
                         .foregroundStyle(.white)
                         .listRowBackground(Color.appSurface)
                 } header: {
-                    sectionHeader("ACCESSIBILITY")
+                    sectionHeader("MOTION")
+                } footer: {
+                    Text("Reduces animated RSVP and meetup effects.")
+                        .font(.caption2)
+                        .foregroundStyle(Color(white: 0.4))
                 }
 
                 // MARK: Notifications
@@ -122,17 +106,34 @@ struct SettingsView: View {
                         .tint(Color.coral)
                         .foregroundStyle(.white)
                         .listRowBackground(Color.appSurface)
-                        .onChange(of: pushEnabled) { _, _ in persist() }
+                        .onChange(of: pushEnabled) { _, newValue in
+                            updatePushNotifications(newValue)
+                        }
                     Toggle("Event Cancelled", isOn: $eventCancelledEnabled)
                         .tint(Color.coral)
                         .foregroundStyle(pushEnabled ? .white : Color(white: 0.45))
                         .listRowBackground(Color.appSurface)
                         .disabled(!pushEnabled)
                         .onChange(of: eventCancelledEnabled) { _, _ in persist() }
+                    if let notificationMessage {
+                        Text(notificationMessage)
+                            .font(.caption2)
+                            .foregroundStyle(Color(white: 0.55))
+                            .listRowBackground(Color.appSurface)
+                    }
+                    if notificationMessage?.contains("iOS Settings") == true {
+                        Button {
+                            openSystemSettings()
+                        } label: {
+                            aboutRow("Open iOS Settings", systemImage: "gear")
+                        }
+                        .buttonStyle(.plain)
+                        .listRowBackground(Color.appSurface)
+                    }
                 } header: {
                     sectionHeader("NOTIFICATIONS")
                 } footer: {
-                    Text("Turn off Push Notifications to silence everything. \"Event Cancelled\" alerts you when a host cancels a meetup you joined.")
+                    Text("\"Event Cancelled\" alerts you when a host cancels a meetup you joined.")
                         .font(.caption2)
                         .foregroundStyle(Color(white: 0.4))
                 }
@@ -170,6 +171,15 @@ struct SettingsView: View {
                             .foregroundStyle(Color(white: 0.55))
                             .listRowBackground(Color.appSurface)
                     }
+                    if contactSyncMessage?.contains("iOS Settings") == true {
+                        Button {
+                            openSystemSettings()
+                        } label: {
+                            aboutRow("Open iOS Settings", systemImage: "gear")
+                        }
+                        .buttonStyle(.plain)
+                        .listRowBackground(Color.appSurface)
+                    }
                 } header: {
                     sectionHeader("PRIVACY")
                 } footer: {
@@ -186,16 +196,6 @@ struct SettingsView: View {
                         Spacer()
                         Text(appVersion)
                             .foregroundStyle(Color(white: 0.6))
-                    }
-                    .listRowBackground(Color.appSurface)
-
-                    Link(destination: URL(string: "https://squadbrunch.app/terms")!) {
-                        aboutRow("Terms of Service")
-                    }
-                    .listRowBackground(Color.appSurface)
-
-                    Link(destination: URL(string: "https://squadbrunch.app/support")!) {
-                        aboutRow("Support")
                     }
                     .listRowBackground(Color.appSurface)
 
@@ -248,7 +248,7 @@ struct SettingsView: View {
             }
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("This deactivates your account and signs you out. Contact support to fully erase your data.")
+            Text("This deactivates your account and signs you out. Send feedback if you need your data fully erased.")
         }
     }
 
@@ -327,6 +327,46 @@ struct SettingsView: View {
             locationSharingEnabled: locationSharingEnabled
         )
         Task { try? await UserSettingsService.shared.save(snapshot) }
+    }
+
+    private func updatePushNotifications(_ enabled: Bool) {
+        guard prefsLoaded else { return }
+        if enabled {
+            notificationMessage = nil
+            Task {
+                let granted = await requestNotificationAuthorization()
+                await MainActor.run {
+                    if granted {
+                        notificationMessage = "Push notifications are on."
+                        UIApplication.shared.registerForRemoteNotifications()
+                    } else {
+                        pushEnabled = false
+                        notificationMessage = "Notifications are blocked. Enable them in iOS Settings."
+                    }
+                    persist()
+                }
+            }
+        } else {
+            if notificationMessage?.contains("blocked") == true {
+                persist()
+                return
+            }
+            notificationMessage = "Push notifications are off."
+            persist()
+        }
+    }
+
+    private func requestNotificationAuthorization() async -> Bool {
+        do {
+            return try await UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .badge, .sound])
+        } catch {
+            return false
+        }
+    }
+
+    private func openSystemSettings() {
+        guard let url = URL(string: UIApplication.openSettingsURLString) else { return }
+        openURL(url)
     }
 
     private func refreshContactSyncState() {
