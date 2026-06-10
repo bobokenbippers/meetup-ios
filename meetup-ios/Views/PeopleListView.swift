@@ -10,6 +10,7 @@ struct PeopleListView: View {
     @State private var error: String?
     @State private var phoneSearch = ""
     @State private var foundUser: FoundUser?
+    @State private var foundUserStatus: FriendshipStatus = .none
     @State private var isSearching = false
     @State private var isAdding = false
     @State private var contactsManager = ContactsManager()
@@ -283,24 +284,7 @@ struct PeopleListView: View {
 
             Spacer()
 
-            Button {
-                addFriend(user)
-            } label: {
-                if isAdding {
-                    ProgressView().tint(.white).scaleEffect(0.8)
-                        .frame(width: 44, height: 20)
-                } else {
-                    Text("Add")
-                        .scaledFont(size: 13, weight: .bold)
-                        .foregroundStyle(.white)
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 8)
-                }
-            }
-            .frame(minWidth: 60)
-            .background(Color.coral)
-            .clipShape(Capsule())
-            .disabled(isAdding)
+            foundUserAction(for: user)
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 12)
@@ -311,6 +295,53 @@ struct PeopleListView: View {
                 .strokeBorder(Color.coral.opacity(0.35), lineWidth: 1)
         )
         .shadow(color: Color.coral.opacity(0.08), radius: 8, y: 2)
+    }
+
+    @ViewBuilder
+    private func foundUserAction(for user: FoundUser) -> some View {
+        if isAdding {
+            ProgressView().tint(.white).scaleEffect(0.8)
+                .frame(width: 72, height: 30)
+                .background(Color.coral)
+                .clipShape(Capsule())
+        } else {
+            switch foundUserStatus {
+            case .accepted:
+                statusBadge("Friends")
+            case .pendingOutgoing:
+                statusBadge("Pending")
+            case .pendingIncoming:
+                Button("Accept") {
+                    addFriend(user)
+                }
+                .scaledFont(size: 13, weight: .bold)
+                .foregroundStyle(.white)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 8)
+                .background(Color.coral)
+                .clipShape(Capsule())
+            case .none:
+                Button("Add") {
+                    addFriend(user)
+                }
+                .scaledFont(size: 13, weight: .bold)
+                .foregroundStyle(.white)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 8)
+                .background(Color.coral)
+                .clipShape(Capsule())
+            }
+        }
+    }
+
+    private func statusBadge(_ title: String) -> some View {
+        Text(title)
+            .scaledFont(size: 12, weight: .bold)
+            .foregroundStyle(Color(white: 0.65))
+            .padding(.horizontal, 12)
+            .padding(.vertical, 7)
+            .background(Color.white.opacity(0.08))
+            .clipShape(Capsule())
     }
 
     private func incomingRequestCard(_ request: IncomingFriendRequest) -> some View {
@@ -490,6 +521,7 @@ struct PeopleListView: View {
         let myId = SupabaseManager.shared.client.auth.currentUser?.id
         isSearching = true
         foundUser = nil
+        foundUserStatus = .none
         error = nil
         do {
             if let user = try await MeetupService.shared.findUserByPhone(e164) {
@@ -498,6 +530,7 @@ struct PeopleListView: View {
                     let resolvedName = isPlaceholderName(user.displayName)
                         ? (contactsManager.name(forPhone: e164) ?? user.displayName)
                         : user.displayName
+                    foundUserStatus = try await MeetupService.shared.friendshipStatus(with: user.id)
                     foundUser = FoundUser(id: user.id, displayName: resolvedName, phone: user.phone)
                 }
             } else {
@@ -514,6 +547,7 @@ struct PeopleListView: View {
         contactSuggestions = []
         phoneSearch = ""
         foundUser = nil
+        foundUserStatus = .none
         error = nil
         let myId = SupabaseManager.shared.client.auth.currentUser?.id
         var found: FoundUser?
@@ -526,6 +560,7 @@ struct PeopleListView: View {
                 let resolvedName = isPlaceholderName(user.displayName)
                     ? contact.displayName
                     : user.displayName
+                foundUserStatus = (try? await MeetupService.shared.friendshipStatus(with: user.id)) ?? .none
                 foundUser = FoundUser(id: user.id, displayName: resolvedName, phone: user.phone)
             }
         } else {
@@ -575,9 +610,15 @@ struct PeopleListView: View {
                 try await MeetupService.shared.addFriend(userId: user.id)
                 phoneSearch = ""
                 foundUser = nil
-                // Realtime subscription triggers load() — no need to call it here.
-                // Optimistically add to pending so UI feels instant.
-                pendingOutgoingIds.insert(user.id)
+                foundUserStatus = .none
+                // Optimistically update the visible list, then reload from Supabase
+                // so accepted-vs-pending state matches the canonical friendship row.
+                let latestStatus = try await MeetupService.shared.friendshipStatus(with: user.id)
+                if latestStatus == .pendingOutgoing {
+                    pendingOutgoingIds.insert(user.id)
+                } else {
+                    pendingOutgoingIds.remove(user.id)
+                }
                 if !people.contains(where: { $0.id == user.id }) {
                     let placeholder = Profile(
                         id: user.id, displayName: user.displayName,
@@ -586,6 +627,8 @@ struct PeopleListView: View {
                     people.append(placeholder)
                     people.sort { ($0.displayName ?? "") < ($1.displayName ?? "") }
                 }
+                await load()
+                enrichWithContactNames()
             } catch {
                 self.error = error.localizedDescription
             }

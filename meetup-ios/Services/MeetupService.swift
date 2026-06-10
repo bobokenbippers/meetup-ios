@@ -9,7 +9,7 @@ struct FoundUser {
 
 /// Friendship relationship between the current user and another user.
 /// Drives whether someone can be invited directly or must be friend-requested first.
-enum FriendshipStatus {
+enum FriendshipStatus: Equatable {
     case none             // no friendship row — must send a request before inviting
     case accepted         // accepted friends — invitable
     case pendingOutgoing  // I sent a request, awaiting their acceptance
