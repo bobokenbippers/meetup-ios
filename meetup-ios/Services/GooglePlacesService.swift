@@ -1,14 +1,26 @@
 import Foundation
 import CoreLocation
 import GooglePlacesSwift
+import MapKit
 
 struct GooglePlacePrediction: Identifiable {
-    let placeId: String
     let mainText: String
     let secondaryText: String
-    // Session token is carried forward so autocomplete + details are billed as one session.
-    let sessionToken: AutocompleteSessionToken
-    var id: String { placeId }
+    let source: GooglePlacePredictionSource
+
+    var id: String {
+        switch source {
+        case .google(let placeId, _):
+            return "google-\(placeId)"
+        case .mapKit(let place):
+            return "mapkit-\(place.name)-\(place.coordinate.latitude)-\(place.coordinate.longitude)"
+        }
+    }
+}
+
+enum GooglePlacePredictionSource {
+    case google(placeId: String, sessionToken: AutocompleteSessionToken)
+    case mapKit(SelectedPlace)
 }
 
 @MainActor
@@ -21,11 +33,11 @@ final class GooglePlacesService {
     private init() {}
 
     var isConfigured: Bool {
-        validAPIKey != nil
+        true
     }
 
     var unavailableMessage: String {
-        "Location search is temporarily unavailable."
+        "No places found. Try a more specific search."
     }
 
     @discardableResult
@@ -38,6 +50,12 @@ final class GooglePlacesService {
     }
 
     func autocomplete(query: String) async -> [GooglePlacePrediction] {
+        let googleResults = await googleAutocomplete(query: query)
+        if !googleResults.isEmpty { return googleResults }
+        return await mapKitAutocomplete(query: query)
+    }
+
+    private func googleAutocomplete(query: String) async -> [GooglePlacePrediction] {
         guard let client = configuredClient() else { return [] }
         let request = AutocompleteRequest(query: query, sessionToken: sessionToken)
         switch await client.fetchAutocompleteSuggestions(with: request) {
@@ -45,10 +63,9 @@ final class GooglePlacesService {
             return suggestions.compactMap { suggestion in
                 guard case .place(let place) = suggestion else { return nil }
                 return GooglePlacePrediction(
-                    placeId: place.placeID,
                     mainText: place.legacyAttributedPrimaryText.string,
                     secondaryText: place.legacyAttributedSecondaryText?.string ?? "",
-                    sessionToken: sessionToken
+                    source: .google(placeId: place.placeID, sessionToken: sessionToken)
                 )
             }
         case .failure:
@@ -57,24 +74,92 @@ final class GooglePlacesService {
     }
 
     func details(for prediction: GooglePlacePrediction) async -> SelectedPlace? {
+        switch prediction.source {
+        case .google(let placeId, let token):
+            return await googleDetails(
+                placeId: placeId,
+                token: token,
+                fallbackName: prediction.mainText
+            )
+        case .mapKit(let place):
+            return place
+        }
+    }
+
+    private func googleDetails(
+        placeId: String,
+        token: AutocompleteSessionToken,
+        fallbackName: String
+    ) async -> SelectedPlace? {
         guard let client = configuredClient() else { return nil }
         let request = FetchPlaceRequest(
-            placeID: prediction.placeId,
+            placeID: placeId,
             placeProperties: [.displayName, .formattedAddress, .coordinate],
-            sessionToken: prediction.sessionToken
+            sessionToken: token
         )
         // Rotate token after a completed session (autocomplete → details pair).
-        sessionToken = AutocompleteSessionToken()
+        self.sessionToken = AutocompleteSessionToken()
         switch await client.fetchPlace(with: request) {
         case .success(let place):
             return SelectedPlace(
-                name: place.displayName ?? prediction.mainText,
+                name: place.displayName ?? fallbackName,
                 address: place.formattedAddress,
                 coordinate: place.location
             )
         case .failure:
             return nil
         }
+    }
+
+    private func mapKitAutocomplete(query: String) async -> [GooglePlacePrediction] {
+        let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard trimmed.count >= 2 else { return [] }
+
+        let request = MKLocalSearch.Request()
+        request.naturalLanguageQuery = trimmed
+        request.resultTypes = [.pointOfInterest, .address]
+
+        do {
+            let response = try await MKLocalSearch(request: request).start()
+            return response.mapItems.prefix(8).compactMap { item in
+                let name = item.name ?? item.placemark.title ?? trimmed
+                let address = formattedAddress(for: item)
+                let place = SelectedPlace(
+                    name: name,
+                    address: address,
+                    coordinate: item.placemark.coordinate
+                )
+                return GooglePlacePrediction(
+                    mainText: name,
+                    secondaryText: address ?? "",
+                    source: .mapKit(place)
+                )
+            }
+        } catch {
+            return []
+        }
+    }
+
+    private func formattedAddress(for item: MKMapItem) -> String? {
+        let placemark = item.placemark
+        let itemName = item.name?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let parts = [
+            placemark.thoroughfare,
+            placemark.locality,
+            placemark.administrativeArea,
+        ]
+        .compactMap { $0?.trimmingCharacters(in: .whitespacesAndNewlines) }
+        .filter { part in
+            guard !part.isEmpty else { return false }
+            return itemName.map { $0 != part } ?? true
+        }
+
+        if !parts.isEmpty {
+            return parts.joined(separator: ", ")
+        }
+        let title = placemark.title?.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard title != itemName else { return nil }
+        return title
     }
 
     private var validAPIKey: String? {
