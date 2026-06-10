@@ -75,6 +75,7 @@ struct TicketmasterEventSource: EventSource {
 
     func fetchNearbyEvents(latitude: Double, longitude: Double, radiusMiles: Int) async throws -> [NearbyEvent] {
         guard let apiKey else { throw EventSourceError.missingAPIKey }
+        let startDateTime = ISO8601DateFormatter().string(from: Date())
 
         var components = URLComponents(string: "https://app.ticketmaster.com/discovery/v2/events.json")!
         components.queryItems = [
@@ -84,6 +85,7 @@ struct TicketmasterEventSource: EventSource {
             URLQueryItem(name: "unit", value: "miles"),
             URLQueryItem(name: "size", value: "20"),
             URLQueryItem(name: "sort", value: "date,asc"),
+            URLQueryItem(name: "startDateTime", value: startDateTime),
         ]
         guard let url = components.url else { throw EventSourceError.badResponse }
 
