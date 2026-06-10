@@ -289,6 +289,11 @@ struct MeetupsListView: View {
                 .listRowSeparator(.hidden)
                 .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 8, trailing: 16))
 
+            NearbyEventsView(onSelect: openCreate(prefill:))
+                .listRowBackground(Color.clear)
+                .listRowSeparator(.hidden)
+                .listRowInsets(EdgeInsets(top: 0, leading: 0, bottom: 8, trailing: 0))
+
             if !invited.isEmpty {
                 Section {
                     ForEach(invited, id: \.meetup.id) { p in
