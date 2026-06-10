@@ -88,14 +88,22 @@ struct SettingsView: View {
 
                 // MARK: Accessibility
                 Section {
+                    Toggle("Bold Text", isOn: $settings.boldText)
+                        .tint(Color.coral)
+                        .foregroundStyle(.white)
+                        .listRowBackground(Color.appSurface)
+                    Toggle("Larger Text", isOn: $settings.largerText)
+                        .tint(Color.coral)
+                        .foregroundStyle(.white)
+                        .listRowBackground(Color.appSurface)
                     Toggle("Reduce Motion", isOn: $settings.reduceMotion)
                         .tint(Color.coral)
                         .foregroundStyle(.white)
                         .listRowBackground(Color.appSurface)
                 } header: {
-                    sectionHeader("MOTION")
+                    sectionHeader("ACCESSIBILITY")
                 } footer: {
-                    Text("Reduces animated RSVP and meetup effects.")
+                    Text("Bold and Larger Text apply across the app. Reduce Motion calms animated RSVP and meetup effects.")
                         .font(.caption2)
                         .foregroundStyle(Color(white: 0.4))
                 }

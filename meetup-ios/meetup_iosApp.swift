@@ -103,6 +103,7 @@ struct meetup_iosApp: App {
             .environment(auth)
             .environment(settings)
             .environment(navState)
+            .modifier(AppAccessibilityPreferencesModifier(settings: settings))
             .preferredColorScheme(.dark)
             .onOpenURL { url in
                 handleDeepLink(url)
@@ -165,5 +166,24 @@ struct meetup_iosApp: App {
         #else
         false
         #endif
+    }
+}
+
+private struct AppAccessibilityPreferencesModifier: ViewModifier {
+    let settings: AppSettings
+
+    @ViewBuilder
+    func body(content: Content) -> some View {
+        let weightedContent = content
+            .environment(
+                \.legibilityWeight,
+                settings.boldText ? LegibilityWeight.bold : nil
+            )
+
+        if settings.largerText {
+            weightedContent.dynamicTypeSize(.accessibility1)
+        } else {
+            weightedContent
+        }
     }
 }
