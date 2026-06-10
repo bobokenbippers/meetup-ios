@@ -102,7 +102,11 @@ struct ReceiptParser {
             }
             request.recognitionLevel = .accurate
             request.usesLanguageCorrection = false
-            try? VNImageRequestHandler(cgImage: cgImage, orientation: orientation).perform([request])
+            do {
+                try VNImageRequestHandler(cgImage: cgImage, orientation: orientation).perform([request])
+            } catch {
+                continuation.resume(returning: [])
+            }
         }
     }
 

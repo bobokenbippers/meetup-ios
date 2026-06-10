@@ -3,6 +3,7 @@ import PhotosUI
 import UniformTypeIdentifiers
 import Supabase
 import Auth
+import UIKit
 
 struct BillView: View {
     let meetup: Meetup
@@ -466,7 +467,7 @@ struct AddReceiptView: View {
                             .clipShape(RoundedRectangle(cornerRadius: 8))
                     }
                     HStack(spacing: 12) {
-                        Button { showCamera = true } label: {
+                        Button { openCamera() } label: {
                             Label("Camera", systemImage: "camera")
                                 .frame(maxWidth: .infinity)
                         }
@@ -593,6 +594,14 @@ struct AddReceiptView: View {
 
     // MARK: - Actions
 
+    private func openCamera() {
+        guard UIImagePickerController.isSourceTypeAvailable(.camera) else {
+            error = "Camera isn't available on this device. Use Photos instead."
+            return
+        }
+        showCamera = true
+    }
+
     private func parseImage(_ image: UIImage) async {
         isProcessing = true
         let parsed = await ReceiptParser.parse(image: image)
@@ -657,13 +666,28 @@ struct AddReceiptView: View {
 struct CameraPickerView: UIViewControllerRepresentable {
     let onImage: (UIImage) -> Void
     func makeCoordinator() -> Coordinator { Coordinator(onImage: onImage) }
-    func makeUIViewController(context: Context) -> UIImagePickerController {
+    func makeUIViewController(context: Context) -> UIViewController {
+        guard UIImagePickerController.isSourceTypeAvailable(.camera) else {
+            let vc = UIViewController()
+            vc.view.backgroundColor = .systemBackground
+            let label = UILabel()
+            label.text = "Camera unavailable"
+            label.textAlignment = .center
+            label.textColor = .secondaryLabel
+            label.translatesAutoresizingMaskIntoConstraints = false
+            vc.view.addSubview(label)
+            NSLayoutConstraint.activate([
+                label.centerXAnchor.constraint(equalTo: vc.view.centerXAnchor),
+                label.centerYAnchor.constraint(equalTo: vc.view.centerYAnchor)
+            ])
+            return vc
+        }
         let vc = UIImagePickerController()
         vc.sourceType = .camera
         vc.delegate = context.coordinator
         return vc
     }
-    func updateUIViewController(_ uiViewController: UIImagePickerController, context: Context) {}
+    func updateUIViewController(_ uiViewController: UIViewController, context: Context) {}
     class Coordinator: NSObject, UIImagePickerControllerDelegate, UINavigationControllerDelegate {
         let onImage: (UIImage) -> Void
         init(onImage: @escaping (UIImage) -> Void) { self.onImage = onImage }
