@@ -5,6 +5,11 @@ name: TestFlight
 # A single afternoon of stacked merges previously archived ~14 macOS builds.
 on:
   workflow_dispatch:
+    inputs:
+      confirm_upload:
+        description: 'Type YES to confirm uploading a new TestFlight build'
+        required: true
+        default: ''
 
 permissions:
   contents: read
@@ -14,11 +19,23 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  confirm:
+    name: Confirm upload
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require explicit YES
+        run: |
+          if [ "${{ inputs.confirm_upload }}" != "YES" ]; then
+            echo "::error::TestFlight upload not confirmed. Re-run and type YES in the confirm_upload field."
+            exit 1
+          fi
+
   build:
+    needs: confirm
     runs-on: macos-26
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Set up Ruby
         uses: ruby/setup-ruby@v1
