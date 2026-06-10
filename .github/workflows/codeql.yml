@@ -1,14 +1,8 @@
 name: CodeQL
 
+# Never runs on PRs — analysis happens on main pushes, the weekly schedule,
+# and on demand via the Actions tab (Run workflow).
 on:
-  pull_request:
-    branches:
-      - main
-    paths:
-      - "meetup-ios/**"
-      - "meetup-ios.xcodeproj/**"
-      - "supabase/functions/**"
-      - ".github/workflows/codeql.yml"
   push:
     branches:
       - main
@@ -33,8 +27,9 @@ concurrency:
 jobs:
   analyze-swift:
     name: Analyze Swift
+    # Needs a full traced rebuild — ~30 min on a macOS runner.
     runs-on: macos-26
-    timeout-minutes: 25
+    timeout-minutes: 45
 
     steps:
       - name: Checkout
