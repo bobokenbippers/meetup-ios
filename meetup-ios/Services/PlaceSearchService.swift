@@ -15,6 +15,10 @@ final class PlaceSearchService {
 
     private init() {}
 
+    var unavailableMessage: String {
+        "No places found. Try a more specific search."
+    }
+
     func search(query: String, near location: CLLocation?) async -> [PlaceSearchResult] {
         let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
         guard trimmed.count >= 2 else { return [] }
@@ -33,7 +37,7 @@ final class PlaceSearchService {
         guard let response = try? await MKLocalSearch(request: request).start(),
               !Task.isCancelled else { return [] }
 
-        return response.mapItems.prefix(5).enumerated().compactMap { offset, item in
+        return response.mapItems.prefix(8).enumerated().compactMap { offset, item in
             guard let place = SelectedPlace(mapItem: item) else { return nil }
             return PlaceSearchResult(
                 id: "\(item.placemark.coordinate.latitude),\(item.placemark.coordinate.longitude)-\(offset)",

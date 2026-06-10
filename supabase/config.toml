@@ -1,0 +1,2 @@
+[functions.join-meetup]
+verify_jwt = false

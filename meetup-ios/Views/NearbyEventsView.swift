@@ -15,7 +15,14 @@ struct NearbyEventsView: View {
 
     private var locationManager: LocationManager { .shared }
 
-    private enum Phase { case idle, loading, loaded, needsLocation, empty, hidden }
+    private enum Phase {
+        case idle
+        case loading
+        case loaded
+        case needsLocation
+        case empty
+        case failed(String)
+    }
 
     // Changing this re-runs the load: "none" until a fix arrives, then the coordinate.
     private var locationKey: String {
@@ -38,6 +45,8 @@ struct NearbyEventsView: View {
                 locationPromptRow
             case .empty:
                 emptyRow
+            case .failed(let message):
+                failedRow(message: message)
             default:
                 EmptyView()
             }
@@ -149,6 +158,50 @@ struct NearbyEventsView: View {
         .padding(.vertical, 6)
     }
 
+    private func failedRow(message: String) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            header
+            HStack(spacing: 10) {
+                Image(systemName: "calendar.badge.exclamationmark")
+                    .scaledFont(size: 14, weight: .semibold)
+                    .foregroundStyle(Color.coral)
+                    .frame(width: 28, height: 28)
+                    .background(Color.coral.opacity(0.12))
+                    .clipShape(Circle())
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Events didn't load")
+                        .scaledFont(size: 13, weight: .semibold)
+                        .foregroundStyle(.white)
+                    Text(message)
+                        .scaledFont(size: 11)
+                        .foregroundStyle(Color(white: 0.58))
+                        .lineLimit(2)
+                }
+
+                Spacer(minLength: 8)
+
+                Button {
+                    Task { await load() }
+                } label: {
+                    Text("Retry")
+                        .scaledFont(size: 12, weight: .bold)
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 7)
+                        .background(Color.coral)
+                        .clipShape(Capsule())
+                }
+                .buttonStyle(.plain)
+            }
+            .padding(14)
+            .background(Color.appSurface)
+            .clipShape(RoundedRectangle(cornerRadius: 18))
+            .padding(.horizontal, 16)
+        }
+        .padding(.vertical, 6)
+    }
+
     // MARK: - Data
 
     private func load() async {
@@ -177,9 +230,20 @@ struct NearbyEventsView: View {
         } catch is CancellationError {
             return
         } catch {
-            // Missing key / network / decode — fail silently and hide the section.
-            phase = .hidden
+            phase = .failed(Self.eventLoadMessage(for: error))
         }
+    }
+
+    private static func eventLoadMessage(for error: Error) -> String {
+        if let sourceError = error as? EventSourceError {
+            switch sourceError {
+            case .missingAPIKey:
+                return "Event suggestions are temporarily unavailable."
+            case .requestFailed, .badResponse:
+                return "Check your connection and try again."
+            }
+        }
+        return "Check your connection and try again."
     }
 
     private func requestLocation() {

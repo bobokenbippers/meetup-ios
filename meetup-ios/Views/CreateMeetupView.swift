@@ -275,6 +275,7 @@ private struct DestinationSection: View {
     @State private var searchQuery = ""
     @State private var predictions: [PlaceSearchResult] = []
     @State private var isLoadingDetails = false
+    @State private var searchError: String?
 
     var body: some View {
         Section {
@@ -306,6 +307,12 @@ private struct DestinationSection: View {
                     ProgressView().frame(maxWidth: .infinity)
                         .listRowBackground(Color.appSurface)
                 }
+                if let searchError {
+                    Text(searchError)
+                        .font(.caption)
+                        .foregroundStyle(Color(white: 0.6))
+                        .listRowBackground(Color.appSurface)
+                }
                 ForEach(predictions) { prediction in
                     Button(action: { selectPrediction(prediction) }) {
                         VStack(alignment: .leading, spacing: 2) {
@@ -325,7 +332,11 @@ private struct DestinationSection: View {
                 .textCase(nil)
         }
         .task(id: searchQuery) {
-            guard searchQuery.count >= 2 else { predictions = []; return }
+            guard searchQuery.count >= 2 else {
+                predictions = []
+                searchError = nil
+                return
+            }
             do { try await Task.sleep(for: .milliseconds(300)) } catch { return }
             await runSearch()
         }
@@ -333,6 +344,7 @@ private struct DestinationSection: View {
 
     private func selectPrediction(_ prediction: PlaceSearchResult) {
         predictions = []
+        searchError = nil
         selectedPlace = prediction.place
     }
 
@@ -344,6 +356,7 @@ private struct DestinationSection: View {
         let results = await PlaceSearchService.shared.search(query: q, near: LocationManager.shared.location)
         guard !Task.isCancelled, searchQuery == q else { return }
         predictions = results
+        searchError = results.isEmpty ? PlaceSearchService.shared.unavailableMessage : nil
     }
 }
 
@@ -354,6 +367,8 @@ private struct DestinationSection: View {
 
 private struct InviteSection: View {
     @Binding var invitees: [FoundUser]
+
+    @Environment(AppSettings.self) private var settings
 
     @State private var inviteePhone = ""
     @State private var foundUser: FoundUser?
@@ -434,13 +449,23 @@ private struct InviteSection: View {
                 .foregroundStyle(Color(white: 0.4))
                 .textCase(nil)
         }
-        .task {
-            await contactsManager.load(requestsAccess: false)
-            refreshContactSuggestions(for: inviteePhone)
+        .task { await loadContactsIfEnabled() }
+        .onChange(of: settings.contactsEnabled) { _, _ in
+            Task { await loadContactsIfEnabled() }
         }
         .alert("Error", isPresented: Binding(get: { error != nil }, set: { if !$0 { error = nil } })) {
             Button("OK") { error = nil }
         } message: { Text(error ?? "") }
+    }
+
+    private func loadContactsIfEnabled() async {
+        guard settings.contactsEnabled else {
+            contactsManager.clear()
+            contactSuggestions = []
+            return
+        }
+        await contactsManager.load(requestsAccess: false)
+        refreshContactSuggestions(for: inviteePhone)
     }
 
     @ViewBuilder
@@ -482,6 +507,10 @@ private struct InviteSection: View {
     }
 
     private func refreshContactSuggestions(for value: String) {
+        guard settings.contactsEnabled else {
+            contactSuggestions = []
+            return
+        }
         // Single pass with no write-back to inviteePhone, so typing causes one render per keystroke.
         let query: String
         if value.contains(where: { $0.isLetter }) {

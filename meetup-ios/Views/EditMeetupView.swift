@@ -184,6 +184,7 @@ private struct EditDestinationSection: View {
     @State private var searchQuery = ""
     @State private var predictions: [PlaceSearchResult] = []
     @State private var isLoadingDetails = false
+    @State private var searchError: String?
 
     var body: some View {
         Section {
@@ -215,6 +216,12 @@ private struct EditDestinationSection: View {
                     ProgressView().frame(maxWidth: .infinity)
                         .listRowBackground(Color.appSurface)
                 }
+                if let searchError {
+                    Text(searchError)
+                        .font(.caption)
+                        .foregroundStyle(Color(white: 0.6))
+                        .listRowBackground(Color.appSurface)
+                }
                 ForEach(predictions) { prediction in
                     Button(action: { selectPrediction(prediction) }) {
                         VStack(alignment: .leading, spacing: 2) {
@@ -234,7 +241,11 @@ private struct EditDestinationSection: View {
                 .textCase(nil)
         }
         .task(id: searchQuery) {
-            guard searchQuery.count >= 2 else { predictions = []; return }
+            guard searchQuery.count >= 2 else {
+                predictions = []
+                searchError = nil
+                return
+            }
             do { try await Task.sleep(for: .milliseconds(300)) } catch { return }
             await runSearch()
         }
@@ -242,6 +253,7 @@ private struct EditDestinationSection: View {
 
     private func selectPrediction(_ prediction: PlaceSearchResult) {
         predictions = []
+        searchError = nil
         selectedPlace = prediction.place
     }
 
@@ -253,5 +265,6 @@ private struct EditDestinationSection: View {
         let results = await PlaceSearchService.shared.search(query: q, near: LocationManager.shared.location)
         guard !Task.isCancelled, searchQuery == q else { return }
         predictions = results
+        searchError = results.isEmpty ? PlaceSearchService.shared.unavailableMessage : nil
     }
 }
