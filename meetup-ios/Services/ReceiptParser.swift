@@ -128,6 +128,7 @@ struct ReceiptParser {
         var tip: Double = 0
         var surcharge: Double = 0
         var total: Double = 0
+        var hasSeenTotal = false
 
         let subtotalKeywords = ["subtotal", "sub total", "sub-total"]
         let taxKeywords = ["tax", "hst", "gst", "vat", "sales tax"]
@@ -141,12 +142,31 @@ struct ReceiptParser {
 
         for (idx, line) in normalizedLines.enumerated() {
             let lower = line.lowercased()
-            guard let match = priceRegex.firstMatch(in: line, range: NSRange(line.startIndex..., in: line)) else {
+            if lower.contains("tip suggestion") || lower.contains("suggested tip") {
+                continue
+            }
+            if line.range(of: #"^\s*(total\s+)?\d{1,2}%\b"#, options: [.regularExpression, .caseInsensitive]) != nil {
+                continue
+            }
+
+            let matches = priceRegex.matches(in: line, range: NSRange(line.startIndex..., in: line))
+            guard let match = matches.last else {
                 continue
             }
             let priceStr = Range(match.range(at: 1), in: line).map { String(line[$0]) }
                         ?? Range(match.range(at: 2), in: line).map { String(line[$0]) }
             guard let priceStr, let price = Double(priceStr), price >= 0.01 else { continue }
+            let selectedPriceHasDollarSign = match.range(at: 1).location != NSNotFound
+
+            let isSubtotalLine = subtotalKeywords.contains(where: { lower.contains($0) })
+            let isTaxLine = taxKeywords.contains(where: { lower.contains($0) })
+            let isTipLine = tipKeywords.contains(where: { lower.contains($0) })
+            let isSurchargeLine = surchargeKeywords.contains(where: { lower.contains($0) })
+            let isTotalLine = totalKeywords.contains(where: { lower.contains($0) })
+            let isSummaryLine = isSubtotalLine || isTaxLine || isTipLine || isSurchargeLine || isTotalLine
+            if isSummaryLine, !selectedPriceHasDollarSign, matches.count == 1, line.contains("%") {
+                continue
+            }
 
             // Helper: resolve what the previous label line was when price is on its own line
             func prevLineCategory() -> String? {
@@ -165,16 +185,20 @@ struct ReceiptParser {
                 return nil
             }
 
-            if subtotalKeywords.contains(where: { lower.contains($0) }) {
+            if isSubtotalLine {
                 subtotal = price
-            } else if taxKeywords.contains(where: { lower.contains($0) }) {
+            } else if isTaxLine {
                 tax = price
-            } else if tipKeywords.contains(where: { lower.contains($0) }) {
+            } else if isTipLine {
                 tip = price
-            } else if surchargeKeywords.contains(where: { lower.contains($0) }) {
+            } else if isSurchargeLine {
                 surcharge = price
-            } else if totalKeywords.contains(where: { lower.contains($0) }) {
+            } else if isTotalLine {
                 if price > total { total = price }
+                hasSeenTotal = true
+            } else if hasSeenTotal {
+                // Receipts often print promos, card metadata, and loyalty copy after total.
+                continue
             } else if !summaryKeywords.contains(where: { lower.contains($0) }) {
                 // Standalone price line — check if previous line was a summary label
                 var name = line
@@ -195,18 +219,27 @@ struct ReceiptParser {
                     }
                 }
 
+                // Capture quantity prefixes ("2 ", "4x ") BEFORE the OCR noise
+                // strippers run — "4x " is 1-5 consonants + space, so the noise
+                // stripper would otherwise eat it. A second capture afterwards
+                // handles quantities hidden behind noise (e.g. "I 2 Tacos").
+                var quantity = 1
+                let quantityPattern = #"^(\d+)\s*[xX]?\s+"#
+                func captureQuantity() {
+                    if let qRange = name.range(of: quantityPattern, options: .regularExpression),
+                       let qInt = Int(name[qRange].filter(\.isNumber)),
+                       qInt >= 2, qInt <= 20 {
+                        quantity = qInt
+                        name = String(name[qRange.upperBound...])
+                    }
+                }
+                captureQuantity()
                 // Strip leading all-consonant OCR noise tokens (e.g. "nll "),
-                // then leading single-letter artifacts (e.g. "I " misread from "1 "),
-                // then leading quantity digits (e.g. "1 ", "2 ") — capture qty before stripping
+                // then leading single-letter artifacts (e.g. "I " misread from "1 ")
                 name = name.replacingOccurrences(of: #"^([^aeiouAEIOU\s]{1,5}\s+)+"#, with: "", options: .regularExpression)
                 name = name.replacingOccurrences(of: #"^[A-Za-z]\s+"#, with: "", options: .regularExpression)
-                var quantity = 1
-                if let qRange = name.range(of: #"^(\d+)\s+"#, options: .regularExpression),
-                   let qInt = Int(name[qRange].trimmingCharacters(in: .whitespaces)),
-                   qInt >= 2, qInt <= 20 {
-                    quantity = qInt
-                }
-                name = name.replacingOccurrences(of: #"^\d+\s+"#, with: "", options: .regularExpression)
+                if quantity == 1 { captureQuantity() }
+                name = name.replacingOccurrences(of: quantityPattern, with: "", options: .regularExpression)
                 name = name.trimmingCharacters(in: .whitespaces)
 
                 // Skip modifier lines like "**w.Salad"
