@@ -2467,6 +2467,45 @@ iOS:
 - `ProfileAvatarView` renders uploaded photos with initials as fallback across Settings,
   People, DMs, meetup creation/invites, and meetup dashboard participants.
 
+### M9.5 Meetup photo gallery
+
+Participants share photos during a meetup (dashboard camera button + thumbnail strip)
+and afterwards in the recap (grid card). Base schema is
+`supabase/migrations/20260605020000_meetup_photos.sql`; deletion + storage policies are
+`supabase/migrations/20260611160000_meetup_photos_delete_and_storage.sql`.
+
+Schema/storage:
+
+- `meetup_photos (id, meetup_id, uploader_user_id, photo_url, caption, created_at)`:
+  one row per uploaded photo. `photo_url` stores the storage path (legacy rows may hold
+  a signed URL; `MeetupPhotoService.storagePath(from:)` normalizes both).
+- `meetup-photos` storage bucket: private, files at `<meetup_id>/<uuid>.jpg`, read via
+  1-hour signed URLs regenerated on each fetch.
+
+RLS (table):
+
+- SELECT: any participant of the meetup.
+- INSERT: own row only, and the uploader must be the host or an *active* participant —
+  `is_active_meetup_participant()` checks `status in ('accepted', 'arrived', 'yes')`,
+  so invited/declined users cannot post.
+- DELETE: the uploader or the meetup host.
+
+RLS (storage.objects, scoped by the `<meetup_id>/` path prefix):
+
+- SELECT: host or participant of the path's meetup.
+- INSERT: host or active participant of the path's meetup.
+- DELETE: object owner (uploader) or the path's meetup host.
+
+iOS:
+
+- `MeetupPhotoService` uploads (JPEG 0.8), inserts rows, fetches with signed-URL refresh,
+  and deletes (`deletePhoto` removes the row, then best-effort removes the storage object).
+  `canDelete(photo:currentUserId:meetupHostId:)` mirrors the delete policy for UI gating.
+- `MeetupPhotoPagerView` is the shared full-screen swipeable viewer (TabView pager) with
+  share and delete, presented from both the dashboard strip and the recap grid.
+- `MeetupDashboardView` keeps a realtime subscription on `meetup_photos` so new photos
+  appear live; the strip shows the first 6 with a `+N` overflow tile into the pager.
+
 ## Appendix C — Testing Strategy
 
 - **Unit tests (backend):** `pytest`. Focus on `services/punctuality.py`, `services/routing.py` ETA caching logic.

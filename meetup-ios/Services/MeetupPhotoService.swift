@@ -43,6 +43,35 @@ final class MeetupPhotoService {
             .execute()
     }
 
+    /// Delete a photo: remove the database row, then best-effort remove the
+    /// storage object. RLS limits this to the uploader or the meetup host.
+    func deletePhoto(_ photo: MeetupPhoto) async throws {
+        try await supabase
+            .from("meetup_photos")
+            .delete()
+            .eq("id", value: photo.id)
+            .execute()
+
+        // The row is the source of truth; an orphaned object is harmless and
+        // unreachable once the row is gone, so storage cleanup is best effort.
+        if let path = Self.storagePath(from: photo.photoUrl) {
+            do {
+                _ = try await supabase.storage.from(bucket).remove(paths: [path])
+            } catch is CancellationError {
+                return
+            } catch {
+                // Ignore: signed-URL reads stop working without the row anyway.
+            }
+        }
+    }
+
+    /// Whether `currentUserId` may delete `photo` — mirrors the
+    /// "uploaders and hosts can delete photos" RLS policy.
+    static func canDelete(photo: MeetupPhoto, currentUserId: UUID?, meetupHostId: UUID) -> Bool {
+        guard let currentUserId else { return false }
+        return photo.uploaderUserId == currentUserId || meetupHostId == currentUserId
+    }
+
     /// Fetch all photos for a meetup, joined with the uploader's display name.
     func fetchPhotos(meetupId: UUID) async throws -> [MeetupPhoto] {
         let photos: [MeetupPhoto] = try await supabase

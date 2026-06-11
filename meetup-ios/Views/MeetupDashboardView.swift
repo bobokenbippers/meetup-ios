@@ -176,8 +176,16 @@ struct MeetupDashboardView: View {
                 ShareSheet(invite: invite)
                     .ignoresSafeArea()
             }
-            .sheet(item: $fullscreenPhoto) { photo in
-                DashboardFullscreenPhotoView(photo: photo)
+            .fullScreenCover(item: $fullscreenPhoto) { photo in
+                MeetupPhotoPagerView(
+                    photos: recentPhotos,
+                    initialPhoto: photo,
+                    currentUserId: myUserId,
+                    meetupHostId: meetup.hostId,
+                    onPhotoDeleted: { deleted in
+                        recentPhotos.removeAll { $0.id == deleted.id }
+                    }
+                )
             }
             .confirmationDialog("Cancel this meetup?", isPresented: $showCancelConfirm, titleVisibility: .visible) {
                 Button("Cancel Meetup", role: .destructive) {
@@ -323,6 +331,20 @@ struct MeetupDashboardView: View {
                     .clipShape(RoundedRectangle(cornerRadius: 10))
                     .contentShape(Rectangle())
                     .onTapGesture { fullscreenPhoto = photo }
+                }
+
+                if recentPhotos.count > 6 {
+                    Button {
+                        fullscreenPhoto = recentPhotos[6]
+                    } label: {
+                        Text("+\(recentPhotos.count - 6)")
+                            .scaledFont(size: 16, weight: .semibold)
+                            .foregroundStyle(.white)
+                            .frame(width: 72, height: 72)
+                            .background(Color(white: 0.20))
+                            .clipShape(RoundedRectangle(cornerRadius: 10))
+                    }
+                    .buttonStyle(.plain)
                 }
             }
             .padding(.horizontal, 16)
@@ -880,52 +902,3 @@ private struct ConfettiView: View {
     }
 }
 
-// MARK: - Dashboard Fullscreen Photo
-
-private struct DashboardFullscreenPhotoView: View {
-    let photo: MeetupPhoto
-    @Environment(\.dismiss) private var dismiss
-
-    var body: some View {
-        ZStack(alignment: .topTrailing) {
-            Color.black.ignoresSafeArea()
-            VStack(spacing: 0) {
-                AsyncImage(url: URL(string: photo.photoUrl)) { phase in
-                    switch phase {
-                    case .success(let image):
-                        image
-                            .resizable()
-                            .scaledToFit()
-                            .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    case .failure:
-                        Image(systemName: "photo")
-                            .scaledFont(size: 48)
-                            .foregroundStyle(.secondary)
-                            .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    default:
-                        ProgressView()
-                            .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    }
-                }
-
-                if let caption = photo.caption, !caption.isEmpty {
-                    Text(caption)
-                        .scaledFont(size: 14)
-                        .foregroundStyle(.white.opacity(0.9))
-                        .padding(.horizontal, 20)
-                        .padding(.bottom, 24)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                }
-            }
-
-            Button {
-                dismiss()
-            } label: {
-                Image(systemName: "xmark.circle.fill")
-                    .scaledFont(size: 28)
-                    .foregroundStyle(.white.opacity(0.8))
-                    .padding(20)
-            }
-        }
-    }
-}
