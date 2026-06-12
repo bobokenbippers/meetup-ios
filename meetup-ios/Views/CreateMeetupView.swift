@@ -245,7 +245,7 @@ struct CreateMeetupView: View {
                     .background(Color.appBackground)
                 }
             }
-            .preferredColorScheme(.dark)
+
             .alert("Error", isPresented: Binding(get: { error != nil }, set: { if !$0 { error = nil } })) {
                 Button("OK") { error = nil }
             } message: { Text(error ?? "") }

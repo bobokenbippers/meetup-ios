@@ -64,6 +64,14 @@ final class AppSettings {
         didSet { UserDefaults.standard.set(eventSuggestionCategory.rawValue, forKey: "eventSuggestionCategory") }
     }
 
+    var colorScheme: ColorScheme? {
+        switch themePreference {
+        case .light:  return .light
+        case .dark:   return .dark
+        case .system: return nil
+        }
+    }
+
     var eventSuggestionClassificationName: String? {
         eventSuggestionCategory.ticketmasterClassificationName
     }

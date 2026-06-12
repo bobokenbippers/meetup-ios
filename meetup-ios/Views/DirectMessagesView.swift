@@ -36,7 +36,7 @@ struct DirectMessagesView: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .background(Color.appBackground)
             .navigationTitle("Messages")
-            .preferredColorScheme(.dark)
+
             .task {
                 await load()
                 await subscribeToMessageChanges()
@@ -248,7 +248,7 @@ struct MessageThreadView: View {
                 .accessibilityLabel("View \(friendName)'s profile")
             }
         }
-        .preferredColorScheme(.dark)
+
         .task(id: conversationId) {
             await load()
             await markRead()
@@ -780,6 +780,6 @@ private struct MessagePhotoPreviewView: View {
             }
             .accessibilityLabel("Close photo")
         }
-        .preferredColorScheme(.dark)
+
     }
 }

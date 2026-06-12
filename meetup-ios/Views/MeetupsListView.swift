@@ -277,7 +277,7 @@ struct MeetupsListView: View {
             } message: {
                 Text(error ?? "")
             }
-            .preferredColorScheme(.dark)
+
             .onChange(of: navState.pendingMeetupId) { _, meetupId in
                 handlePendingMeetupId(meetupId)
             }
@@ -726,7 +726,7 @@ private struct RecapFolderView: View {
                 }
             }
         }
-        .preferredColorScheme(.dark)
+
     }
 
     private func sectionHeader(_ title: String) -> some View {

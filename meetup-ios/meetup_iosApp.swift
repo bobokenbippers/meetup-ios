@@ -104,7 +104,7 @@ struct meetup_iosApp: App {
             .environment(settings)
             .environment(navState)
             .modifier(AppAccessibilityPreferencesModifier(settings: settings))
-            .preferredColorScheme(.dark)
+            .preferredColorScheme(settings.colorScheme)
             .onOpenURL { url in
                 handleDeepLink(url)
             }

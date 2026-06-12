@@ -104,7 +104,7 @@ struct SignInView: View {
                 .padding(.bottom, 52)
             }
         }
-        .preferredColorScheme(.dark)
+
         .onAppear { glowPulse = true }
     }
 }

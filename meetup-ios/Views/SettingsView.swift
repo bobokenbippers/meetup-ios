@@ -86,6 +86,19 @@ struct SettingsView: View {
                     sectionHeader("ACCOUNT")
                 }
 
+                // MARK: Appearance
+                Section {
+                    Picker("Theme", selection: $settings.themePreference) {
+                        Text("System").tag(ThemePreference.system)
+                        Text("Light").tag(ThemePreference.light)
+                        Text("Dark").tag(ThemePreference.dark)
+                    }
+                    .pickerStyle(.segmented)
+                    .listRowBackground(Color.appSurface)
+                } header: {
+                    sectionHeader("APPEARANCE")
+                }
+
                 // MARK: Accessibility
                 Section {
                     Toggle("Bold Text", isOn: $settings.boldText)
@@ -269,7 +282,7 @@ struct SettingsView: View {
             .scrollContentBackground(.hidden)
             .background(Color.appBackground)
             .navigationTitle("Settings")
-            .preferredColorScheme(.dark)
+
         }
         .task {
             await loadPrefs()
@@ -507,7 +520,7 @@ private struct EditDisplayNameView: View {
         .background(Color.appBackground)
         .navigationTitle("Edit Name")
         .navigationBarTitleDisplayMode(.inline)
-        .preferredColorScheme(.dark)
+
         .toolbar {
             ToolbarItem(placement: .confirmationAction) {
                 Button("Save") {
