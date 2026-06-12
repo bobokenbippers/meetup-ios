@@ -2573,6 +2573,72 @@ iOS:
   prompt card appears only after the coin settles. Dare proof uses the in-app camera
   (`CameraPickerView`), with a photo-library fallback on camera-less devices.
 
+### M9.7 Standalone Truth or Dare (Games tab)
+
+Truth or Dare is decoupled from meetups: it is a first-class game mode on its own
+"Games" tab, joinable with a short invite code. Meetup-embedded sessions still work,
+but the meetup dashboard no longer exposes a Game button. Canonical migration:
+`supabase/migrations/20260612200000_standalone_truth_or_dare.sql`.
+
+Schema changes:
+
+- `game_sessions.meetup_id` is now nullable — `NULL` means a standalone session.
+  The partial unique "one live game per meetup" index is unaffected (NULLs are
+  distinct), so any number of standalone games can run concurrently.
+- `game_sessions.invite_code TEXT UNIQUE NOT NULL`: 6-char uppercase alphanumeric
+  code (ambiguous 0/O/1/I excluded) generated server-side by
+  `generate_game_invite_code()`; existing rows were backfilled.
+- New helper `is_game_player(p_session_id, p_user_id)` (SECURITY DEFINER, STABLE):
+  player-membership check usable inside the game tables' RLS policies without
+  recursing into `game_players`' own policy.
+
+RPC changes:
+
+- `start_truth_or_dare(p_tier, p_meetup_id default null)` replaces the old
+  `(p_meetup_id, p_tier)` signature. With no meetup, any authenticated user can
+  start; with a meetup, membership and the one-live-game rule are enforced as
+  before. Returns `(session_id, invite_code)`.
+- `join_truth_or_dare_by_code(p_code)` (new): resolves the (case/whitespace
+  normalized) code to a non-ended session, inserts the caller into `game_players`
+  (appending to `turn_order` mid-game), and returns the session id.
+- `join_truth_or_dare(p_session_id)`: meetup membership is only required when the
+  session has a meetup; standalone sessions are joinable by session id (only
+  discoverable via the invite code or a player's device).
+- `end_truth_or_dare`: meetup-host override only applies when `meetup_id` is set;
+  standalone games can only be ended by their starter.
+
+RLS (SELECT on `game_sessions` / `game_players` / `game_turns`):
+
+- `is_game_player(session, auth.uid())` — players always see their own games —
+  OR (for meetup-embedded sessions) the previous meetup host/participant check.
+  Writes still happen only inside the SECURITY DEFINER RPCs.
+
+Storage:
+
+- Standalone dare proofs go to the same private `meetup-photos` bucket under
+  `games/<session_id>/dares/<uuid>.jpg` (the bucket's policies are
+  authenticated-scoped, not path-scoped, so no storage policy change was needed).
+  Meetup games keep `<meetup_id>/dares/<uuid>.jpg`.
+
+iOS:
+
+- `NavigationState.Tab` gains `.games`; `HomeView` adds a Games tab
+  (`gamecontroller.fill`) between Messages and Settings.
+- `GamesHomeView` (new): Start New Game (opens `TruthOrDareView()` at the tier
+  pick), Join with Code (text field → `joinSessionByCode` → opens the game), and
+  a recent-games list backed by `fetchMyGames()` (`game_players` rows for the
+  current user with the session embedded).
+- `TruthOrDareView` now has two inits: `init(sessionId: UUID? = nil)` for
+  standalone games and `init(meetup: Meetup)` for the legacy embedded flow. The
+  lobby shows the session's invite code in a copyable "Share code" chip.
+- `TruthOrDareService`: `startSession(tier:)` / `startSession(meetupId:tier:)`
+  both decode `StartGameResult (session_id, invite_code)`;
+  `joinSessionByCode(code:)`, `fetchSessionByCode(code:)`, and `fetchMyGames()`
+  are new; `uploadProofPhoto(image:sessionId:meetupId:)` picks the storage folder
+  by mode.
+- `MeetupDashboardView` no longer shows the Game action button (Directions and
+  Split Bill remain).
+
 ## Appendix C — Testing Strategy
 
 - **Unit tests (backend):** `pytest`. Focus on `services/punctuality.py`, `services/routing.py` ETA caching logic.

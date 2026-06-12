@@ -6,12 +6,14 @@ enum TruthOrDareError: LocalizedError {
     case notSignedIn
     case compressionFailed
     case flipFailed
+    case startFailed
 
     var errorDescription: String? {
         switch self {
         case .notSignedIn:       return "You must be signed in to play."
         case .compressionFailed: return "Failed to compress the proof photo."
         case .flipFailed:        return "The coin flip didn't reach the server. Try again."
+        case .startFailed:       return "Couldn't start the game. Try again."
         }
     }
 }
@@ -55,6 +57,33 @@ final class TruthOrDareService {
         return sessions.first
     }
 
+    /// Look up a session by its invite code. Only resolves for games
+    /// the caller can already see (RLS) — joining a new game goes
+    /// through `joinSessionByCode` instead.
+    func fetchSessionByCode(code: String) async throws -> GameSession? {
+        let sessions: [GameSession] = try await supabase
+            .from("game_sessions")
+            .select()
+            .eq("invite_code", value: code.trimmingCharacters(in: .whitespaces).uppercased())
+            .execute()
+            .value
+        return sessions.first
+    }
+
+    /// Sessions the current user has joined, newest first, for the
+    /// Games tab list.
+    func fetchMyGames() async throws -> [MyGameEntry] {
+        guard let userId = supabase.auth.currentUser?.id else { throw TruthOrDareError.notSignedIn }
+        return try await supabase
+            .from("game_players")
+            .select("session_id, user_id, joined_at, game_sessions!game_players_session_id_fkey(*)")
+            .eq("user_id", value: userId)
+            .order("joined_at", ascending: false)
+            .limit(20)
+            .execute()
+            .value
+    }
+
     func fetchPlayers(sessionId: UUID) async throws -> [GamePlayer] {
         try await supabase
             .from("game_players")
@@ -84,13 +113,43 @@ final class TruthOrDareService {
 
     // MARK: - State transitions (RPCs)
 
-    func startSession(meetupId: UUID, tier: String) async throws -> UUID {
+    /// Start a standalone session — no meetup required. The returned
+    /// invite code is what friends type in to join.
+    func startSession(tier: String) async throws -> StartGameResult {
         struct Params: Encodable {
-            let p_meetup_id: UUID
             let p_tier: String
         }
+        let results: [StartGameResult] = try await supabase
+            .rpc("start_truth_or_dare", params: Params(p_tier: tier))
+            .execute()
+            .value
+        guard let result = results.first else { throw TruthOrDareError.startFailed }
+        return result
+    }
+
+    /// Start a session embedded in a meetup (legacy flow).
+    func startSession(meetupId: UUID, tier: String) async throws -> StartGameResult {
+        struct Params: Encodable {
+            let p_tier: String
+            let p_meetup_id: UUID
+        }
+        let results: [StartGameResult] = try await supabase
+            .rpc("start_truth_or_dare", params: Params(p_tier: tier, p_meetup_id: meetupId))
+            .execute()
+            .value
+        guard let result = results.first else { throw TruthOrDareError.startFailed }
+        return result
+    }
+
+    /// Join a session by invite code. Returns the session id so the
+    /// caller can open the game directly.
+    func joinSessionByCode(code: String) async throws -> UUID {
+        struct Params: Encodable {
+            let p_code: String
+        }
         return try await supabase
-            .rpc("start_truth_or_dare", params: Params(p_meetup_id: meetupId, p_tier: tier))
+            .rpc("join_truth_or_dare_by_code",
+                 params: Params(p_code: code.trimmingCharacters(in: .whitespaces).uppercased()))
             .execute()
             .value
     }
@@ -155,13 +214,16 @@ final class TruthOrDareService {
     // MARK: - Dare proof photos
 
     /// Compress and upload a dare proof, returning the storage path
-    /// to store on the turn row.
-    func uploadProofPhoto(image: UIImage, meetupId: UUID) async throws -> String {
+    /// to store on the turn row. Meetup games keep their proofs under
+    /// the meetup's folder; standalone games use a games/ folder keyed
+    /// by session id.
+    func uploadProofPhoto(image: UIImage, sessionId: UUID, meetupId: UUID?) async throws -> String {
         guard supabase.auth.currentUser != nil else { throw TruthOrDareError.notSignedIn }
         guard let jpeg = image.jpegData(compressionQuality: 0.8) else {
             throw TruthOrDareError.compressionFailed
         }
-        let path = "\(meetupId.uuidString)/dares/\(UUID().uuidString).jpg"
+        let folder = meetupId.map { "\($0.uuidString)/dares" } ?? "games/\(sessionId.uuidString)/dares"
+        let path = "\(folder)/\(UUID().uuidString).jpg"
         try await supabase.storage
             .from(bucket)
             .upload(path: path, file: jpeg, options: FileOptions(contentType: "image/jpeg", upsert: false))

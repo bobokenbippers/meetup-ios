@@ -16,6 +16,9 @@ struct HomeView: View {
             DirectMessagesView()
                 .tabItem { Label("Messages", systemImage: "bubble.left.and.bubble.right") }
                 .tag(NavigationState.Tab.messages)
+            GamesHomeView()
+                .tabItem { Label("Games", systemImage: "gamecontroller.fill") }
+                .tag(NavigationState.Tab.games)
             SettingsView()
                 .tabItem { Label("Settings", systemImage: "gear") }
                 .tag(NavigationState.Tab.settings)
