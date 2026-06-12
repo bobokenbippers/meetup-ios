@@ -36,6 +36,7 @@ Please test:
 - Meetup share sheets now include readable invite text plus the web invite URL.
 
 ### Fixed
+- Meetup dashboard action buttons (Directions, Split Bill, Game) no longer wrap or hyphenate onto two lines now that the row holds three buttons.
 - Invitees can see the meetup host/sender in the participant roster after accepting an invite.
 - Missing host participant rows are backfilled so older meetups can render the inviter.
 - Settings feedback now sends to `gautam.pappu@utexas.edu` instead of the unregistered `support@squadbrunch.app` address.
