@@ -8,12 +8,11 @@ class AppDelegate: NSObject, UIApplicationDelegate {
         _ application: UIApplication,
         didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
     ) -> Bool {
-        // Force white navigation titles globally — must set all three appearances
-        // (standard, compact, scrollEdge) so large titles are white in SwiftUI NavigationStack
+        // Navigation title color: primary label adapts to light/dark automatically.
         let navAppearance = UINavigationBarAppearance()
         navAppearance.configureWithTransparentBackground()
-        navAppearance.largeTitleTextAttributes = [.foregroundColor: UIColor.white]
-        navAppearance.titleTextAttributes = [.foregroundColor: UIColor.white]
+        navAppearance.largeTitleTextAttributes = [.foregroundColor: UIColor.label]
+        navAppearance.titleTextAttributes = [.foregroundColor: UIColor.label]
         UINavigationBar.appearance().standardAppearance = navAppearance
         UINavigationBar.appearance().compactAppearance = navAppearance
         UINavigationBar.appearance().scrollEdgeAppearance = navAppearance
