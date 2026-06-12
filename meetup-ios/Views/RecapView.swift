@@ -72,8 +72,16 @@ struct RecapView: View {
                 guard let item else { return }
                 Task { await uploadPickedPhoto(item) }
             }
-            .sheet(item: $fullscreenPhoto) { photo in
-                RecapFullscreenPhotoView(photo: photo, uploaderName: photo.uploaderDisplayName)
+            .fullScreenCover(item: $fullscreenPhoto) { photo in
+                MeetupPhotoPagerView(
+                    photos: meetupPhotos,
+                    initialPhoto: photo,
+                    currentUserId: myUserId,
+                    meetupHostId: meetup.hostId,
+                    onPhotoDeleted: { deleted in
+                        meetupPhotos.removeAll { $0.id == deleted.id }
+                    }
+                )
             }
             .sheet(item: $sharePhoto) { photo in
                 if let url = URL(string: photo.photoUrl) {
@@ -539,73 +547,6 @@ struct RecapView: View {
         } catch {
             self.error = error.localizedDescription
             hasLoaded = true
-        }
-    }
-}
-
-// MARK: - Fullscreen Photo Viewer (RecapView)
-
-private struct RecapFullscreenPhotoView: View {
-    let photo: MeetupPhoto
-    let uploaderName: String?
-    @Environment(\.dismiss) private var dismiss
-
-    var body: some View {
-        ZStack(alignment: .topTrailing) {
-            Color.black.ignoresSafeArea()
-
-            VStack(spacing: 0) {
-                AsyncImage(url: URL(string: photo.photoUrl)) { phase in
-                    switch phase {
-                    case .success(let image):
-                        image
-                            .resizable()
-                            .scaledToFit()
-                            .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    case .failure:
-                        Image(systemName: "photo")
-                            .scaledFont(size: 48)
-                            .foregroundStyle(.secondary)
-                            .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    default:
-                        ProgressView()
-                            .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    }
-                }
-
-                // Caption + uploader info
-                VStack(alignment: .leading, spacing: 4) {
-                    if let caption = photo.caption, !caption.isEmpty {
-                        Text(caption)
-                            .scaledFont(size: 15)
-                            .foregroundStyle(.white)
-                    }
-                    if let name = uploaderName {
-                        Text("Shared by \(name)")
-                            .scaledFont(size: 12)
-                            .foregroundStyle(.white.opacity(0.7))
-                    }
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.horizontal, 20)
-                .padding(.vertical, 16)
-                .background(
-                    LinearGradient(
-                        colors: [.black.opacity(0), .black.opacity(0.7)],
-                        startPoint: .top,
-                        endPoint: .bottom
-                    )
-                )
-            }
-
-            Button {
-                dismiss()
-            } label: {
-                Image(systemName: "xmark.circle.fill")
-                    .scaledFont(size: 28)
-                    .foregroundStyle(.white.opacity(0.8))
-                    .padding(20)
-            }
         }
     }
 }
