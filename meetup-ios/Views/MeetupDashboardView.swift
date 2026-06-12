@@ -441,26 +441,41 @@ struct MeetupDashboardView: View {
                 Button {
                     openDirections()
                 } label: {
-                    Label("Directions", systemImage: "map.fill")
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.8)
-                        .frame(maxWidth: .infinity)
+                    Label {
+                        Text("Directions")
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.5)
+                            .allowsTightening(true)
+                    } icon: {
+                        Image(systemName: "map.fill")
+                    }
+                    .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.glass)
 
                 Button { showBill = true } label: {
-                    Label("Split Bill", systemImage: "receipt")
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.8)
-                        .frame(maxWidth: .infinity)
+                    Label {
+                        Text("Split Bill")
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.5)
+                            .allowsTightening(true)
+                    } icon: {
+                        Image(systemName: "receipt")
+                    }
+                    .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.glass)
 
                 Button { showTruthOrDare = true } label: {
-                    Label("Game", systemImage: "flame.fill")
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.8)
-                        .frame(maxWidth: .infinity)
+                    Label {
+                        Text("Game")
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.5)
+                            .allowsTightening(true)
+                    } icon: {
+                        Image(systemName: "flame.fill")
+                    }
+                    .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.glass)
                 .accessibilityIdentifier("btn_truth_or_dare")
