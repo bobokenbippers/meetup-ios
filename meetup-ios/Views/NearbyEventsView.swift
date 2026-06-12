@@ -11,7 +11,7 @@ struct NearbyEventsView: View {
 
     @Environment(\.openURL) private var openURL
     @State private var events: [NearbyEvent] = []
-    @State private var phase: Phase = .idle
+    @State private var phase: Phase = .loading
 
     private var locationManager: LocationManager { .shared }
 
@@ -47,8 +47,10 @@ struct NearbyEventsView: View {
                 emptyRow
             case .failed(let message):
                 failedRow(message: message)
+            case .idle:
+                loadingRow
             default:
-                EmptyView()
+                loadingRow
             }
         }
         .task(id: loadKey) { await load() }
@@ -226,7 +228,10 @@ struct NearbyEventsView: View {
                 phase = .loading
                 locationManager.requestOneShotLocation()
                 try? await Task.sleep(for: .seconds(4))
-                if !Task.isCancelled, locationManager.location == nil {
+                guard !Task.isCancelled else { return }
+                if let location = locationManager.location {
+                    await loadEvents(near: location)
+                } else {
                     phase = .needsLocation
                 }
             case .denied, .restricted:
@@ -236,6 +241,10 @@ struct NearbyEventsView: View {
             }
             return
         }
+        await loadEvents(near: location)
+    }
+
+    private func loadEvents(near location: CLLocation) async {
         phase = .loading
         do {
             let result = try await EventSuggestionsService.shared.nearbyEvents(
