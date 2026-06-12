@@ -114,13 +114,16 @@ final class TruthOrDareService {
     // MARK: - State transitions (RPCs)
 
     /// Start a standalone session — no meetup required. The returned
-    /// invite code is what friends type in to join.
-    func startSession(tier: String) async throws -> StartGameResult {
+    /// invite code is what friends type in to join. Passing a
+    /// `groupId` stamps the session with the game group and pushes
+    /// the code to every other member.
+    func startSession(tier: String, groupId: UUID? = nil) async throws -> StartGameResult {
         struct Params: Encodable {
             let p_tier: String
+            let p_group_id: UUID?
         }
         let results: [StartGameResult] = try await supabase
-            .rpc("start_truth_or_dare", params: Params(p_tier: tier))
+            .rpc("start_truth_or_dare", params: Params(p_tier: tier, p_group_id: groupId))
             .execute()
             .value
         guard let result = results.first else { throw TruthOrDareError.startFailed }

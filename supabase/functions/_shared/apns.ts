@@ -53,6 +53,7 @@ export interface PushPayload {
   friendshipId?: string
   conversationId?: string
   senderId?: string
+  sessionId?: string
   badge?: number
 }
 
@@ -69,6 +70,7 @@ export async function sendPush(token: string, payload: PushPayload): Promise<voi
     ...(payload.friendshipId ? { friendshipId: payload.friendshipId } : {}),
     ...(payload.conversationId ? { conversationId: payload.conversationId } : {}),
     ...(payload.senderId ? { senderId: payload.senderId } : {}),
+    ...(payload.sessionId ? { sessionId: payload.sessionId } : {}),
   }
 
   const url = `https://${APNS_HOST}/3/device/${token}`

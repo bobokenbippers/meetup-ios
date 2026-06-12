@@ -7,12 +7,17 @@ struct GamesHomeView: View {
     @Environment(AuthViewModel.self) private var auth
 
     @State private var myGames: [MyGameEntry] = []
+    @State private var myGroups: [GameGroup] = []
     @State private var joinCode = ""
     @State private var isJoining = false
     @State private var error: String?
 
     @State private var showNewGame = false
     @State private var openedSession: OpenedGameSession?
+
+    @State private var showNewGroupPrompt = false
+    @State private var newGroupName = ""
+    @State private var isCreatingGroup = false
 
     /// Identifiable wrapper so a joined/tapped session id can drive
     /// a fullScreenCover(item:).
@@ -30,6 +35,7 @@ struct GamesHomeView: View {
                 VStack(spacing: 20) {
                     heroCard
                     joinSection
+                    groupsSection
                     if !recentGames.isEmpty {
                         recentGamesSection
                     }
@@ -42,6 +48,18 @@ struct GamesHomeView: View {
             .navigationTitle("Games")
             .refreshable { await loadGames() }
             .task { await loadGames() }
+            .navigationDestination(for: GameGroup.self) { group in
+                GameGroupView(group: group) {
+                    Task { await loadGames() }
+                }
+            }
+            .alert("New Group", isPresented: $showNewGroupPrompt) {
+                TextField("Group name", text: $newGroupName)
+                Button("Create") { Task { await createGroup() } }
+                Button("Cancel", role: .cancel) { newGroupName = "" }
+            } message: {
+                Text("Name your crew — you can add friends next.")
+            }
             .fullScreenCover(isPresented: $showNewGame, onDismiss: { Task { await loadGames() } }) {
                 TruthOrDareView()
                     .environment(auth)
@@ -148,6 +166,82 @@ struct GamesHomeView: View {
         joinCode.trimmingCharacters(in: .whitespaces)
     }
 
+    // MARK: - Groups
+
+    private var groupsSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("My Groups")
+                .scaledFont(size: 13, weight: .bold)
+                .foregroundStyle(Color(white: 0.6))
+                .padding(.horizontal, 4)
+
+            if !myGroups.isEmpty {
+                VStack(spacing: 0) {
+                    ForEach(Array(myGroups.enumerated()), id: \.element.id) { idx, group in
+                        NavigationLink(value: group) {
+                            groupRow(group)
+                        }
+                        .buttonStyle(.plain)
+                        if idx < myGroups.count - 1 {
+                            Divider().padding(.leading, 56)
+                        }
+                    }
+                }
+                .background(Color.appSurface)
+                .clipShape(RoundedRectangle(cornerRadius: 16))
+            }
+
+            Button {
+                newGroupName = ""
+                showNewGroupPrompt = true
+            } label: {
+                if isCreatingGroup {
+                    ProgressView()
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 6)
+                } else {
+                    Label("New Group", systemImage: "person.3.fill")
+                        .scaledFont(size: 15, weight: .semibold)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 6)
+                }
+            }
+            .buttonStyle(.bordered)
+            .tint(Color.coral)
+            .disabled(isCreatingGroup)
+            .accessibilityIdentifier("btn_new_group")
+        }
+    }
+
+    private func groupRow(_ group: GameGroup) -> some View {
+        HStack(spacing: 12) {
+            Image(systemName: "person.3.fill")
+                .scaledFont(size: 16)
+                .foregroundStyle(Color.coral)
+                .frame(width: 32)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(group.name)
+                    .scaledFont(size: 15, weight: .semibold)
+                    .foregroundStyle(.white)
+                if let count = group.memberCount {
+                    Text("\(count) member\(count == 1 ? "" : "s")")
+                        .scaledFont(size: 11)
+                        .foregroundStyle(Color(white: 0.55))
+                }
+            }
+
+            Spacer()
+
+            Image(systemName: "chevron.right")
+                .scaledFont(size: 13, weight: .semibold)
+                .foregroundStyle(Color(white: 0.4))
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 12)
+        .contentShape(Rectangle())
+    }
+
     // MARK: - Recent games
 
     private var recentGamesSection: some View {
@@ -228,6 +322,29 @@ struct GamesHomeView: View {
             return
         } catch {
             // Quiet failure on the list — pull to refresh retries.
+        }
+        do {
+            myGroups = try await GameGroupService.shared.fetchMyGroups()
+        } catch is CancellationError {
+            return
+        } catch {
+            // Quiet failure on the list — pull to refresh retries.
+        }
+    }
+
+    private func createGroup() async {
+        let name = newGroupName.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !name.isEmpty else { return }
+        isCreatingGroup = true
+        defer { isCreatingGroup = false }
+        do {
+            _ = try await GameGroupService.shared.createGroup(name: name)
+            newGroupName = ""
+            await loadGames()
+        } catch is CancellationError {
+            return
+        } catch {
+            self.error = error.localizedDescription
         }
     }
 

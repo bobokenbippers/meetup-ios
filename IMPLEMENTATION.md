@@ -2639,6 +2639,101 @@ iOS:
 - `MeetupDashboardView` no longer shows the Game action button (Directions and
   Split Bill remain).
 
+### M9.8 Game Groups (Games tab)
+
+Persistent named groups of friends for playing Truth or Dare together. The owner
+creates a group, adds **accepted friends** as members, and starting a game from
+the group stamps the session with the group id and pushes the invite code to
+every other member. Canonical migration:
+`supabase/migrations/20260612220000_game_groups.sql`.
+
+Schema:
+
+```sql
+create table public.game_groups (
+  id         uuid        primary key default gen_random_uuid(),
+  name       text        not null check (char_length(trim(name)) between 1 and 60),
+  owner_id   uuid        not null references public.profiles(id) on delete cascade,
+  created_at timestamptz not null default now()
+);
+
+create table public.game_group_members (
+  group_id  uuid        not null references public.game_groups(id) on delete cascade,
+  user_id   uuid        not null references public.profiles(id) on delete cascade,
+  joined_at timestamptz not null default now(),
+  primary key (group_id, user_id)
+);
+
+alter table public.game_sessions
+  add column group_id uuid references public.game_groups(id) on delete set null;
+```
+
+`owner_id` / `user_id` reference `public.profiles` (1:1 with `auth.users` here)
+like the other game tables so PostgREST can embed `display_name` / `avatar_url`.
+Deleting a group keeps its past sessions (`group_id` nulls out).
+
+Helpers (SECURITY DEFINER, STABLE, so the group tables' RLS policies can use
+them without recursing): `is_game_group_owner(group, user)` and
+`is_game_group_member(group, user)`.
+
+RLS (both tables have RLS enabled):
+
+- `game_groups` SELECT: owner or member. INSERT: any authenticated user with
+  `owner_id = auth.uid()`. UPDATE / DELETE: owner only.
+- `game_group_members` SELECT: group owner or any member of the group (every
+  member sees the full roster). INSERT: owner only (the friend gate lives in
+  the RPC). DELETE: owner, or the member themselves (leave).
+
+RPCs (all SECURITY DEFINER, authenticated-only):
+
+- `create_game_group(p_name) → uuid`: creates the group and inserts the creator
+  as the first member.
+- `add_game_group_member(p_group_id, p_user_id)`: owner only; raises unless
+  `is_accepted_friend(auth.uid(), p_user_id)` — only accepted friends of the
+  owner can be added. Idempotent (`on conflict do nothing`).
+- `remove_game_group_member(p_group_id, p_user_id)`: owner only; cannot remove
+  the owner.
+- `leave_game_group(p_group_id)`: any member; the owner cannot leave (delete
+  the group instead).
+- `start_truth_or_dare(p_tier, p_meetup_id default null, p_group_id default null)`:
+  grew a third arg. A group game requires group membership, is mutually
+  exclusive with `p_meetup_id`, stamps `game_sessions.group_id`, and fires
+  `call_push_function('push-game-group-start', …)` (pg_net → edge function,
+  wrapped so a push failure never fails the game start).
+
+Push:
+
+- `push-game-group-start` edge function (new): payload
+  `{sessionId, groupId, starterId}`. Looks up the group name, the session's
+  invite code, the starter's display name, and the other members'
+  `profiles.apns_token`s, then sends
+  **"🎮 [GroupName] — [Owner] started a game! Join with code [CODE]"**
+  (`event: game_group_start`, includes `sessionId` for deep-linking) to each.
+  Reuses the existing `_shared/apns.ts` sender + the vault-keyed
+  `call_push_function` plumbing from M5.0.
+
+iOS:
+
+- Models: `GameGroup` (id, name, ownerId, createdAt, memberCount) and
+  `GameGroupMember` (groupId, userId, joinedAt + embedded profile);
+  `GameSession` gains optional `groupId`.
+- `GameGroupService` (new): `fetchMyGroups()` (memberships with the group +
+  member count embedded), `fetchMembers(groupId:)` (profile join),
+  `createGroup(name:)`, `addMember`, `removeMember`, `leaveGroup` (RPCs),
+  `deleteGroup` (direct delete, RLS-enforced), `fetchFriends()` (delegates to
+  `MeetupService.getFriends()`).
+- `TruthOrDareService.startSession(tier:groupId:)` passes the group to the RPC;
+  `TruthOrDareView.init(sessionId:groupId:)` threads it from the UI.
+- `GamesHomeView`: "My Groups" section (name + member count rows → push to
+  `GameGroupView`) and a "New Group" button (name prompt → `createGroup`).
+- `GameGroupView` (new): roster with crown badge on the owner; owner gets
+  Add Member (friend picker sheet), per-row remove, and a destructive Delete
+  Group; non-owners get Leave Group. Start Game opens `TruthOrDareView` in
+  standalone mode stamped with the group — the lobby's copyable invite chip
+  still covers late joiners.
+- `AddGroupMemberView` (new): searchable list of the owner's accepted friends;
+  already-members are grayed out; tapping adds immediately via `addMember`.
+
 ## Appendix C — Testing Strategy
 
 - **Unit tests (backend):** `pytest`. Focus on `services/punctuality.py`, `services/routing.py` ETA caching logic.
