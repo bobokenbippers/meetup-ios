@@ -76,7 +76,7 @@ struct RecapView: View {
             }
             .task { await load() }
             .background(Color.appBackground.ignoresSafeArea())
-            .preferredColorScheme(.dark)
+
             .sheet(isPresented: $showBillView) {
                 BillView(meetup: meetup, participants: participants)
             }

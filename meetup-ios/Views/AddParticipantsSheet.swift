@@ -140,7 +140,7 @@ struct AddParticipantsSheet: View {
                     Button("Done") { dismiss() }
                 }
             }
-            .preferredColorScheme(.dark)
+
             .task {
                 friends = (try? await MeetupService.shared.getFriends()) ?? []
             }

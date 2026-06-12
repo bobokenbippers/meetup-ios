@@ -55,7 +55,7 @@ struct GamesHomeView: View {
             } message: {
                 Text(error ?? "")
             }
-            .preferredColorScheme(.dark)
+
         }
     }
 

@@ -113,7 +113,7 @@ struct FriendProfileView: View {
                 }
             }
         }
-        .preferredColorScheme(.dark)
+
         .task(id: profile.id) {
             await loadStats()
         }

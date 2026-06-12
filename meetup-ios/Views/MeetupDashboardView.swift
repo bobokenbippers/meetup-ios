@@ -218,7 +218,7 @@ struct MeetupDashboardView: View {
             .overlay {
                 if showConfetti { ConfettiView() }
             }
-            .preferredColorScheme(.dark)
+
         }
     }
 

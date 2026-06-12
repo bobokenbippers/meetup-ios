@@ -89,7 +89,7 @@ struct EditMeetupView: View {
                     .background(Color.appBackground)
                 }
             }
-            .preferredColorScheme(.dark)
+
         }
     }
 

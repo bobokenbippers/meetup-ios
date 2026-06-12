@@ -160,7 +160,7 @@ struct TruthOrDareView: View {
             } message: {
                 Text(error ?? "")
             }
-            .preferredColorScheme(.dark)
+
         }
     }
 

@@ -176,7 +176,7 @@ struct PeopleListView: View {
             .scrollContentBackground(.hidden)
             .background(Color.appBackground)
             .navigationTitle("People")
-            .preferredColorScheme(.dark)
+
             .task {
                 await load()
                 await loadContactsIfEnabled()
