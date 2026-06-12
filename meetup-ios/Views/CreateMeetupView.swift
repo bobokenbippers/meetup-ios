@@ -127,20 +127,11 @@ struct CreateMeetupView: View {
                                 selectedCategory = (selectedCategory == option.title) ? nil : option.title
                                 showingCustomCategory = false
                             } label: {
-                                let isSelected = selectedCategory == option.title
-                                Text(option.title)
-                                    .font(.subheadline.weight(.medium))
-                                    .multilineTextAlignment(.center)
-                                    .frame(maxWidth: .infinity, minHeight: 52)
-                                    .foregroundStyle(isSelected ? option.color : option.color.opacity(0.5))
-                                    .background(
-                                        RoundedRectangle(cornerRadius: 12)
-                                            .fill(isSelected ? option.color.opacity(0.18) : Color(white: 0.10))
-                                            .overlay(
-                                                RoundedRectangle(cornerRadius: 12)
-                                                    .strokeBorder(isSelected ? option.color : option.color.opacity(0.25), lineWidth: 1.5)
-                                            )
-                                    )
+                                CategorySelectionTile(
+                                    title: option.title,
+                                    color: option.color,
+                                    isSelected: selectedCategory == option.title
+                                )
                             }
                             .buttonStyle(.plain)
                         }
@@ -148,18 +139,12 @@ struct CreateMeetupView: View {
                             showingCustomCategory.toggle()
                             if !showingCustomCategory { selectedCategory = nil }
                         } label: {
-                            Text("Custom...")
-                                .font(.subheadline.weight(.medium))
-                                .frame(maxWidth: .infinity, minHeight: 52)
-                                .foregroundStyle(showingCustomCategory ? Color.coral : Color(white: 0.55))
-                                .background(
-                                    RoundedRectangle(cornerRadius: 12)
-                                        .fill(Color(white: 0.12))
-                                        .overlay(
-                                            RoundedRectangle(cornerRadius: 12)
-                                                .strokeBorder(showingCustomCategory ? Color.coral : Color.clear, lineWidth: 1.5)
-                                        )
-                                )
+                            CategorySelectionTile(
+                                title: "Custom...",
+                                color: .coral,
+                                isSelected: showingCustomCategory,
+                                systemImage: "text.cursor"
+                            )
                         }
                         .buttonStyle(.plain)
                     }
@@ -309,6 +294,45 @@ struct CreateMeetupView: View {
             self.error = error.localizedDescription
             isCreating = false
         }
+    }
+}
+
+private struct CategorySelectionTile: View {
+    let title: String
+    let color: Color
+    let isSelected: Bool
+    var systemImage: String?
+
+    var body: some View {
+        HStack(spacing: 8) {
+            if let systemImage {
+                Image(systemName: systemImage)
+                    .scaledFont(size: 13, weight: .semibold)
+            }
+
+            Text(title)
+                .scaledFont(size: 14, weight: .semibold)
+                .lineLimit(1)
+                .minimumScaleFactor(0.82)
+
+            if isSelected {
+                Image(systemName: "checkmark.circle.fill")
+                    .scaledFont(size: 13, weight: .bold)
+            }
+        }
+        .foregroundStyle(isSelected ? .white : Color(white: 0.88))
+        .frame(maxWidth: .infinity, minHeight: 52)
+        .padding(.horizontal, 10)
+        .background {
+            RoundedRectangle(cornerRadius: 12)
+                .fill(isSelected ? color.opacity(0.30) : Color(white: 0.145))
+        }
+        .overlay {
+            RoundedRectangle(cornerRadius: 12)
+                .strokeBorder(isSelected ? color : color.opacity(0.55), lineWidth: isSelected ? 2 : 1.25)
+        }
+        .contentShape(RoundedRectangle(cornerRadius: 12))
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
 }
 

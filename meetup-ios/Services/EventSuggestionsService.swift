@@ -4,7 +4,7 @@ import CoreLocation
 // MARK: - Source abstraction
 
 /// A swappable backing source for nearby real-world events. Implement this to add
-/// a new provider (SeatGeek, Eventbrite, a scrape, …) without touching the UI.
+/// a new provider (SeatGeek, a scrape, etc.) without touching the UI.
 protocol EventSource {
     var sourceName: String { get }
     func fetchNearbyEvents(latitude: Double, longitude: Double, radiusMiles: Int) async throws -> [NearbyEvent]
@@ -55,10 +55,9 @@ final class EventSuggestionsService {
 
 // MARK: - Ticketmaster Discovery API
 
-/// Free Ticketmaster Discovery API source. Search by lat/long + radius, no auth
-/// header — just an `apikey` query param. Key is read from Info.plist
-/// (`TicketmasterAPIKey`), never hardcoded; if it's still the placeholder the
-/// source reports `missingAPIKey` and the UI quietly hides the section.
+/// Ticketmaster-backed nearby event source. Search by lat/long + radius, no auth
+/// header -- just an `apikey` query param. The Consumer Key is read from Info.plist
+/// (`TicketmasterAPIKey`) and is never hardcoded in source.
 struct TicketmasterEventSource: EventSource {
     let sourceName = "Ticketmaster"
 
