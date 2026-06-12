@@ -7,6 +7,7 @@ import UIKit
 /// with that event's title, date/time, and venue.
 struct NearbyEventsView: View {
     /// Hand a pre-fill back up so the parent can present `CreateMeetupView`.
+    let refreshID: Int
     let onSelect: (EventPrefill) -> Void
 
     @Environment(\.openURL) private var openURL
@@ -38,6 +39,7 @@ struct NearbyEventsView: View {
             "\(settings.eventSuggestionsEnabled)",
             "\(settings.eventSuggestionRadiusMiles)",
             settings.eventSuggestionCategory.rawValue,
+            "\(refreshID)",
         ].joined(separator: "|")
     }
 

@@ -166,6 +166,7 @@ struct MeetupsListView: View {
     @State private var presentedSheet: MeetupsSheet?
     @State private var deletedMeetupIds: Set<UUID> = []
     @State private var permanentlyHiddenIds: Set<UUID> = []
+    @State private var nearbyEventsRefreshID = 0
     @Environment(AuthViewModel.self) private var auth
     @Environment(NavigationState.self) private var navState
 
@@ -218,7 +219,10 @@ struct MeetupsListView: View {
                 } else if invited.isEmpty && active.isEmpty && past.isEmpty && deleted.isEmpty {
                     ScrollView {
                         VStack(spacing: 0) {
-                            NearbyEventsView(onSelect: openCreate(prefill:))
+                            NearbyEventsView(
+                                refreshID: nearbyEventsRefreshID,
+                                onSelect: openCreate(prefill:)
+                            )
                             MeetupsEmptyState { presentedSheet = .create }
                                 .frame(minHeight: 480)
                         }
@@ -265,7 +269,7 @@ struct MeetupsListView: View {
                 await load()
                 await subscribeToInviteChanges()
             }
-            .refreshable { await load() }
+            .refreshable { await refreshHome() }
             .onChange(of: deletedMeetupIds) { _, _ in saveHiddenIds() }
             .onChange(of: permanentlyHiddenIds) { _, _ in saveHiddenIds() }
             .alert("Error", isPresented: Binding(get: { error != nil }, set: { if !$0 { error = nil } })) {
@@ -289,7 +293,10 @@ struct MeetupsListView: View {
                 .listRowSeparator(.hidden)
                 .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 8, trailing: 16))
 
-            NearbyEventsView(onSelect: openCreate(prefill:))
+            NearbyEventsView(
+                refreshID: nearbyEventsRefreshID,
+                onSelect: openCreate(prefill:)
+            )
                 .listRowBackground(Color.clear)
                 .listRowSeparator(.hidden)
                 .listRowInsets(EdgeInsets(top: 0, leading: 0, bottom: 8, trailing: 0))
@@ -455,12 +462,28 @@ struct MeetupsListView: View {
 
     // MARK: - Data
 
-    private func load() async {
+    private func refreshHome() async {
+        nearbyEventsRefreshID += 1
+        await load(animated: false)
+    }
+
+    private func load(animated: Bool = true) async {
         do {
             let result = try await MeetupService.shared.listMyParticipations()
-            withAnimation(.spring(response: 0.5, dampingFraction: 0.85)) {
+            let applyResult = {
                 if result != participations { participations = result }
                 hasLoaded = true
+            }
+            if animated {
+                withAnimation(.spring(response: 0.5, dampingFraction: 0.85)) {
+                    applyResult()
+                }
+            } else {
+                var transaction = Transaction()
+                transaction.disablesAnimations = true
+                withTransaction(transaction) {
+                    applyResult()
+                }
             }
         } catch is CancellationError {
             return
