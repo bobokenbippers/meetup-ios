@@ -3,16 +3,39 @@ import PhotosUI
 import Supabase
 import UIKit
 
-/// Truth or Dare game screen for a meetup. Handles the whole session
-/// lifecycle: setup (tier pick), lobby, live game (coin flip → prompt
-/// → proof/answer/pass), and the end-of-game scoreboard. All game
+/// Truth or Dare game screen. Handles the whole session lifecycle:
+/// setup (tier pick), lobby, live game (coin flip → prompt →
+/// proof/answer/pass), and the end-of-game scoreboard. All game
 /// state is server-authoritative and synced over Supabase Realtime.
+///
+/// Runs in two modes: standalone (the default — friends join with
+/// the session's invite code) or embedded in a meetup, where any
+/// meetup participant can play.
 struct TruthOrDareView: View {
-    let meetup: Meetup
+    let meetup: Meetup?
+
+    /// Standalone mode: open an existing session directly, or start
+    /// from the tier-pick setup screen when nil.
+    init(sessionId: UUID? = nil) {
+        self.meetup = nil
+        self._standaloneSessionId = State(initialValue: sessionId)
+        self.channelScope = sessionId?.uuidString ?? UUID().uuidString
+    }
+
+    /// Meetup-embedded mode: shows the meetup's live game, if any.
+    init(meetup: Meetup) {
+        self.meetup = meetup
+        self._standaloneSessionId = State(initialValue: nil)
+        self.channelScope = meetup.id.uuidString
+    }
 
     @Environment(\.dismiss) private var dismiss
     @Environment(AuthViewModel.self) private var auth
 
+    // Stable per-presentation suffix for realtime channel names.
+    private let channelScope: String
+
+    @State private var standaloneSessionId: UUID?
     @State private var session: GameSession?
     @State private var players: [GamePlayer] = []
     @State private var turns: [GameTurn] = []
@@ -34,6 +57,7 @@ struct TruthOrDareView: View {
 
     @State private var showPassConfirm = false
     @State private var showEndConfirm = false
+    @State private var copiedCode = false
 
     private var myUserId: UUID? { auth.session?.user.id }
 
@@ -54,7 +78,7 @@ struct TruthOrDareView: View {
     }
 
     private var canEndGame: Bool {
-        amStarter || meetup.hostId == myUserId
+        amStarter || (meetup != nil && meetup?.hostId == myUserId)
     }
 
     private var isMyTurn: Bool {
@@ -235,6 +259,10 @@ struct TruthOrDareView: View {
             }
             .padding(.top, 24)
 
+            if let code = session.inviteCode {
+                inviteCodeChip(code)
+            }
+
             ScrollView {
                 VStack(spacing: 0) {
                     ForEach(players) { player in
@@ -303,6 +331,45 @@ struct TruthOrDareView: View {
             .padding(.horizontal, 20)
             .padding(.bottom, 16)
         }
+    }
+
+    /// Copyable invite-code chip so the host can read the code out or
+    /// paste it into any chat.
+    private func inviteCodeChip(_ code: String) -> some View {
+        Button {
+            UIPasteboard.general.string = code
+            copiedCode = true
+            Task {
+                try? await Task.sleep(for: .seconds(2))
+                copiedCode = false
+            }
+        } label: {
+            HStack(spacing: 10) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Share code")
+                        .scaledFont(size: 10, weight: .semibold)
+                        .foregroundStyle(Color(white: 0.55))
+                    Text(code)
+                        .scaledFont(size: 24, weight: .black)
+                        .foregroundStyle(Color.coral)
+                        .tracking(6)
+                }
+                Image(systemName: copiedCode ? "checkmark.circle.fill" : "doc.on.doc")
+                    .scaledFont(size: 16)
+                    .foregroundStyle(copiedCode ? Color.statusLive : Color(white: 0.6))
+            }
+            .padding(.horizontal, 18)
+            .padding(.vertical, 10)
+            .background(Color.appSurface)
+            .clipShape(RoundedRectangle(cornerRadius: 14))
+            .overlay(
+                RoundedRectangle(cornerRadius: 14)
+                    .strokeBorder(Color.coral.opacity(0.35), lineWidth: 1)
+            )
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier("chip_invite_code")
+        .accessibilityLabel("Share code \(code). Tap to copy.")
     }
 
     private var starterName: String {
@@ -629,13 +696,17 @@ struct TruthOrDareView: View {
 
     private func load(showErrors: Bool = false) async {
         do {
-            if let live = try await TruthOrDareService.shared.fetchLiveSession(meetupId: meetup.id) {
-                session = live
-            } else if let current = session {
-                // No live session — the open one may have just ended.
-                session = try await TruthOrDareService.shared.fetchSession(sessionId: current.id) ?? current
-            } else {
-                session = nil
+            if let meetup {
+                if let live = try await TruthOrDareService.shared.fetchLiveSession(meetupId: meetup.id) {
+                    session = live
+                } else if let current = session {
+                    // No live session — the open one may have just ended.
+                    session = try await TruthOrDareService.shared.fetchSession(sessionId: current.id) ?? current
+                } else {
+                    session = nil
+                }
+            } else if let sessionId = session?.id ?? standaloneSessionId {
+                session = try await TruthOrDareService.shared.fetchSession(sessionId: sessionId) ?? session
             }
 
             if let session {
@@ -655,7 +726,7 @@ struct TruthOrDareView: View {
 
     private func subscribeToTable(_ table: String, channelSuffix: String) async {
         let channel = SupabaseManager.shared.client.realtimeV2
-            .channel("truth-or-dare-\(channelSuffix)-\(meetup.id)")
+            .channel("truth-or-dare-\(channelSuffix)-\(channelScope)")
         let changes = channel.postgresChange(AnyAction.self, schema: "public", table: table)
         do {
             try await channel.subscribeWithError()
@@ -675,7 +746,13 @@ struct TruthOrDareView: View {
         isActing = true
         defer { isActing = false }
         do {
-            _ = try await TruthOrDareService.shared.startSession(meetupId: meetup.id, tier: selectedTier)
+            let result: StartGameResult
+            if let meetup {
+                result = try await TruthOrDareService.shared.startSession(meetupId: meetup.id, tier: selectedTier)
+            } else {
+                result = try await TruthOrDareService.shared.startSession(tier: selectedTier)
+            }
+            standaloneSessionId = result.sessionId
             await load(showErrors: true)
         } catch is CancellationError {
             return
@@ -787,8 +864,13 @@ struct TruthOrDareView: View {
         guard let turn = currentTurn, turn.isPrompted, isMyTurn else { return }
         isUploadingProof = true
         defer { isUploadingProof = false }
+        guard let session else { return }
         do {
-            let path = try await TruthOrDareService.shared.uploadProofPhoto(image: image, meetupId: meetup.id)
+            let path = try await TruthOrDareService.shared.uploadProofPhoto(
+                image: image,
+                sessionId: session.id,
+                meetupId: meetup?.id
+            )
             try await TruthOrDareService.shared.completeTurn(turnId: turn.id, proofPath: path)
             await load(showErrors: true)
         } catch is CancellationError {

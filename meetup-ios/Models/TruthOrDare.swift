@@ -1,14 +1,16 @@
 import Foundation
 
-/// A Truth or Dare game session inside a meetup.
+/// A Truth or Dare game session. Standalone sessions have no meetup
+/// (`meetupId == nil`) and are joined via their short invite code.
 struct GameSession: Codable, Identifiable, Equatable {
     let id: UUID
-    let meetupId: UUID
+    let meetupId: UUID?
     let startedBy: UUID
     let tier: String                 // "normal" | "spicy"
     let status: String               // "lobby" | "active" | "ended"
     let turnOrder: [UUID]
     let currentTurnIndex: Int
+    let inviteCode: String?
     let createdAt: Date
     let endedAt: Date?
 
@@ -18,6 +20,7 @@ struct GameSession: Codable, Identifiable, Equatable {
         case startedBy = "started_by"
         case turnOrder = "turn_order"
         case currentTurnIndex = "current_turn_index"
+        case inviteCode = "invite_code"
         case createdAt = "created_at"
         case endedAt = "ended_at"
     }
@@ -132,6 +135,36 @@ struct GameTurn: Codable, Identifiable, Equatable {
             profiles: profiles
         )
     }
+}
+
+/// Result of the start-session RPC: the new session and the short
+/// invite code friends use to join it.
+struct StartGameResult: Codable, Equatable {
+    let sessionId: UUID
+    let inviteCode: String
+
+    enum CodingKeys: String, CodingKey {
+        case sessionId = "session_id"
+        case inviteCode = "invite_code"
+    }
+}
+
+/// A row in the Games tab list: the caller's membership joined with
+/// the session it belongs to.
+struct MyGameEntry: Codable, Identifiable, Equatable {
+    let sessionId: UUID
+    let userId: UUID
+    let joinedAt: Date
+    let session: GameSession?
+
+    enum CodingKeys: String, CodingKey {
+        case sessionId = "session_id"
+        case userId = "user_id"
+        case joinedAt = "joined_at"
+        case session = "game_sessions"
+    }
+
+    var id: UUID { sessionId }
 }
 
 /// Result of the server-side coin flip RPC.

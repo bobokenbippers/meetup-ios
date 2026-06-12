@@ -10,7 +10,8 @@ final class NavigationState {
         case meetups = 0
         case people = 1
         case messages = 2
-        case settings = 3
+        case games = 3
+        case settings = 4
     }
 
     var selectedTab: Tab = .meetups
