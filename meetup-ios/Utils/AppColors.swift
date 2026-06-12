@@ -44,17 +44,17 @@ extension Color {
 }
 
 extension UIColor {
-    // Near-black with purple tint in dark; soft lavender in light.
+    // Apple-standard backgrounds: pure black/white primaries, system secondary fills.
     static let appBackground = UIColor { t in
         t.userInterfaceStyle == .dark
-            ? UIColor(red: 0.06, green: 0.06, blue: 0.10, alpha: 1)  // #0F0F19
-            : UIColor(red: 0.96, green: 0.95, blue: 1.00, alpha: 1)  // #F5F2FF
+            ? UIColor(red: 0.000, green: 0.000, blue: 0.000, alpha: 1)  // #000000
+            : UIColor(red: 1.000, green: 1.000, blue: 1.000, alpha: 1)  // #FFFFFF
     }
 
-    // Dark elevated surface in dark; slightly deeper lavender card in light.
+    // Elevated surface: Apple's grouped secondary fill (#1C1C1E dark / #F5F5F7 light).
     static let appSurface = UIColor { t in
         t.userInterfaceStyle == .dark
-            ? UIColor(red: 0.10, green: 0.10, blue: 0.16, alpha: 1)  // #1A1A29
-            : UIColor(red: 0.90, green: 0.88, blue: 0.98, alpha: 1)  // #E6E0FA
+            ? UIColor(red: 0.110, green: 0.110, blue: 0.118, alpha: 1)  // #1C1C1E
+            : UIColor(red: 0.961, green: 0.961, blue: 0.969, alpha: 1)  // #F5F5F7
     }
 }
