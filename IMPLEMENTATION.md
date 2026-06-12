@@ -2506,6 +2506,73 @@ iOS:
 - `MeetupDashboardView` keeps a realtime subscription on `meetup_photos` so new photos
   appear live; the strip shows the first 6 with a `+N` overflow tile into the pager.
 
+### M9.6 Truth or Dare game
+
+Squad members in a meetup play Truth or Dare together with a synced virtual coin flip,
+tiered prompt decks, photo-proof dares, and a pass scoreboard. Canonical migration:
+`supabase/migrations/20260612100000_truth_or_dare.sql`.
+
+Schema:
+
+- `game_prompts (id, kind, tier, text)`: built-in prompt deck — `kind in ('truth','dare')`,
+  `tier in ('normal','spicy')`, seeded with 60 prompts in the migration.
+- `game_sessions (id, meetup_id, started_by, tier, status, turn_order, current_turn_index,
+  created_at, ended_at)`: one session per game; `status in ('lobby','active','ended')`;
+  a partial unique index allows only one live (lobby/active) session per meetup.
+  `turn_order uuid[]` is randomized server-side when the game begins and loops via
+  `current_turn_index`.
+- `game_players (session_id, user_id, joined_at)`: who joined the session.
+- `game_turns (id, session_id, turn_number, player_id, status, coin_result, prompt_kind,
+  prompt_text, proof_photo_url, created_at, completed_at)`: one row per turn;
+  `status: pending → prompted → completed | passed`. Dare proofs store the storage path
+  in `proof_photo_url`.
+
+Server-authoritative flow — clients are read-only on these tables; every mutation is a
+SECURITY DEFINER RPC so the coin flip and prompt draw happen once, in Postgres, and sync
+to all players via Realtime:
+
+- `start_truth_or_dare(p_meetup_id, p_tier)`: participant creates a lobby and auto-joins.
+- `join_truth_or_dare(p_session_id)`: participant joins the lobby; joining mid-game
+  appends them to `turn_order`.
+- `begin_truth_or_dare(p_session_id)`: starter only, needs ≥ 2 players; randomizes
+  `turn_order` (`order by random()`) and creates the first turn.
+- `flip_truth_or_dare_coin(p_turn_id)`: current player only; server picks heads/tails
+  (`random() < 0.5` → heads = truth, tails = dare) and draws an unused prompt of the
+  session's tier (falls back to reuse if the deck is exhausted).
+- `complete_truth_or_dare_turn(p_turn_id, p_action, p_proof_path)`: current player only;
+  `done` on a dare requires a proof path (the turn cannot advance without it), `pass`
+  marks the chicken-out. Advances `current_turn_index` and inserts the next turn.
+- `end_truth_or_dare(p_session_id)`: starter or meetup host; deletes the open turn and
+  marks the session ended.
+
+RLS:
+
+- `game_prompts`: SELECT for any authenticated user.
+- `game_sessions` / `game_players` / `game_turns`: SELECT for the meetup's host or
+  participants (via `is_meetup_host` / `is_meetup_participant`). No INSERT/UPDATE/DELETE
+  policies — writes only happen inside the RPCs.
+- All three game tables are added to the `supabase_realtime` publication.
+
+Storage:
+
+- Dare proofs reuse the private `meetup-photos` bucket at `<meetup_id>/dares/<uuid>.jpg`,
+  so the existing participant-scoped storage policies and 1-hour signed-URL flow apply.
+
+iOS:
+
+- `Models/TruthOrDare.swift`: `GameSession`, `GamePlayer`, `GameTurn`, `CoinFlipResult`,
+  and `GameScoreboard.compute` (pure scoreboard tally, unit-tested in
+  `GameScoreboardTests`).
+- `TruthOrDareService`: reads + RPC wrappers + proof upload/signed-URL refresh.
+- `TruthOrDareView` (full-screen cover from the dashboard's Game button): setup (tier
+  pick), lobby, live game, and end-of-game scoreboard; keeps realtime subscriptions on
+  the three game tables and reloads on any change.
+- `CoinFlipView`: full-screen tap-to-flip coin (3D x-axis spin via a `GeometryEffect`,
+  fast launch into a slow-motion settle, haptics on landing). The animation always lands
+  on the server's result; observers watch the same flip when the turn syncs in. The
+  prompt card appears only after the coin settles. Dare proof uses the in-app camera
+  (`CameraPickerView`), with a photo-library fallback on camera-less devices.
+
 ## Appendix C — Testing Strategy
 
 - **Unit tests (backend):** `pytest`. Focus on `services/punctuality.py`, `services/routing.py` ETA caching logic.
