@@ -58,7 +58,7 @@ final class TruthOrDareService {
     func fetchPlayers(sessionId: UUID) async throws -> [GamePlayer] {
         try await supabase
             .from("game_players")
-            .select("*, profiles(display_name, avatar_url)")
+            .select("*, profiles!game_players_user_id_fkey(display_name, avatar_url)")
             .eq("session_id", value: sessionId)
             .order("joined_at", ascending: true)
             .execute()
@@ -68,9 +68,13 @@ final class TruthOrDareService {
     /// All turns for a session, oldest first, with proof photo paths
     /// swapped for fresh signed URLs.
     func fetchTurns(sessionId: UUID) async throws -> [GameTurn] {
+        // The FK hint is required: game_turn_votes references both
+        // game_turns and profiles, so PostgREST sees two relationships
+        // between game_turns and profiles (the direct player FK and a
+        // many-to-many through votes) and rejects a bare embed.
         let turns: [GameTurn] = try await supabase
             .from("game_turns")
-            .select("*, profiles(display_name, avatar_url)")
+            .select("*, profiles!game_turns_player_id_fkey(display_name, avatar_url)")
             .eq("session_id", value: sessionId)
             .order("turn_number", ascending: true)
             .execute()
