@@ -91,7 +91,6 @@ struct MeetupDashboardView: View {
                     }
                 }
                 .frame(maxHeight: .infinity)
-                .disabled(true)
 
                 // Photo thumbnail strip (shown when photos exist)
                 if !recentPhotos.isEmpty {
