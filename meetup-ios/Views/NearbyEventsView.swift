@@ -10,6 +10,7 @@ struct NearbyEventsView: View {
     let onSelect: (EventPrefill) -> Void
 
     @Environment(\.openURL) private var openURL
+    @Environment(AppSettings.self) private var settings
     @State private var events: [NearbyEvent] = []
     @State private var phase: Phase = .loading
 
@@ -31,12 +32,20 @@ struct NearbyEventsView: View {
     }
 
     private var loadKey: String {
-        "\(locationManager.authorizationStatus.rawValue)|\(locationKey)"
+        [
+            "\(locationManager.authorizationStatus.rawValue)",
+            locationKey,
+            "\(settings.eventSuggestionsEnabled)",
+            "\(settings.eventSuggestionRadiusMiles)",
+            settings.eventSuggestionCategory.rawValue,
+        ].joined(separator: "|")
     }
 
     var body: some View {
         Group {
             switch phase {
+            case .idle where !settings.eventSuggestionsEnabled:
+                EmptyView()
             case .loaded where !events.isEmpty:
                 content
             case .loading:
@@ -220,6 +229,12 @@ struct NearbyEventsView: View {
     // MARK: - Data
 
     private func load() async {
+        guard settings.eventSuggestionsEnabled else {
+            events = []
+            phase = .idle
+            return
+        }
+
         guard let location = locationManager.location else {
             switch locationManager.authorizationStatus {
             case .notDetermined:
@@ -245,11 +260,25 @@ struct NearbyEventsView: View {
     }
 
     private func loadEvents(near location: CLLocation) async {
-        phase = .loading
+        let cached = EventSuggestionsService.shared.cachedNearbyEvents(
+            latitude: location.coordinate.latitude,
+            longitude: location.coordinate.longitude,
+            radiusMiles: settings.eventSuggestionRadiusMiles,
+            classificationName: settings.eventSuggestionClassificationName
+        )?.filter { $0.coordinate != nil } ?? []
+        if !cached.isEmpty {
+            events = cached
+            phase = .loaded
+        } else {
+            phase = .loading
+        }
+
         do {
             let result = try await EventSuggestionsService.shared.nearbyEvents(
                 latitude: location.coordinate.latitude,
-                longitude: location.coordinate.longitude
+                longitude: location.coordinate.longitude,
+                radiusMiles: settings.eventSuggestionRadiusMiles,
+                classificationName: settings.eventSuggestionClassificationName
             )
             // Only events with a coordinate are actionable (the create flow needs lat/lng).
             let actionable = result.filter { $0.coordinate != nil }
@@ -258,7 +287,9 @@ struct NearbyEventsView: View {
         } catch is CancellationError {
             return
         } catch {
-            phase = .failed(Self.eventLoadMessage(for: error))
+            if cached.isEmpty {
+                phase = .failed(Self.eventLoadMessage(for: error))
+            }
         }
     }
 
@@ -267,6 +298,8 @@ struct NearbyEventsView: View {
             switch sourceError {
             case .missingAPIKey:
                 return "Event suggestions are temporarily unavailable."
+            case .timedOut:
+                return "Events are taking too long to respond. Try again."
             case .requestFailed, .badResponse:
                 return "Check your connection and try again."
             }

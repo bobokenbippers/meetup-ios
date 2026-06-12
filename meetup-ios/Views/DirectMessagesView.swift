@@ -254,7 +254,7 @@ struct MessageThreadView: View {
             await markRead()
             lastMarkedReadMessageId = messages.last?.id
             async let realtime: Void = subscribeToThreadChanges()
-            async let refresh: Void = refreshThreadWhileOpen()
+            async let refresh: Void = refreshThreadFallback()
             _ = await (realtime, refresh)
         }
         .onChange(of: selectedPhoto) { _, item in
@@ -516,10 +516,10 @@ struct MessageThreadView: View {
         lastMarkedReadMessageId = latest.id
     }
 
-    private func refreshThreadWhileOpen() async {
+    private func refreshThreadFallback() async {
         while !Task.isCancelled {
             do {
-                try await Task.sleep(for: .seconds(2))
+                try await Task.sleep(for: .seconds(20))
             } catch {
                 return
             }
@@ -699,6 +699,7 @@ private struct MessageImage: View {
     }
 
     private func loadSignedURL() async {
+        if url != nil, !failedToLoad { return }
         failedToLoad = false
         url = nil
         do {

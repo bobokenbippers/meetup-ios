@@ -108,6 +108,41 @@ struct SettingsView: View {
                         .foregroundStyle(Color(white: 0.4))
                 }
 
+                // MARK: Event Suggestions
+                Section {
+                    Toggle("Event Suggestions", isOn: $settings.eventSuggestionsEnabled)
+                        .tint(Color.coral)
+                        .foregroundStyle(.white)
+                        .listRowBackground(Color.appSurface)
+
+                    Picker("Event Type", selection: $settings.eventSuggestionCategory) {
+                        ForEach(EventSuggestionCategoryPreference.allCases) { category in
+                            Text(category.title).tag(category)
+                        }
+                    }
+                    .tint(Color.coral)
+                    .foregroundStyle(settings.eventSuggestionsEnabled ? .white : Color(white: 0.45))
+                    .listRowBackground(Color.appSurface)
+                    .disabled(!settings.eventSuggestionsEnabled)
+
+                    Stepper(
+                        "Within \(settings.eventSuggestionRadiusMiles) miles",
+                        value: $settings.eventSuggestionRadiusMiles,
+                        in: 5...50,
+                        step: 5
+                    )
+                    .tint(Color.coral)
+                    .foregroundStyle(settings.eventSuggestionsEnabled ? .white : Color(white: 0.45))
+                    .listRowBackground(Color.appSurface)
+                    .disabled(!settings.eventSuggestionsEnabled)
+                } header: {
+                    sectionHeader("EVENT SUGGESTIONS")
+                } footer: {
+                    Text("Used for the Happening Near You row on Meetups.")
+                        .font(.caption2)
+                        .foregroundStyle(Color(white: 0.4))
+                }
+
                 // MARK: Notifications
                 Section {
                     Toggle("Push Notifications", isOn: $pushEnabled)

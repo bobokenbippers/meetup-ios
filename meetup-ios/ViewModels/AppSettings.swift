@@ -6,6 +6,36 @@ enum ThemePreference: String {
     case system
 }
 
+enum EventSuggestionCategoryPreference: String, CaseIterable, Identifiable {
+    case all
+    case music
+    case sports
+    case artsTheater
+    case family
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .all: return "All Events"
+        case .music: return "Music"
+        case .sports: return "Sports"
+        case .artsTheater: return "Arts & Theater"
+        case .family: return "Family"
+        }
+    }
+
+    var ticketmasterClassificationName: String? {
+        switch self {
+        case .all: return nil
+        case .music: return "Music"
+        case .sports: return "Sports"
+        case .artsTheater: return "Arts & Theatre"
+        case .family: return "Family"
+        }
+    }
+}
+
 @Observable
 @MainActor
 final class AppSettings {
@@ -24,6 +54,19 @@ final class AppSettings {
     var contactsEnabled: Bool {
         didSet { UserDefaults.standard.set(contactsEnabled, forKey: "contactsEnabled") }
     }
+    var eventSuggestionsEnabled: Bool {
+        didSet { UserDefaults.standard.set(eventSuggestionsEnabled, forKey: "eventSuggestionsEnabled") }
+    }
+    var eventSuggestionRadiusMiles: Int {
+        didSet { UserDefaults.standard.set(eventSuggestionRadiusMiles, forKey: "eventSuggestionRadiusMiles") }
+    }
+    var eventSuggestionCategory: EventSuggestionCategoryPreference {
+        didSet { UserDefaults.standard.set(eventSuggestionCategory.rawValue, forKey: "eventSuggestionCategory") }
+    }
+
+    var eventSuggestionClassificationName: String? {
+        eventSuggestionCategory.ticketmasterClassificationName
+    }
 
     init() {
         let d = UserDefaults.standard
@@ -33,5 +76,12 @@ final class AppSettings {
         largerText = d.bool(forKey: "largerText")
         reduceMotion = d.bool(forKey: "reduceMotion")
         contactsEnabled = d.bool(forKey: "contactsEnabled")
+        eventSuggestionsEnabled = d.object(forKey: "eventSuggestionsEnabled") == nil
+            ? true
+            : d.bool(forKey: "eventSuggestionsEnabled")
+        let storedRadius = d.integer(forKey: "eventSuggestionRadiusMiles")
+        eventSuggestionRadiusMiles = storedRadius == 0 ? 25 : storedRadius
+        let rawCategory = d.string(forKey: "eventSuggestionCategory") ?? ""
+        eventSuggestionCategory = EventSuggestionCategoryPreference(rawValue: rawCategory) ?? .all
     }
 }

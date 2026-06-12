@@ -48,6 +48,19 @@ struct CreateMeetupView: View {
     @State private var conflictingMeetup: Meetup?
     @State private var error: String?
 
+    private var chosenCategory: String {
+        selectedCategory?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false
+            ? selectedCategory!
+            : "Squad plan"
+    }
+
+    private var createButtonTitle: String {
+        guard let selectedPlace else { return "Pick a place to continue" }
+        let inviteCount = invitees.count
+        if inviteCount == 0 { return "Create at \(selectedPlace.name)" }
+        return "Create for \(inviteCount + 1) people"
+    }
+
     /// Opens blank by default; pass a `prefill` (e.g. from a tapped nearby-event card)
     /// to seed the destination, time, and category from a real event.
     init(prefill: EventPrefill? = nil, liveMeetups: [Meetup] = []) {
@@ -71,6 +84,15 @@ struct CreateMeetupView: View {
     var body: some View {
         NavigationStack {
             Form {
+                CreatePlanSummary(
+                    place: selectedPlace,
+                    targetTime: setTargetTime ? targetTime : nil,
+                    category: chosenCategory,
+                    invitees: invitees
+                )
+                .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
+                .listRowBackground(Color.clear)
+
                 DestinationSection(selectedPlace: $selectedPlace)
 
                 Section {
@@ -78,11 +100,18 @@ struct CreateMeetupView: View {
                         .tint(Color.coral)
                         .foregroundStyle(.white)
                         .listRowBackground(Color.appSurface)
+                    TimePresetRow(
+                        targetTime: $targetTime,
+                        setTargetTime: $setTargetTime,
+                        onChange: syncPickerState
+                    )
+                    .listRowBackground(Color.appSurface)
                     if setTargetTime {
                         DatePicker("Date", selection: $targetTime, in: Date()..., displayedComponents: [.date])
                             .foregroundStyle(.white)
                             .tint(Color.coral)
                             .listRowBackground(Color.appSurface)
+                            .onChange(of: targetTime) { _, _ in syncPickerState() }
                         HStack(spacing: 0) {
                             Picker("Hour", selection: $pickerHour) {
                                 ForEach(1...12, id: \.self) { h in
@@ -197,7 +226,7 @@ struct CreateMeetupView: View {
                             Button {
                                 createTapped()
                             } label: {
-                                Text("Create")
+                                Text(createButtonTitle)
                                     .font(.headline)
                                     .foregroundStyle(.white)
                                     .frame(maxWidth: .infinity)
@@ -250,6 +279,13 @@ struct CreateMeetupView: View {
         if let date = cal.date(from: comps) { targetTime = date }
     }
 
+    private func syncPickerState() {
+        let hour = Calendar.current.component(.hour, from: targetTime)
+        pickerHour = hour % 12 == 0 ? 12 : hour % 12
+        pickerMinute = Calendar.current.component(.minute, from: targetTime)
+        pickerAmPm = hour < 12 ? 0 : 1
+    }
+
     private func createTapped() {
         if let conflict = findConflict(), conflict.id != conflictingMeetup?.id {
             conflictingMeetup = conflict
@@ -294,6 +330,165 @@ struct CreateMeetupView: View {
             self.error = error.localizedDescription
             isCreating = false
         }
+    }
+}
+
+private struct CreatePlanSummary: View {
+    let place: SelectedPlace?
+    let targetTime: Date?
+    let category: String
+    let invitees: [FoundUser]
+
+    private var timeText: String {
+        guard let targetTime else { return "Start when everyone is ready" }
+        return targetTime.formatted(.dateTime.weekday(.abbreviated).hour().minute())
+    }
+
+    private var peopleText: String {
+        let total = invitees.count + 1
+        return total == 1 ? "Just you for now" : "\(total) people"
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(alignment: .top, spacing: 12) {
+                Text(meetupCategoryEmoji(category))
+                    .scaledFont(size: 28)
+                    .frame(width: 46, height: 46)
+                    .background(Color.coral.opacity(0.18))
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(place?.name ?? "Where are we meeting?")
+                        .scaledFont(size: 20, weight: .bold)
+                        .foregroundStyle(.white)
+                        .lineLimit(2)
+                    Text(category)
+                        .scaledFont(size: 12, weight: .semibold)
+                        .foregroundStyle(Color.coral)
+                }
+
+                Spacer(minLength: 0)
+            }
+
+            HStack(spacing: 8) {
+                CreateSummaryPill(systemImage: "clock", title: timeText)
+                CreateSummaryPill(systemImage: "person.2.fill", title: peopleText)
+            }
+
+            if !invitees.isEmpty {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 8) {
+                        ForEach(invitees, id: \.id) { invitee in
+                            Label(invitee.displayName, systemImage: "checkmark.circle.fill")
+                                .scaledFont(size: 12, weight: .semibold)
+                                .foregroundStyle(.white)
+                                .lineLimit(1)
+                                .padding(.horizontal, 10)
+                                .padding(.vertical, 7)
+                                .background(Color.white.opacity(0.10))
+                                .clipShape(Capsule())
+                        }
+                    }
+                }
+            }
+        }
+        .padding(16)
+        .background {
+            RoundedRectangle(cornerRadius: 18)
+                .fill(Color.appSurface)
+            RoundedRectangle(cornerRadius: 18)
+                .strokeBorder(Color.coral.opacity(0.22), lineWidth: 1)
+        }
+    }
+}
+
+private struct CreateSummaryPill: View {
+    let systemImage: String
+    let title: String
+
+    var body: some View {
+        Label(title, systemImage: systemImage)
+            .scaledFont(size: 11, weight: .semibold)
+            .foregroundStyle(Color(white: 0.78))
+            .lineLimit(1)
+            .minimumScaleFactor(0.82)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 7)
+            .background(Color.white.opacity(0.08))
+            .clipShape(Capsule())
+    }
+}
+
+private struct TimePresetRow: View {
+    @Binding var targetTime: Date
+    @Binding var setTargetTime: Bool
+    let onChange: () -> Void
+
+    private let presets: [TimePreset] = [
+        .init(title: "Now", minutesFromNow: 0),
+        .init(title: "30 min", minutesFromNow: 30),
+        .init(title: "1 hour", minutesFromNow: 60),
+        .init(title: "Tonight", minutesFromNow: nil),
+    ]
+
+    var body: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                ForEach(presets) { preset in
+                    Button {
+                        targetTime = preset.date()
+                        setTargetTime = true
+                        onChange()
+                    } label: {
+                        Text(preset.title)
+                            .scaledFont(size: 12, weight: .semibold)
+                            .foregroundStyle(.white)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 8)
+                            .background(Color.white.opacity(0.10))
+                            .clipShape(Capsule())
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .padding(.vertical, 2)
+        }
+        .accessibilityLabel("Time presets")
+    }
+}
+
+private struct TimePreset: Identifiable {
+    let title: String
+    let minutesFromNow: Int?
+
+    var id: String { title }
+
+    func date() -> Date {
+        if let minutesFromNow {
+            return Self.roundToQuarterHour(Date().addingTimeInterval(TimeInterval(minutesFromNow * 60)))
+        }
+
+        let calendar = Calendar.current
+        let now = Date()
+        var comps = calendar.dateComponents([.year, .month, .day], from: now)
+        comps.hour = 19
+        comps.minute = 0
+        comps.second = 0
+        let tonight = calendar.date(from: comps) ?? now.addingTimeInterval(3 * 3600)
+        if tonight > now { return tonight }
+        return calendar.date(byAdding: .day, value: 1, to: tonight) ?? now.addingTimeInterval(24 * 3600)
+    }
+
+    private static func roundToQuarterHour(_ date: Date) -> Date {
+        let calendar = Calendar.current
+        let minute = calendar.component(.minute, from: date)
+        let rounded = Int((Double(minute) / 15.0).rounded(.up)) * 15
+        var comps = calendar.dateComponents([.year, .month, .day, .hour], from: date)
+        comps.minute = rounded % 60
+        if rounded == 60 { comps.hour = (comps.hour ?? 0) + 1 }
+        comps.second = 0
+        return calendar.date(from: comps) ?? date
     }
 }
 

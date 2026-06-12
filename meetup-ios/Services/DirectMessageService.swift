@@ -25,6 +25,7 @@ final class DirectMessageService {
     private let supabase = SupabaseManager.shared.client
     private let photoBucket = "message-photos"
     private let signedURLExpiry = 60 * 60 * 24
+    private var signedImageURLCache: [String: SignedImageURLCacheEntry] = [:]
 
     private init() {}
 
@@ -150,9 +151,19 @@ final class DirectMessageService {
     }
 
     func signedImageURL(for path: String) async throws -> URL {
-        try await supabase.storage
+        if let cached = signedImageURLCache[path],
+           cached.expiresAt > Date().addingTimeInterval(60) {
+            return cached.url
+        }
+
+        let url = try await supabase.storage
             .from(photoBucket)
             .createSignedURL(path: path, expiresIn: signedURLExpiry)
+        signedImageURLCache[path] = SignedImageURLCacheEntry(
+            url: url,
+            expiresAt: Date().addingTimeInterval(TimeInterval(signedURLExpiry))
+        )
+        return url
     }
 
     func markRead(conversationId: UUID) async throws {
@@ -226,6 +237,11 @@ final class DirectMessageService {
             ))
             .execute()
     }
+}
+
+private struct SignedImageURLCacheEntry {
+    let url: URL
+    let expiresAt: Date
 }
 
 private extension UIImage {

@@ -40,11 +40,22 @@ struct RecapView: View {
         participants.first(where: { $0.userId == meetup.hostId })?.displayName ?? "Unknown"
     }
 
+    private var peopleCountText: String {
+        let total = participants.count
+        guard total > 0 else { return "Loading the crew" }
+        return arrived.isEmpty ? "\(total) invited" : "\(arrived.count) of \(total) made it"
+    }
+
+    private var receiptTotal: Double {
+        receipts.reduce(0) { $0 + $1.totalAmount }
+    }
+
     var body: some View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: 20) {
                     headerCard
+                    socialStatsRow
                     if isHost { hostSummaryCard }
                     attendeeSection
                     billPlaceholderCard
@@ -64,6 +75,8 @@ struct RecapView: View {
                 }
             }
             .task { await load() }
+            .background(Color.appBackground.ignoresSafeArea())
+            .preferredColorScheme(.dark)
             .sheet(isPresented: $showBillView) {
                 BillView(meetup: meetup, participants: participants)
             }
@@ -100,65 +113,129 @@ struct RecapView: View {
 
     private var headerCard: some View {
         VStack(alignment: .leading, spacing: 12) {
-            HStack(spacing: 10) {
+            HStack(alignment: .top, spacing: 12) {
                 Text(meetupCategoryEmoji(meetup.category))
-                    .scaledFont(size: 28)
-                    .frame(width: 48, height: 48)
-                    .background(Color(.tertiarySystemBackground))
+                    .scaledFont(size: 30)
+                    .frame(width: 54, height: 54)
+                    .background(Color.coral.opacity(0.18))
                     .clipShape(RoundedRectangle(cornerRadius: 12))
 
                 VStack(alignment: .leading, spacing: 2) {
                     Text(meetup.destinationName)
-                        .scaledFont(size: 20, weight: .bold)
-                        .foregroundStyle(Color(.label))
+                        .scaledFont(size: 24, weight: .bold)
+                        .foregroundStyle(.white)
                         .lineLimit(2)
                     if let addr = meetup.destinationAddress, !addr.isEmpty {
                         Text(addr)
                             .scaledFont(size: 12)
-                            .foregroundStyle(Color(.secondaryLabel))
+                            .foregroundStyle(Color(white: 0.66))
                             .lineLimit(1)
                     }
                 }
+
+                Spacer(minLength: 0)
             }
 
-            Divider()
+            photoPreviewStrip
 
-            VStack(spacing: 8) {
-                if let target = meetup.targetArrivalAt {
-                    recapDetail(
-                        icon: "clock",
-                        label: "Scheduled",
-                        value: target.formatted(.dateTime.weekday(.wide).month(.wide).day().hour().minute())
-                    )
-                }
+            HStack(spacing: 8) {
+                RecapMetaPill(systemImage: "person.2.fill", title: peopleCountText)
                 if hasLoaded {
-                    recapDetail(icon: "person.fill", label: "Hosted by", value: hostName)
+                    RecapMetaPill(systemImage: "sparkles", title: "Hosted by \(hostName)")
                 }
+            }
+
+            if let target = meetup.targetArrivalAt {
+                recapDetail(
+                    icon: "clock",
+                    label: "Started from",
+                    value: target.formatted(.dateTime.weekday(.wide).month(.wide).day().hour().minute())
+                )
             }
         }
         .padding(16)
-        .background(Color(.secondarySystemBackground))
+        .background(Color.appSurface)
         .clipShape(RoundedRectangle(cornerRadius: 20))
         .overlay(
             RoundedRectangle(cornerRadius: 20)
-                .strokeBorder(Color(.separator).opacity(0.5), lineWidth: 1)
+                .strokeBorder(Color.coral.opacity(0.22), lineWidth: 1)
         )
+    }
+
+    @ViewBuilder
+    private var photoPreviewStrip: some View {
+        if meetupPhotos.isEmpty {
+            HStack(spacing: 10) {
+                Image(systemName: "camera.fill")
+                    .scaledFont(size: 16)
+                    .foregroundStyle(Color.coral)
+                Text("Add the first photo from this meetup")
+                    .scaledFont(size: 13, weight: .semibold)
+                    .foregroundStyle(Color(white: 0.76))
+                Spacer()
+                Button {
+                    showPhotoPicker = true
+                } label: {
+                    Image(systemName: "plus")
+                        .scaledFont(size: 13, weight: .bold)
+                        .foregroundStyle(.white)
+                        .frame(width: 30, height: 30)
+                        .background(Color.coral)
+                        .clipShape(Circle())
+                }
+                .buttonStyle(.plain)
+            }
+            .padding(12)
+            .background(Color.white.opacity(0.08))
+            .clipShape(RoundedRectangle(cornerRadius: 14))
+        } else {
+            HStack(spacing: 4) {
+                ForEach(Array(meetupPhotos.prefix(3))) { photo in
+                    AsyncImage(url: URL(string: photo.photoUrl)) { phase in
+                        switch phase {
+                        case .success(let image):
+                            image.resizable().scaledToFill()
+                        default:
+                            Color.white.opacity(0.08)
+                                .overlay(Image(systemName: "photo").foregroundStyle(Color(white: 0.45)))
+                        }
+                    }
+                    .frame(height: 112)
+                    .frame(maxWidth: .infinity)
+                    .clipped()
+                    .clipShape(RoundedRectangle(cornerRadius: 10))
+                    .onTapGesture { fullscreenPhoto = photo }
+                }
+            }
+        }
     }
 
     private func recapDetail(icon: String, label: String, value: String) -> some View {
         HStack(spacing: 8) {
             Image(systemName: icon)
                 .scaledFont(size: 12)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Color(white: 0.62))
                 .frame(width: 16)
             Text(label)
                 .scaledFont(size: 12)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Color(white: 0.62))
             Spacer()
             Text(value)
                 .scaledFont(size: 12, weight: .medium)
-                .foregroundStyle(Color(.label))
+                .foregroundStyle(.white)
                 .multilineTextAlignment(.trailing)
+        }
+    }
+
+    private var socialStatsRow: some View {
+        HStack(spacing: 10) {
+            RecapStatTile(value: "\(arrived.count)", label: "showed up", systemImage: "checkmark.circle.fill")
+            RecapStatTile(value: "\(meetupPhotos.count)", label: "photos", systemImage: "photo.stack")
+            RecapStatTile(
+                value: receiptTotal > 0 ? receiptTotal.formatted(.currency(code: "USD")) : "$0",
+                label: "split total",
+                systemImage: "dollarsign.circle.fill"
+            )
         }
     }
 
@@ -180,7 +257,7 @@ struct RecapView: View {
             Spacer()
         }
         .padding(.vertical, 20)
-        .background(Color.coral.opacity(0.12))
+        .background(Color.appSurface)
         .clipShape(RoundedRectangle(cornerRadius: 20))
         .overlay(
             RoundedRectangle(cornerRadius: 20)
@@ -548,6 +625,54 @@ struct RecapView: View {
             self.error = error.localizedDescription
             hasLoaded = true
         }
+    }
+}
+
+private struct RecapMetaPill: View {
+    let systemImage: String
+    let title: String
+
+    var body: some View {
+        Label(title, systemImage: systemImage)
+            .scaledFont(size: 11, weight: .semibold)
+            .foregroundStyle(Color(white: 0.78))
+            .lineLimit(1)
+            .minimumScaleFactor(0.82)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 7)
+            .background(Color.white.opacity(0.08))
+            .clipShape(Capsule())
+    }
+}
+
+private struct RecapStatTile: View {
+    let value: String
+    let label: String
+    let systemImage: String
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Image(systemName: systemImage)
+                .scaledFont(size: 14, weight: .semibold)
+                .foregroundStyle(Color.coral)
+            Text(value)
+                .scaledFont(size: 18, weight: .bold)
+                .foregroundStyle(.white)
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
+            Text(label.uppercased())
+                .scaledFont(size: 10, weight: .bold)
+                .foregroundStyle(Color(white: 0.5))
+                .lineLimit(1)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(12)
+        .background(Color.appSurface)
+        .clipShape(RoundedRectangle(cornerRadius: 14))
+        .overlay(
+            RoundedRectangle(cornerRadius: 14)
+                .strokeBorder(Color.white.opacity(0.08), lineWidth: 1)
+        )
     }
 }
 
