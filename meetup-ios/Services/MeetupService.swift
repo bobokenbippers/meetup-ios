@@ -762,33 +762,12 @@ final class MeetupService {
             .execute()
     }
 
-    /// Join a meetup via share link — inserts an "invited" participant row if not already present.
-    func joinByShareToken(meetupId: UUID) async throws {
-        guard let userId = supabase.auth.currentUser?.id else { throw MeetupError.notSignedIn }
-
-        // Check if already a participant
-        let existing: [MeetupParticipant] = try await supabase
-            .from("meetup_participants")
-            .select()
-            .eq("meetup_id", value: meetupId)
-            .eq("user_id", value: userId)
-            .execute()
-            .value
-        if !existing.isEmpty { return }
-
-        struct ParticipantInsert: Encodable {
-            let meetupId: UUID
-            let userId: UUID
-            let status: String
-            enum CodingKeys: String, CodingKey {
-                case meetupId = "meetup_id"
-                case userId   = "user_id"
-                case status
-            }
-        }
-        try await supabase
-            .from("meetup_participants")
-            .insert(ParticipantInsert(meetupId: meetupId, userId: userId, status: "invited"))
+    /// Join a meetup via share link. The RPC validates the share token server-side
+    /// and performs the insert with the right RLS context.
+    func joinByShareToken(_ token: String) async throws {
+        guard supabase.auth.currentUser?.id != nil else { throw MeetupError.notSignedIn }
+        _ = try await supabase
+            .rpc("join_meetup_by_token", params: ["p_share_token": token])
             .execute()
     }
 }

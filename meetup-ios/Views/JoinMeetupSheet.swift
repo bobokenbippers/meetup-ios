@@ -194,7 +194,7 @@ struct JoinMeetupSheet: View {
     private func join(_ meetup: Meetup) async {
         isJoining = true
         do {
-            try await MeetupService.shared.joinByShareToken(meetupId: meetup.id)
+            try await MeetupService.shared.joinByShareToken(shareToken)
             withAnimation { joined = true }
             try? await Task.sleep(for: .seconds(1.5))
             dismiss()

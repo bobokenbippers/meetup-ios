@@ -573,6 +573,7 @@ struct MeetupDashboardView: View {
         isGeneratingShareLink = true
         do {
             let token = try await MeetupService.shared.ensureShareToken(for: meetup)
+            let appURLString = "squadbrunch://join/\(token)"
             // Share a normal web URL so beta testers can forward it anywhere. The Edge
             // Function page redirects installed users into squadbrunch://join/<token>
             // and gives people without the app a useful fallback instead of a dead link.
@@ -580,7 +581,7 @@ struct MeetupDashboardView: View {
             if let url = URL(string: urlString) {
                 shareInvite = ShareInvite(
                     url: url,
-                    message: "Join my Squad Brunch meetup at \(meetup.destinationName): \(url.absoluteString)"
+                    message: "Join my Squad Brunch meetup at \(meetup.destinationName): \(url.absoluteString)\n\nIf that does not open the app, use: \(appURLString)"
                 )
             }
         } catch is CancellationError {
@@ -901,4 +902,3 @@ private struct ConfettiView: View {
         }
     }
 }
-

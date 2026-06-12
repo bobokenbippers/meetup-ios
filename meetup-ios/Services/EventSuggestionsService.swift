@@ -5,22 +5,29 @@ import CoreLocation
 
 /// A swappable backing source for nearby real-world events. Implement this to add
 /// a new provider (SeatGeek, a scrape, etc.) without touching the UI.
-protocol EventSource {
+protocol EventSource: Sendable {
     var sourceName: String { get }
-    func fetchNearbyEvents(latitude: Double, longitude: Double, radiusMiles: Int) async throws -> [NearbyEvent]
+    func fetchNearbyEvents(
+        latitude: Double,
+        longitude: Double,
+        radiusMiles: Int,
+        classificationName: String?
+    ) async throws -> [NearbyEvent]
 }
 
-enum EventSourceError: LocalizedError {
+enum EventSourceError: LocalizedError, Equatable {
     /// The provider key was never configured (placeholder still in Info.plist).
     case missingAPIKey
     case requestFailed(Int)
     case badResponse
+    case timedOut
 
     var errorDescription: String? {
         switch self {
         case .missingAPIKey:        return "Event suggestions are not configured."
         case .requestFailed(let c): return "Event source request failed (HTTP \(c))."
         case .badResponse:          return "Event source returned an unexpected response."
+        case .timedOut:             return "Event source request timed out."
         }
     }
 }
@@ -33,9 +40,11 @@ final class EventSuggestionsService {
     static let shared = EventSuggestionsService()
 
     private let source: EventSource
+    private let timeoutSeconds: Double
 
-    private init(source: EventSource = TicketmasterEventSource()) {
+    init(source: EventSource = TicketmasterEventSource(), timeoutSeconds: Double = 8) {
         self.source = source
+        self.timeoutSeconds = timeoutSeconds
     }
 
     var sourceName: String { source.sourceName }
@@ -43,13 +52,90 @@ final class EventSuggestionsService {
     func nearbyEvents(
         latitude: Double,
         longitude: Double,
-        radiusMiles: Int = 25
+        radiusMiles: Int = 25,
+        classificationName: String? = nil
     ) async throws -> [NearbyEvent] {
-        try await source.fetchNearbyEvents(
+        try await withThrowingTaskGroup(of: [NearbyEvent].self) { group in
+            group.addTask { [self] in
+                try await source.fetchNearbyEvents(
+                    latitude: latitude,
+                    longitude: longitude,
+                    radiusMiles: radiusMiles,
+                    classificationName: classificationName
+                )
+            }
+            group.addTask { [self] in
+                let milliseconds = max(1, Int(timeoutSeconds * 1_000))
+                try await Task.sleep(for: .milliseconds(milliseconds))
+                throw EventSourceError.timedOut
+            }
+
+            guard let result = try await group.next() else { throw EventSourceError.badResponse }
+            group.cancelAll()
+            cache(
+                result,
+                latitude: latitude,
+                longitude: longitude,
+                radiusMiles: radiusMiles,
+                classificationName: classificationName
+            )
+            return result
+        }
+    }
+
+    func cachedNearbyEvents(
+        latitude: Double,
+        longitude: Double,
+        radiusMiles: Int = 25,
+        classificationName: String? = nil
+    ) -> [NearbyEvent]? {
+        let key = Self.cacheKey(
             latitude: latitude,
             longitude: longitude,
-            radiusMiles: radiusMiles
+            radiusMiles: radiusMiles,
+            classificationName: classificationName
         )
+        guard let data = UserDefaults.standard.data(forKey: key),
+              let cached = try? JSONDecoder().decode(CachedEventSuggestions.self, from: data),
+              Date().timeIntervalSince(cached.storedAt) < Self.cacheTTL
+        else { return nil }
+        return cached.events.map(\.nearbyEvent)
+    }
+
+    private func cache(
+        _ events: [NearbyEvent],
+        latitude: Double,
+        longitude: Double,
+        radiusMiles: Int,
+        classificationName: String?
+    ) {
+        let key = Self.cacheKey(
+            latitude: latitude,
+            longitude: longitude,
+            radiusMiles: radiusMiles,
+            classificationName: classificationName
+        )
+        let cached = CachedEventSuggestions(
+            storedAt: Date(),
+            events: events.map(CachedNearbyEvent.init)
+        )
+        if let data = try? JSONEncoder().encode(cached) {
+            UserDefaults.standard.set(data, forKey: key)
+        }
+    }
+
+    private static let cacheTTL: TimeInterval = 30 * 60
+
+    private static func cacheKey(
+        latitude: Double,
+        longitude: Double,
+        radiusMiles: Int,
+        classificationName: String?
+    ) -> String {
+        let lat = (latitude * 100).rounded() / 100
+        let lng = (longitude * 100).rounded() / 100
+        let category = classificationName?.replacingOccurrences(of: " ", with: "-") ?? "all"
+        return "eventSuggestions.\(lat).\(lng).\(radiusMiles).\(category)"
     }
 }
 
@@ -61,7 +147,12 @@ final class EventSuggestionsService {
 struct TicketmasterEventSource: EventSource {
     let sourceName = "Ticketmaster"
 
-    private let session: URLSession = .shared
+    private let session: URLSession = {
+        let configuration = URLSessionConfiguration.default
+        configuration.timeoutIntervalForRequest = 8
+        configuration.timeoutIntervalForResource = 12
+        return URLSession(configuration: configuration)
+    }()
 
     private var apiKey: String? {
         guard let raw = Bundle.main.object(forInfoDictionaryKey: "TicketmasterAPIKey") as? String else { return nil }
@@ -72,14 +163,20 @@ struct TicketmasterEventSource: EventSource {
         return trimmed
     }
 
-    func fetchNearbyEvents(latitude: Double, longitude: Double, radiusMiles: Int) async throws -> [NearbyEvent] {
+    func fetchNearbyEvents(
+        latitude: Double,
+        longitude: Double,
+        radiusMiles: Int,
+        classificationName: String?
+    ) async throws -> [NearbyEvent] {
         guard let apiKey else { throw EventSourceError.missingAPIKey }
 
         let url = Self.discoveryURL(
             apiKey: apiKey,
             latitude: latitude,
             longitude: longitude,
-            radiusMiles: radiusMiles
+            radiusMiles: radiusMiles,
+            classificationName: classificationName
         )
 
         let (data, response) = try await session.data(from: url)
@@ -95,10 +192,11 @@ struct TicketmasterEventSource: EventSource {
         latitude: Double,
         longitude: Double,
         radiusMiles: Int,
+        classificationName: String? = nil,
         now: Date = Date()
     ) -> URL {
         var components = URLComponents(string: "https://app.ticketmaster.com/discovery/v2/events.json")!
-        components.queryItems = [
+        var queryItems = [
             URLQueryItem(name: "apikey", value: apiKey),
             URLQueryItem(name: "latlong", value: "\(latitude),\(longitude)"),
             URLQueryItem(name: "radius", value: String(radiusMiles)),
@@ -107,6 +205,10 @@ struct TicketmasterEventSource: EventSource {
             URLQueryItem(name: "sort", value: "date,asc"),
             URLQueryItem(name: "startDateTime", value: ISO8601DateFormatter().string(from: now)),
         ]
+        if let classificationName {
+            queryItems.append(URLQueryItem(name: "classificationName", value: classificationName))
+        }
+        components.queryItems = queryItems
         return components.url!
     }
 
@@ -212,3 +314,48 @@ private struct TMAddress: Decodable { let line1: String? }
 private struct TMCity: Decodable { let name: String? }
 private struct TMState: Decodable { let stateCode: String? }
 private struct TMLocation: Decodable { let latitude: String?; let longitude: String? }
+
+private struct CachedEventSuggestions: Codable {
+    let storedAt: Date
+    let events: [CachedNearbyEvent]
+}
+
+private struct CachedNearbyEvent: Codable {
+    let id: String
+    let name: String
+    let startDate: Date?
+    let venueName: String?
+    let address: String?
+    let latitude: Double?
+    let longitude: Double?
+    let url: String?
+
+    init(_ event: NearbyEvent) {
+        id = event.id
+        name = event.name
+        startDate = event.startDate
+        venueName = event.venueName
+        address = event.address
+        latitude = event.coordinate?.latitude
+        longitude = event.coordinate?.longitude
+        url = event.url
+    }
+
+    var nearbyEvent: NearbyEvent {
+        let coordinate: CLLocationCoordinate2D?
+        if let latitude, let longitude {
+            coordinate = CLLocationCoordinate2D(latitude: latitude, longitude: longitude)
+        } else {
+            coordinate = nil
+        }
+        return NearbyEvent(
+            id: id,
+            name: name,
+            startDate: startDate,
+            venueName: venueName,
+            address: address,
+            coordinate: coordinate,
+            url: url
+        )
+    }
+}

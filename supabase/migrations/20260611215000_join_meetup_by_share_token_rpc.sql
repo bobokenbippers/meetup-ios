@@ -1,0 +1,39 @@
+-- Join a meetup through its share token without requiring the client to bypass
+-- meetup_participants RLS. The function validates the token server-side, then
+-- inserts the signed-in user as a participant.
+
+create or replace function public.join_meetup_by_token(p_share_token text)
+returns uuid
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_meetup_id uuid;
+  v_user_id uuid := auth.uid();
+begin
+  if v_user_id is null then
+    raise exception 'not signed in' using errcode = '28000';
+  end if;
+
+  select id
+    into v_meetup_id
+  from public.meetups
+  where share_token = p_share_token
+    and status = 'active'
+  limit 1;
+
+  if v_meetup_id is null then
+    raise exception 'meetup not found' using errcode = 'P0002';
+  end if;
+
+  insert into public.meetup_participants (meetup_id, user_id, status, joined_at)
+  values (v_meetup_id, v_user_id, 'invited', now())
+  on conflict (meetup_id, user_id) do nothing;
+
+  return v_meetup_id;
+end;
+$$;
+
+revoke all on function public.join_meetup_by_token(text) from public;
+grant execute on function public.join_meetup_by_token(text) to authenticated;
