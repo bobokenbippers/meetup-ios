@@ -437,21 +437,30 @@ struct MeetupDashboardView: View {
             }
 
             // Action buttons
-            HStack(spacing: 12) {
+            HStack(spacing: 8) {
                 Button {
                     openDirections()
                 } label: {
-                    Label("Directions", systemImage: "map.fill").frame(maxWidth: .infinity)
+                    Label("Directions", systemImage: "map.fill")
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.8)
+                        .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.glass)
 
                 Button { showBill = true } label: {
-                    Label("Split Bill", systemImage: "receipt").frame(maxWidth: .infinity)
+                    Label("Split Bill", systemImage: "receipt")
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.8)
+                        .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.glass)
 
                 Button { showTruthOrDare = true } label: {
-                    Label("Game", systemImage: "flame.fill").frame(maxWidth: .infinity)
+                    Label("Game", systemImage: "flame.fill")
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.8)
+                        .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.glass)
                 .accessibilityIdentifier("btn_truth_or_dare")
