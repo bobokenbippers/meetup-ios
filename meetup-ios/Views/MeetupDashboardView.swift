@@ -27,6 +27,7 @@ struct MeetupDashboardView: View {
     @State private var isGeneratingShareLink = false
     @State private var showRecap = false
     @State private var showAddParticipants = false
+    @State private var showTruthOrDare = false
 
     // Photo state
     @State private var recentPhotos: [MeetupPhoto] = []
@@ -154,6 +155,10 @@ struct MeetupDashboardView: View {
                 BillView(meetup: meetup, participants: participants)
                     .environment(auth)
                     .environment(settings)
+            }
+            .fullScreenCover(isPresented: $showTruthOrDare) {
+                TruthOrDareView(meetup: meetup)
+                    .environment(auth)
             }
             .sheet(isPresented: $showRecap, onDismiss: { dismiss() }) {
                 RecapView(meetup: meetup).environment(auth)
@@ -444,6 +449,12 @@ struct MeetupDashboardView: View {
                     Label("Split Bill", systemImage: "receipt").frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.glass)
+
+                Button { showTruthOrDare = true } label: {
+                    Label("Game", systemImage: "flame.fill").frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.glass)
+                .accessibilityIdentifier("btn_truth_or_dare")
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 12)

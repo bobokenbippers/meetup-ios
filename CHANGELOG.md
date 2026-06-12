@@ -20,6 +20,7 @@ Please test:
 - Upload a profile photo from Settings and confirm it appears in People, DMs, and meetup participant rows.
 
 ### Added
+- Truth or Dare squad game inside meetups: start a session from the dashboard Game button, pick Normal or Spicy prompts, and play in a realtime lobby. A server-decided full-screen coin flip (heads = truth, tails = dare) with a slow-motion settle and haptics picks each player's fate; dares require an in-app camera photo proof that shows in the shared game feed, truths are answered out loud, and passes land on the end-of-game chicken scoreboard. Backed by `game_sessions`/`game_players`/`game_turns`/`game_prompts` tables, SECURITY DEFINER RPCs, and Supabase Realtime.
 - Friend direct messages with a Messages tab, inbox, chat threads, realtime updates, unread counts, and push routing.
 - Text and photo messages between accepted friends, backed by the new `message-photos` storage bucket.
 - Delete support for a user's own direct messages.
