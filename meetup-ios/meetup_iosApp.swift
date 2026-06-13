@@ -79,6 +79,7 @@ struct meetup_iosApp: App {
     @State private var pendingShareToken: String?
     @State private var showJoinSheet = false
     @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding = false
+    @AppStorage("themePreference") private var themePreference: ThemePreference = .system
 
     var body: some Scene {
         WindowGroup {
@@ -103,7 +104,7 @@ struct meetup_iosApp: App {
             .environment(settings)
             .environment(navState)
             .modifier(AppAccessibilityPreferencesModifier(settings: settings))
-            .preferredColorScheme(settings.colorScheme)
+            .preferredColorScheme(themePreference.colorScheme)
             .onOpenURL { url in
                 handleDeepLink(url)
             }
