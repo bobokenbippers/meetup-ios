@@ -4,6 +4,7 @@ import UniformTypeIdentifiers
 import Supabase
 import Auth
 import UIKit
+import VisionKit
 
 struct BillView: View {
     let meetup: Meetup
@@ -415,6 +416,7 @@ struct AddReceiptView: View {
     @State private var selectedPhotoItem: PhotosPickerItem?
     @State private var receiptImage: UIImage?
     @State private var showCamera = false
+    @State private var showScanner = false
     @State private var parsedReceipt: ParsedReceipt?
     @State private var editableItems: [BillItem] = []
     @FocusState private var focusedItemId: UUID?
@@ -484,8 +486,8 @@ struct AddReceiptView: View {
                             .clipShape(RoundedRectangle(cornerRadius: 8))
                     }
                     HStack(spacing: 12) {
-                        Button { openCamera() } label: {
-                            Label("Camera", systemImage: "camera")
+                        Button { startCapture() } label: {
+                            Label("Scan", systemImage: "doc.viewfinder")
                                 .frame(maxWidth: .infinity)
                         }
                         .buttonStyle(.glass)
@@ -521,6 +523,13 @@ struct AddReceiptView: View {
             .buttonStyle(.glassProminent)
             .disabled(!canProceedToItems || isProcessing)
             .padding()
+        }
+        .sheet(isPresented: $showScanner) {
+            DocumentScannerView { image in
+                receiptImage = image
+                Task { await parseImage(image) }
+            } onCancel: {}
+            .ignoresSafeArea()
         }
         .sheet(isPresented: $showCamera) {
             CameraPickerView { image in
@@ -611,12 +620,18 @@ struct AddReceiptView: View {
 
     // MARK: - Actions
 
-    private func openCamera() {
-        guard UIImagePickerController.isSourceTypeAvailable(.camera) else {
+    private func startCapture() {
+        // Prefer the system document scanner: it edge-detects, deskews,
+        // crops to the receipt, and reduces glare — producing a far cleaner
+        // image for OCR than a raw camera photo. Fall back to a plain camera
+        // capture only where scanning is unsupported (e.g. older devices).
+        if VNDocumentCameraViewController.isSupported {
+            showScanner = true
+        } else if UIImagePickerController.isSourceTypeAvailable(.camera) {
+            showCamera = true
+        } else {
             error = "Camera isn't available on this device. Use Photos instead."
-            return
         }
-        showCamera = true
     }
 
     private func parseImage(_ image: UIImage) async {
@@ -679,6 +694,55 @@ struct AddReceiptView: View {
 }
 
 // MARK: - UIKit wrappers
+
+/// System document scanner (VisionKit). Performs live edge detection,
+/// perspective correction, auto-cropping, and glare/shadow reduction, then
+/// hands back the enhanced scan of the first page — a much stronger OCR input
+/// than a raw camera photo.
+struct DocumentScannerView: UIViewControllerRepresentable {
+    let onScan: (UIImage) -> Void
+    let onCancel: () -> Void
+
+    func makeCoordinator() -> Coordinator { Coordinator(onScan: onScan, onCancel: onCancel) }
+
+    func makeUIViewController(context: Context) -> VNDocumentCameraViewController {
+        let vc = VNDocumentCameraViewController()
+        vc.delegate = context.coordinator
+        return vc
+    }
+
+    func updateUIViewController(_ uiViewController: VNDocumentCameraViewController, context: Context) {}
+
+    class Coordinator: NSObject, VNDocumentCameraViewControllerDelegate {
+        let onScan: (UIImage) -> Void
+        let onCancel: () -> Void
+        init(onScan: @escaping (UIImage) -> Void, onCancel: @escaping () -> Void) {
+            self.onScan = onScan
+            self.onCancel = onCancel
+        }
+
+        func documentCameraViewController(_ controller: VNDocumentCameraViewController,
+                                          didFinishWith scan: VNDocumentCameraScan) {
+            if scan.pageCount > 0 {
+                onScan(scan.imageOfPage(at: 0))
+            } else {
+                onCancel()
+            }
+            controller.dismiss(animated: true)
+        }
+
+        func documentCameraViewControllerDidCancel(_ controller: VNDocumentCameraViewController) {
+            onCancel()
+            controller.dismiss(animated: true)
+        }
+
+        func documentCameraViewController(_ controller: VNDocumentCameraViewController,
+                                          didFailWithError error: Error) {
+            onCancel()
+            controller.dismiss(animated: true)
+        }
+    }
+}
 
 struct CameraPickerView: UIViewControllerRepresentable {
     let onImage: (UIImage) -> Void
