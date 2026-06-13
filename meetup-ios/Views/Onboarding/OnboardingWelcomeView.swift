@@ -32,16 +32,16 @@ struct OnboardingWelcomeView: View {
 
                 Text("Squad Brunch")
                     .scaledFont(size: 42, weight: .black, design: .rounded)
-                    .foregroundColor(.white)
+                    .foregroundStyle(DS.Color.textPrimary)
 
                 Text("Know who's on their way.")
                     .scaledFont(size: 20, weight: .semibold)
-                    .foregroundColor(.white)
+                    .foregroundStyle(DS.Color.textPrimary)
                     .padding(.top, 14)
 
                 Text("Live location sharing for your crew.")
                     .scaledFont(size: 16)
-                    .foregroundColor(Color(white: 0.6))
+                    .foregroundStyle(DS.Color.textSecondary)
                     .padding(.top, 8)
 
                 Spacer()
@@ -52,7 +52,7 @@ struct OnboardingWelcomeView: View {
                         Image(systemName: "arrow.right")
                     }
                     .scaledFont(size: 18, weight: .semibold)
-                    .foregroundColor(.white)
+                    .foregroundStyle(.white) // on coral background
                     .frame(maxWidth: .infinity)
                     .frame(height: 56)
                     .background(Color.coral)

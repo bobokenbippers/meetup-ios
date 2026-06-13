@@ -288,7 +288,7 @@ struct MeetupsListView: View {
         List {
             Text("Meetups")
                 .scaledFont(size: 34, weight: .bold)
-                .foregroundStyle(.white)
+                .foregroundStyle(DS.Color.textPrimary)
                 .listRowBackground(Color.clear)
                 .listRowSeparator(.hidden)
                 .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 8, trailing: 16))
@@ -425,7 +425,7 @@ struct MeetupsListView: View {
             }
             Text(title.uppercased())
                 .scaledFont(size: 10, weight: .bold)
-                .foregroundStyle(Color(white: 0.45))
+                .foregroundStyle(DS.Color.textSecondary)
                 .textCase(nil)
         }
         .padding(.leading, 4)
@@ -626,16 +626,16 @@ private struct RecapFolderCard: View {
             VStack(alignment: .leading, spacing: 3) {
                 Text("Recaps")
                     .scaledFont(size: 15, weight: .bold)
-                    .foregroundStyle(.white)
+                    .foregroundStyle(DS.Color.textPrimary)
                 if let latestMeetup {
                     Text("Latest: \(latestMeetup.destinationName)")
                         .scaledFont(size: 11)
-                        .foregroundStyle(Color(white: 0.58))
+                        .foregroundStyle(DS.Color.textSecondary)
                         .lineLimit(1)
                 } else {
                     Text("Past meetups")
                         .scaledFont(size: 11)
-                        .foregroundStyle(Color(white: 0.58))
+                        .foregroundStyle(DS.Color.textSecondary)
                 }
             }
 
@@ -643,7 +643,7 @@ private struct RecapFolderCard: View {
 
             Text("\(recapCount)")
                 .scaledFont(size: 12, weight: .bold)
-                .foregroundStyle(.white)
+                .foregroundStyle(DS.Color.textPrimary)
                 .padding(.horizontal, 9)
                 .padding(.vertical, 5)
                 .background(Color.appSurface)
@@ -651,7 +651,7 @@ private struct RecapFolderCard: View {
 
             Image(systemName: "chevron.right")
                 .scaledFont(size: 12, weight: .semibold)
-                .foregroundStyle(Color(white: 0.36))
+                .foregroundStyle(DS.Color.textSecondary)
         }
         .padding(.vertical, 14)
         .padding(.horizontal, 16)
@@ -675,7 +675,7 @@ private struct RecapFolderView: View {
             List {
                 Text("Recaps")
                     .scaledFont(size: 34, weight: .bold)
-                    .foregroundStyle(.white)
+                    .foregroundStyle(DS.Color.textPrimary)
                     .listRowBackground(Color.clear)
                     .listRowSeparator(.hidden)
                     .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 8, trailing: 16))
@@ -699,7 +699,7 @@ private struct RecapFolderView: View {
                             sectionHeader(group.key.isEmpty ? "Past" : group.key)
                             Text("\(group.value.count)")
                                 .scaledFont(size: 10, weight: .bold)
-                                .foregroundStyle(.white)
+                                .foregroundStyle(DS.Color.textPrimary)
                                 .padding(.horizontal, 6)
                                 .padding(.vertical, 2)
                                 .background(Color.appSurface)
@@ -732,7 +732,7 @@ private struct RecapFolderView: View {
     private func sectionHeader(_ title: String) -> some View {
         Text(title.uppercased())
             .scaledFont(size: 10, weight: .bold)
-            .foregroundStyle(Color(white: 0.45))
+            .foregroundStyle(DS.Color.textSecondary)
             .textCase(nil)
             .padding(.leading, 4)
             .padding(.top, 8)

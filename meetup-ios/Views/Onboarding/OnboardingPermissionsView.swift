@@ -25,7 +25,7 @@ struct OnboardingPermissionsView: View {
 
                 Text("A couple of things")
                     .scaledFont(size: 34, weight: .black, design: .rounded)
-                    .foregroundColor(.white)
+                    .foregroundStyle(DS.Color.textPrimary)
                     .padding(.bottom, 36)
 
                 VStack(spacing: 16) {
@@ -49,7 +49,7 @@ struct OnboardingPermissionsView: View {
                 } label: {
                     Text(isRequesting ? "Requesting…" : "Allow →")
                         .scaledFont(size: 18, weight: .semibold)
-                        .foregroundColor(.white)
+                        .foregroundStyle(.white) // on coral background
                         .frame(maxWidth: .infinity)
                         .frame(height: 56)
                         .background(Color.coral)
@@ -74,10 +74,10 @@ struct OnboardingPermissionsView: View {
             VStack(alignment: .leading, spacing: 4) {
                 Text(title)
                     .scaledFont(size: 16, weight: .semibold)
-                    .foregroundColor(.white)
+                    .foregroundStyle(DS.Color.textPrimary)
                 Text(subtitle)
                     .scaledFont(size: 14)
-                    .foregroundColor(Color(white: 0.6))
+                    .foregroundStyle(DS.Color.textSecondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
             Spacer()

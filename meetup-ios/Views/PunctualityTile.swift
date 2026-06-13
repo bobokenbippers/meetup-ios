@@ -164,7 +164,7 @@ struct PunctualityLegend: View {
                             .frame(width: 9, height: 9)
                         Text(status.label)
                             .scaledFont(size: 10, weight: .medium)
-                            .foregroundStyle(Color(white: 0.6))
+                            .foregroundStyle(DS.Color.textSecondary)
                     }
                 }
             }

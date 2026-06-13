@@ -39,15 +39,15 @@ struct SettingsView: View {
 
                         VStack(alignment: .leading, spacing: 2) {
                             Text("Profile Photo")
-                                .foregroundStyle(.white)
+                                .foregroundStyle(DS.Color.textPrimary)
                             if isUploadingProfilePhoto {
                                 Text("Uploading...")
                                     .font(.caption)
-                                    .foregroundStyle(Color(white: 0.6))
+                                    .foregroundStyle(DS.Color.textSecondary)
                             } else if let profilePhotoMessage {
                                 Text(profilePhotoMessage)
                                     .font(.caption)
-                                    .foregroundStyle(Color(white: 0.6))
+                                    .foregroundStyle(DS.Color.textSecondary)
                             }
                         }
 
@@ -56,7 +56,7 @@ struct SettingsView: View {
                         PhotosPicker(selection: $selectedProfilePhoto, matching: .images) {
                             Text(auth.profile?.avatarUrl == nil ? "Upload" : "Change")
                                 .font(.subheadline.weight(.semibold))
-                                .foregroundStyle(isUploadingProfilePhoto ? Color(white: 0.45) : Color.coral)
+                                .foregroundStyle(isUploadingProfilePhoto ? DS.Color.textSecondary : Color.coral)
                         }
                         .disabled(isUploadingProfilePhoto)
                     }
@@ -67,10 +67,10 @@ struct SettingsView: View {
                     } label: {
                         HStack {
                             Text("Display Name")
-                                .foregroundStyle(.white)
+                                .foregroundStyle(DS.Color.textPrimary)
                             Spacer()
                             Text(auth.profile?.displayName ?? "Not set")
-                                .foregroundStyle(Color(white: 0.6))
+                                .foregroundStyle(DS.Color.textSecondary)
                         }
                     }
                     .listRowBackground(Color.appSurface)
@@ -103,29 +103,29 @@ struct SettingsView: View {
                 Section {
                     Toggle("Bold Text", isOn: $settings.boldText)
                         .tint(Color.coral)
-                        .foregroundStyle(.white)
+                        .foregroundStyle(DS.Color.textPrimary)
                         .listRowBackground(Color.appSurface)
                     Toggle("Larger Text", isOn: $settings.largerText)
                         .tint(Color.coral)
-                        .foregroundStyle(.white)
+                        .foregroundStyle(DS.Color.textPrimary)
                         .listRowBackground(Color.appSurface)
                     Toggle("Reduce Motion", isOn: $settings.reduceMotion)
                         .tint(Color.coral)
-                        .foregroundStyle(.white)
+                        .foregroundStyle(DS.Color.textPrimary)
                         .listRowBackground(Color.appSurface)
                 } header: {
                     sectionHeader("ACCESSIBILITY")
                 } footer: {
                     Text("Bold and Larger Text apply across the app. Reduce Motion calms animated RSVP and meetup effects.")
                         .font(.caption2)
-                        .foregroundStyle(Color(white: 0.4))
+                        .foregroundStyle(DS.Color.textSecondary)
                 }
 
                 // MARK: Event Suggestions
                 Section {
                     Toggle("Event Suggestions", isOn: $settings.eventSuggestionsEnabled)
                         .tint(Color.coral)
-                        .foregroundStyle(.white)
+                        .foregroundStyle(DS.Color.textPrimary)
                         .listRowBackground(Color.appSurface)
 
                     Picker("Event Type", selection: $settings.eventSuggestionCategory) {
@@ -134,7 +134,7 @@ struct SettingsView: View {
                         }
                     }
                     .tint(Color.coral)
-                    .foregroundStyle(settings.eventSuggestionsEnabled ? .white : Color(white: 0.45))
+                    .foregroundStyle(settings.eventSuggestionsEnabled ? DS.Color.textPrimary : DS.Color.textSecondary)
                     .listRowBackground(Color.appSurface)
                     .disabled(!settings.eventSuggestionsEnabled)
 
@@ -145,7 +145,7 @@ struct SettingsView: View {
                         step: 1
                     )
                     .tint(Color.coral)
-                    .foregroundStyle(settings.eventSuggestionsEnabled ? .white : Color(white: 0.45))
+                    .foregroundStyle(settings.eventSuggestionsEnabled ? DS.Color.textPrimary : DS.Color.textSecondary)
                     .listRowBackground(Color.appSurface)
                     .disabled(!settings.eventSuggestionsEnabled)
                 } header: {
@@ -153,28 +153,28 @@ struct SettingsView: View {
                 } footer: {
                     Text("Used for the Happening Near You row on Meetups.")
                         .font(.caption2)
-                        .foregroundStyle(Color(white: 0.4))
+                        .foregroundStyle(DS.Color.textSecondary)
                 }
 
                 // MARK: Notifications
                 Section {
                     Toggle("Push Notifications", isOn: $pushEnabled)
                         .tint(Color.coral)
-                        .foregroundStyle(.white)
+                        .foregroundStyle(DS.Color.textPrimary)
                         .listRowBackground(Color.appSurface)
                         .onChange(of: pushEnabled) { _, newValue in
                             updatePushNotifications(newValue)
                         }
                     Toggle("Event Cancelled", isOn: $eventCancelledEnabled)
                         .tint(Color.coral)
-                        .foregroundStyle(pushEnabled ? .white : Color(white: 0.45))
+                        .foregroundStyle(pushEnabled ? DS.Color.textPrimary : DS.Color.textSecondary)
                         .listRowBackground(Color.appSurface)
                         .disabled(!pushEnabled)
                         .onChange(of: eventCancelledEnabled) { _, _ in persist() }
                     if let notificationMessage {
                         Text(notificationMessage)
                             .font(.caption2)
-                            .foregroundStyle(Color(white: 0.55))
+                            .foregroundStyle(DS.Color.textSecondary)
                             .listRowBackground(Color.appSurface)
                     }
                     if notificationMessage?.contains("iOS Settings") == true {
@@ -191,14 +191,14 @@ struct SettingsView: View {
                 } footer: {
                     Text("\"Event Cancelled\" alerts you when a host cancels a meetup you joined.")
                         .font(.caption2)
-                        .foregroundStyle(Color(white: 0.4))
+                        .foregroundStyle(DS.Color.textSecondary)
                 }
 
                 // MARK: Privacy
                 Section {
                     Toggle("Location Sharing", isOn: $locationSharingEnabled)
                         .tint(Color.coral)
-                        .foregroundStyle(.white)
+                        .foregroundStyle(DS.Color.textPrimary)
                         .listRowBackground(Color.appSurface)
                         .onChange(of: locationSharingEnabled) { _, newValue in
                             if !newValue { LocationManager.shared.stopTracking() }
@@ -218,13 +218,13 @@ struct SettingsView: View {
                         }
                     }
                         .tint(Color.coral)
-                        .foregroundStyle(.white)
+                        .foregroundStyle(DS.Color.textPrimary)
                         .listRowBackground(Color.appSurface)
 
                     if let contactSyncMessage {
                         Text(contactSyncMessage)
                             .font(.caption2)
-                            .foregroundStyle(Color(white: 0.55))
+                            .foregroundStyle(DS.Color.textSecondary)
                             .listRowBackground(Color.appSurface)
                     }
                     if contactSyncMessage?.contains("iOS Settings") == true {
@@ -241,17 +241,17 @@ struct SettingsView: View {
                 } footer: {
                     Text("When off, your live location and ETA are never shared during meetups. Contact sync only reads your device contacts locally to suggest people you may know.")
                         .font(.caption2)
-                        .foregroundStyle(Color(white: 0.4))
+                        .foregroundStyle(DS.Color.textSecondary)
                 }
 
                 // MARK: About
                 Section {
                     HStack {
                         Text("Version")
-                            .foregroundStyle(.white)
+                            .foregroundStyle(DS.Color.textPrimary)
                         Spacer()
                         Text(appVersion)
-                            .foregroundStyle(Color(white: 0.6))
+                            .foregroundStyle(DS.Color.textSecondary)
                     }
                     .listRowBackground(Color.appSurface)
 
@@ -313,17 +313,17 @@ struct SettingsView: View {
     private func sectionHeader(_ title: String) -> some View {
         Text(title)
             .font(.caption.weight(.semibold))
-            .foregroundStyle(Color(white: 0.4))
+            .foregroundStyle(DS.Color.textSecondary)
             .textCase(nil)
     }
 
     private func aboutRow(_ title: String, systemImage: String = "arrow.up.right") -> some View {
         HStack {
-            Text(title).foregroundStyle(.white)
+            Text(title).foregroundStyle(DS.Color.textPrimary)
             Spacer()
             Image(systemName: systemImage)
                 .font(.caption)
-                .foregroundStyle(Color(white: 0.4))
+                .foregroundStyle(DS.Color.textSecondary)
         }
     }
 
@@ -506,12 +506,12 @@ private struct EditDisplayNameView: View {
         List {
             Section {
                 TextField("Display name", text: $name)
-                    .foregroundStyle(.white)
+                    .foregroundStyle(DS.Color.textPrimary)
                     .listRowBackground(Color.appSurface)
             } header: {
                 Text("DISPLAY NAME")
                     .font(.caption.weight(.semibold))
-                    .foregroundStyle(Color(white: 0.4))
+                    .foregroundStyle(DS.Color.textSecondary)
                     .textCase(nil)
             }
         }

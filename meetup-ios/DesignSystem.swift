@@ -57,14 +57,16 @@ extension Color {
 }
 
 // MARK: - DS namespace (canonical token surface)
-/// Canonical design-token surface. Views should prefer `DS.Color.*` and
-/// `DS.Font.*` over raw literals so swaps propagate from one place.
+/// Canonical design-token surface. Views should prefer `DS.Color.*`,
+/// `DS.Font.*`, and `DS.Spacing.*` over raw literals so swaps propagate
+/// from one place.
 enum DS {
     enum Color {
         static let background    = SwiftUI.Color.surface
         static let surface       = SwiftUI.Color.surfaceCard
         static let textPrimary   = SwiftUI.Color.textPrimary
         static let textSecondary = SwiftUI.Color.textSecondary
+        /// Indigo brand accent — #6C57C5 light, #8A78E0 dark.
         static let accent        = SwiftUI.Color.brand
     }
 
@@ -74,6 +76,14 @@ enum DS {
         static let headline = Typography.Font.headline
         static let body     = Typography.Font.body
         static let caption  = Typography.Font.caption
+    }
+
+    enum Spacing {
+        static let xs: CGFloat =  4
+        static let sm: CGFloat =  8
+        static let md: CGFloat = 16
+        static let lg: CGFloat = 24
+        static let xl: CGFloat = 48
     }
 }
 
@@ -91,5 +101,46 @@ struct CardStyle: ViewModifier {
 extension View {
     func cardStyle() -> some View {
         modifier(CardStyle())
+    }
+}
+
+// MARK: - Glass card
+/// `.ultraThinMaterial` frosted-glass surface with 18 pt corners and a subtle shadow.
+struct GlassCard: ViewModifier {
+    func body(content: Content) -> some View {
+        content
+            .background(.ultraThinMaterial)
+            .clipShape(RoundedRectangle(cornerRadius: 18))
+            .shadow(color: .black.opacity(0.08), radius: 12, x: 0, y: 4)
+    }
+}
+
+extension View {
+    func glassCard() -> some View {
+        modifier(GlassCard())
+    }
+}
+
+// MARK: - DS primary button
+/// Pill-shaped primary button using the brand indigo accent (#6C57C5).
+struct DSButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .font(.system(size: 17, weight: .semibold))
+            .foregroundStyle(.white)
+            .padding(.horizontal, DS.Spacing.lg)
+            .padding(.vertical, 13)
+            .frame(maxWidth: .infinity)
+            .background(DS.Color.accent)
+            .clipShape(Capsule())
+            .scaleEffect(configuration.isPressed ? 0.97 : 1)
+            .animation(.spring(duration: 0.18, bounce: 0.25), value: configuration.isPressed)
+    }
+}
+
+extension View {
+    /// Applies the DS primary pill-button appearance to any view acting as a button label.
+    func dsButtonStyle() -> some View {
+        self.buttonStyle(DSButtonStyle())
     }
 }

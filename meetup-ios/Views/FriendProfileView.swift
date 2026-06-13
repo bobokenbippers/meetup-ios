@@ -31,7 +31,7 @@ struct FriendProfileView: View {
                         VStack(spacing: 6) {
                             Text(displayName)
                                 .scaledFont(size: 24, weight: .bold)
-                                .foregroundStyle(.white)
+                                .foregroundStyle(DS.Color.textPrimary)
                                 .multilineTextAlignment(.center)
 
                             Text(isPending ? "Pending request" : "Friend")
@@ -67,7 +67,7 @@ struct FriendProfileView: View {
                             } label: {
                                 Label("Message", systemImage: "bubble.left.and.bubble.right.fill")
                                     .scaledFont(size: 15, weight: .bold)
-                                    .foregroundStyle(.white)
+                                    .foregroundStyle(.white) // on coral background
                                     .frame(maxWidth: .infinity)
                                     .padding(.vertical, 13)
                                     .background(Color.coral)
@@ -107,7 +107,7 @@ struct FriendProfileView: View {
                     } label: {
                         Image(systemName: "xmark.circle.fill")
                             .scaledFont(size: 22)
-                            .foregroundStyle(Color(white: 0.65))
+                            .foregroundStyle(DS.Color.textSecondary)
                     }
                     .accessibilityLabel("Close profile")
                 }
@@ -143,12 +143,12 @@ struct FriendProfileView: View {
         VStack(spacing: 5) {
             Text(value)
                 .scaledFont(size: 22, weight: .bold)
-                .foregroundStyle(.white)
+                .foregroundStyle(DS.Color.textPrimary)
                 .frame(height: 27)
 
             Text(title)
                 .scaledFont(size: 11, weight: .semibold)
-                .foregroundStyle(Color(white: 0.58))
+                .foregroundStyle(DS.Color.textSecondary)
                 .lineLimit(1)
                 .minimumScaleFactor(0.82)
         }
@@ -187,10 +187,10 @@ struct FriendProfileView: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(title)
                     .scaledFont(size: 11, weight: .semibold)
-                    .foregroundStyle(Color(white: 0.48))
+                    .foregroundStyle(DS.Color.textSecondary)
                 Text(value)
                     .scaledFont(size: 14, weight: .medium)
-                    .foregroundStyle(.white)
+                    .foregroundStyle(DS.Color.textPrimary)
                     .textSelection(.enabled)
             }
 

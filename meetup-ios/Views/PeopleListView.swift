@@ -363,7 +363,7 @@ struct PeopleListView: View {
     private func statusBadge(_ title: String) -> some View {
         Text(title)
             .scaledFont(size: 12, weight: .bold)
-            .foregroundStyle(Color(white: 0.65))
+            .foregroundStyle(DS.Color.textSecondary)
             .padding(.horizontal, 12)
             .padding(.vertical, 7)
             .background(Color.white.opacity(0.08))
