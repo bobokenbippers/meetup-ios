@@ -156,8 +156,8 @@ struct BillView: View {
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 } else {
-                    ForEach(items) { item in
-                        itemRow(item: item)
+                    ForEach(disambiguatedItems(items), id: \.item.id) { entry in
+                        itemRow(item: entry.item, displayName: entry.label)
                     }
                 }
                 let myOwed = myOwedForReceipt(receipt)
@@ -177,7 +177,24 @@ struct BillView: View {
         }
     }
 
-    private func itemRow(item: BillItem) -> some View {
+    /// Build display labels that disambiguate duplicate items. When a receipt has
+    /// multiple identical line items (e.g. two "Old Fashioned" rows from a
+    /// "(2 @18.00)" annotation), each gets a "· N of M" suffix so two people can
+    /// each claim their own without guessing which row is which. Unique items are
+    /// left untouched. Order is preserved so the numbering is stable.
+    private func disambiguatedItems(_ items: [BillItem]) -> [(item: BillItem, label: String)] {
+        let counts = Dictionary(grouping: items, by: { $0.name }).mapValues(\.count)
+        var seen: [String: Int] = [:]
+        return items.map { item in
+            let total = counts[item.name] ?? 1
+            guard total > 1 else { return (item, item.name) }
+            let n = (seen[item.name] ?? 0) + 1
+            seen[item.name] = n
+            return (item, "\(item.name) · \(n) of \(total)")
+        }
+    }
+
+    private func itemRow(item: BillItem, displayName: String) -> some View {
         let itemClaims = claims.filter { $0.billItemId == item.id }
         let isMine = itemClaims.contains { $0.userId == myUserId }
         let claimNames = itemClaims.compactMap { c in
@@ -185,7 +202,7 @@ struct BillView: View {
         }
         return HStack {
             VStack(alignment: .leading, spacing: 2) {
-                Text(item.name)
+                Text(displayName)
                 if !claimNames.isEmpty {
                     Text(claimNames.joined(separator: ", "))
                         .font(.caption)
@@ -202,7 +219,7 @@ struct BillView: View {
                     .foregroundStyle(isMine ? Color.accentColor : .secondary)
             }
             .buttonStyle(.plain)
-            .accessibilityLabel(isMine ? "Unclaim \(item.name)" : "Claim \(item.name)")
+            .accessibilityLabel(isMine ? "Unclaim \(displayName)" : "Claim \(displayName)")
         }
     }
 
