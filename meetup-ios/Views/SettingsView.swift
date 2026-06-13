@@ -139,10 +139,10 @@ struct SettingsView: View {
                     .disabled(!settings.eventSuggestionsEnabled)
 
                     Stepper(
-                        "Within \(settings.eventSuggestionRadiusMiles) miles",
+                        "Within \(settings.eventSuggestionRadiusMiles) mile\(settings.eventSuggestionRadiusMiles == 1 ? "" : "s")",
                         value: $settings.eventSuggestionRadiusMiles,
-                        in: 5...50,
-                        step: 5
+                        in: 1...50,
+                        step: 1
                     )
                     .tint(Color.coral)
                     .foregroundStyle(settings.eventSuggestionsEnabled ? .white : Color(white: 0.45))
