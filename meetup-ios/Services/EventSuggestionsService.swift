@@ -72,14 +72,57 @@ final class EventSuggestionsService {
 
             guard let result = try await group.next() else { throw EventSourceError.badResponse }
             group.cancelAll()
+            let deduped = Self.dedupe(result)
             cache(
-                result,
+                deduped,
                 latitude: latitude,
                 longitude: longitude,
                 radiusMiles: radiusMiles,
                 classificationName: classificationName
             )
-            return result
+            return deduped
+        }
+    }
+
+    /// Collapse duplicate suggestions before they reach the UI (and the cache).
+    ///
+    /// Providers like Ticketmaster return the same logical event more than once —
+    /// most often a multi-night run listed as one entry per performance date, and
+    /// occasionally the exact same event ID twice. `ForEach` over those produced
+    /// visibly stacked, near-identical cards. We drop exact ID repeats, then collapse
+    /// entries sharing a name + venue down to a single card, keeping the soonest date.
+    static func dedupe(_ events: [NearbyEvent]) -> [NearbyEvent] {
+        var seenIDs = Set<String>()
+        var indexByLogicalKey: [String: Int] = [:]
+        var output: [NearbyEvent] = []
+
+        for event in events {
+            guard seenIDs.insert(event.id).inserted else { continue }
+
+            let key = logicalKey(for: event)
+            if let existingIndex = indexByLogicalKey[key] {
+                if isEarlier(event.startDate, than: output[existingIndex].startDate) {
+                    output[existingIndex] = event
+                }
+            } else {
+                indexByLogicalKey[key] = output.count
+                output.append(event)
+            }
+        }
+        return output
+    }
+
+    private static func logicalKey(for event: NearbyEvent) -> String {
+        let name = event.name.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
+        let venue = (event.venueName ?? "").lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
+        return "\(name)|\(venue)"
+    }
+
+    private static func isEarlier(_ lhs: Date?, than rhs: Date?) -> Bool {
+        switch (lhs, rhs) {
+        case let (l?, r?): return l < r
+        case (_?, nil):    return true   // a dated event wins over an undated one
+        case (nil, _):     return false
         }
     }
 
