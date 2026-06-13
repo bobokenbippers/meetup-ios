@@ -62,8 +62,8 @@ extension Color {
 /// from one place.
 enum DS {
     enum Color {
-        static let background    = SwiftUI.Color.appBackground
-        static let surface       = SwiftUI.Color.appSurface
+        static let background    = SwiftUI.Color.surface
+        static let surface       = SwiftUI.Color.surfaceCard
         static let textPrimary   = SwiftUI.Color.textPrimary
         static let textSecondary = SwiftUI.Color.textSecondary
         /// Indigo brand accent — #6C57C5 light, #8A78E0 dark.
