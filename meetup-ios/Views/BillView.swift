@@ -636,7 +636,15 @@ struct AddReceiptView: View {
 
     private func parseImage(_ image: UIImage) async {
         isProcessing = true
-        let parsed = await ReceiptParser.parse(image: image)
+        // Prefer the vision-LLM parser (far more accurate on messy receipts).
+        // Fall back to the on-device Apple Vision + regex parser if the network
+        // call fails (offline, function not deployed, API key missing, etc.).
+        let parsed: ParsedReceipt
+        do {
+            parsed = try await ReceiptVisionService.parse(image: image)
+        } catch {
+            parsed = await ReceiptParser.parse(image: image)
+        }
         parsedReceipt = parsed
         editableItems = parsed.items.enumerated().map { idx, i in
             BillItem(id: UUID(), name: i.name, price: i.price, position: idx)

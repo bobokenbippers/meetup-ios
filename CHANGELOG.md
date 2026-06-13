@@ -20,6 +20,7 @@ Please test:
 - Upload a profile photo from Settings and confirm it appears in People, DMs, and meetup participant rows.
 
 ### Added
+- Vision-LLM receipt parsing: scanned receipts are sent to a new `parse-receipt` Supabase Edge Function that calls Claude (vision) and returns clean, structured line items, dramatically improving accuracy on messy bar/restaurant receipts. Quantities expand into individual claimable rows, no-price modifier lines are dropped, and the printed subtotal/tax/total are trusted as-is. The on-device Apple Vision + regex parser remains a graceful fallback when the network call fails. Requires the `ANTHROPIC_API_KEY` Supabase secret to be set.
 - Truth or Dare squad game inside meetups: start a session from the dashboard Game button, pick Normal or Spicy prompts, and play in a realtime lobby. A server-decided full-screen coin flip (heads = truth, tails = dare) with a slow-motion settle and haptics picks each player's fate; dares require an in-app camera photo proof that shows in the shared game feed, truths are answered out loud, and passes land on the end-of-game chicken scoreboard. Backed by `game_sessions`/`game_players`/`game_turns`/`game_prompts` tables, SECURITY DEFINER RPCs, and Supabase Realtime.
 - Friend direct messages with a Messages tab, inbox, chat threads, realtime updates, unread counts, and push routing.
 - Text and photo messages between accepted friends, backed by the new `message-photos` storage bucket.
