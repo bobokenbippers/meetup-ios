@@ -10,9 +10,10 @@ extension Color {
     static let appBackground = Color(uiColor: .appBackground)
     static let appSurface    = Color(uiColor: .appSurface)
 
-    // MARK: - Primary accent (indigo-violet — works on both schemes)
+    // MARK: - Primary accent
 
-    static let coral = Color(red: 0.424, green: 0.341, blue: 0.773)  // #6C57C5
+    static var coral: Color { AppColorTheme.current.accentColor }
+    static var appSecondaryAccent: Color { AppColorTheme.current.secondaryAccentColor }
 
     // MARK: - Status semantic colors
 
@@ -28,19 +29,12 @@ extension Color {
 
     // MARK: - Participant avatar / map pin palette
 
-    static let participantPalette: [Color] = [
-        Color(red: 0.424, green: 0.341, blue: 0.773),
-        Color(red: 0.482, green: 0.361, blue: 0.749),
-        Color(red: 0.118, green: 0.565, blue: 1.000),
-        Color(red: 0.180, green: 0.800, blue: 0.443),
-        Color(red: 0.910, green: 0.212, blue: 0.278),
-        Color(red: 0.000, green: 0.780, blue: 0.941),
-    ]
+    static var participantPalette: [Color] { AppColorTheme.current.participantPalette }
 
     // MARK: - Category gradients
 
-    static let categoryGradientFoodStart = Color(red: 0.388, green: 0.302, blue: 0.718)
-    static let categoryGradientFoodEnd   = Color(red: 0.235, green: 0.180, blue: 0.478)
+    static var categoryGradientFoodStart: Color { AppColorTheme.current.categoryGradientFoodStart }
+    static var categoryGradientFoodEnd: Color { AppColorTheme.current.categoryGradientFoodEnd }
 }
 
 extension UIColor {

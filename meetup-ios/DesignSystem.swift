@@ -34,8 +34,8 @@ extension Color {
     static let textSecondary = Color(light: Color(hex: "6B6975"), dark: Color(hex: "A6A4B0"))
     // Border
     static let borderSubtle = Color(light: Color(hex: "E4E2EA"), dark: Color(hex: "2C2B34"))
-    // Brand (was "coral" — now brand)
-    static let brand = Color(light: Color(hex: "6C57C5"), dark: Color(hex: "8A78E0"))
+    // Brand accent follows the selected app color theme.
+    static var brand: Color { Color.coral }
 
     // Light/dark adaptive initializer
     init(light: Color, dark: Color) {
@@ -66,8 +66,7 @@ enum DS {
         static let surface       = SwiftUI.Color.surfaceCard
         static let textPrimary   = SwiftUI.Color.textPrimary
         static let textSecondary = SwiftUI.Color.textSecondary
-        /// Indigo brand accent — #6C57C5 light, #8A78E0 dark.
-        static let accent        = SwiftUI.Color.brand
+        static var accent: SwiftUI.Color { SwiftUI.Color.brand }
     }
 
     enum Font {
