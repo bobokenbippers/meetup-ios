@@ -9,39 +9,43 @@ import SwiftUI
 /// older paths and the spec use `"accepted"` / `"declined"`. Both spellings are handled.
 ///
 /// The `.runningLate` state is *derived*, not stored: if the meetup has a target arrival
-/// time and a participant who has committed (accepted) or not yet responded (invited) has
-/// blown past that time without arriving, they get the amber "running late" treatment,
-/// which overrides the normal blue/gray.
+/// time and a participant who has committed (accepted) has blown past that time without
+/// arriving, they get the amber "running late" treatment, which overrides the normal
+/// committed/live ETA state.
 enum PunctualityStatus {
     case arrived       // green
-    case enRoute       // blue   — accepted / on the way, not yet arrived
+    case enRoute       // blue   — sharing a live ETA / on the way, not yet arrived
+    case going         // teal   — accepted, but not sharing live ETA/location
     case invited       // gray   — no response yet
     case declined      // red
     case maybe         // lavender — tentative
-    case runningLate   // amber  — committed/invited but past start time without arriving
+    case runningLate   // amber  — committed but past start time without arriving
 
     /// Resolve a participant's status string + the meetup's optional start time into a
     /// single display state, applying the "running late" override where appropriate.
     ///
     /// - Parameters:
     ///   - status: the raw `meetup_participants.status` value.
+    ///   - hasLiveETA: true when the participant is sharing a fresh ETA/location signal.
     ///   - targetArrivalAt: the meetup's start/target arrival time (`Meetup.targetArrivalAt`).
     ///   - now: injectable clock for testing; defaults to `Date()`.
-    static func resolve(status: String, targetArrivalAt: Date?, now: Date = Date()) -> PunctualityStatus {
+    static func resolve(
+        status: String,
+        hasLiveETA: Bool = false,
+        targetArrivalAt: Date?,
+        now: Date = Date()
+    ) -> PunctualityStatus {
         switch status {
         case "arrived":
             return .arrived
         case "no", "declined":
             return .declined
         case "maybe":
-            // Tentative attendees can still be flagged late if they blow past the start time.
-            if isPastStart(targetArrivalAt, now: now) { return .runningLate }
             return .maybe
         case "yes", "accepted":
             if isPastStart(targetArrivalAt, now: now) { return .runningLate }
-            return .enRoute
+            return hasLiveETA ? .enRoute : .going
         case "invited":
-            if isPastStart(targetArrivalAt, now: now) { return .runningLate }
             return .invited
         default:
             return .invited
@@ -59,6 +63,7 @@ enum PunctualityStatus {
         switch self {
         case .arrived:     return .statusLive
         case .enRoute:     return .statusEnRoute
+        case .going:       return .statusGoing
         case .invited:     return .statusInvited
         case .declined:    return .statusLate
         case .maybe:       return .statusPending
@@ -70,6 +75,7 @@ enum PunctualityStatus {
         switch self {
         case .arrived:     return "Arrived"
         case .enRoute:     return "On the way"
+        case .going:       return "Going"
         case .invited:     return "Invited"
         case .declined:    return "Declined"
         case .maybe:       return "Maybe"
@@ -82,6 +88,7 @@ enum PunctualityStatus {
         switch self {
         case .arrived:     return "checkmark.circle.fill"
         case .enRoute:     return "location.fill"
+        case .going:       return "checkmark.seal.fill"
         case .invited:     return "envelope.fill"
         case .declined:    return "xmark.circle.fill"
         case .maybe:       return "questionmark.circle.fill"
@@ -105,8 +112,12 @@ struct PunctualityTile: View {
     }
 
     /// Convenience: resolve directly from a raw status string + the meetup start time.
-    init(rawStatus: String, targetArrivalAt: Date?, compact: Bool = false) {
-        self.status = PunctualityStatus.resolve(status: rawStatus, targetArrivalAt: targetArrivalAt)
+    init(rawStatus: String, hasLiveETA: Bool = false, targetArrivalAt: Date?, compact: Bool = false) {
+        self.status = PunctualityStatus.resolve(
+            status: rawStatus,
+            hasLiveETA: hasLiveETA,
+            targetArrivalAt: targetArrivalAt
+        )
         self.compact = compact
     }
 
@@ -149,8 +160,8 @@ struct PunctualityLegend: View {
     let showsRunningLate: Bool
 
     private var entries: [PunctualityStatus] {
-        var all: [PunctualityStatus] = [.arrived, .enRoute, .invited, .declined]
-        if showsRunningLate { all.insert(.runningLate, at: 2) }
+        var all: [PunctualityStatus] = [.arrived, .enRoute, .going, .invited, .declined]
+        if showsRunningLate { all.insert(.runningLate, at: 3) }
         return all
     }
 
