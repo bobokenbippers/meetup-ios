@@ -60,6 +60,28 @@ struct EventSuggestionsServiceTests {
             Issue.record("Expected EventSourceError.timedOut, got \(error)")
         }
     }
+
+    @Test("Duplicate suggestions collapse to one card, keeping the soonest date")
+    func dedupeCollapsesRepeatsAndRuns() throws {
+        let mar1 = ISO8601DateFormatter().date(from: "2026-03-01T20:00:00Z")
+        let mar2 = ISO8601DateFormatter().date(from: "2026-03-02T20:00:00Z")
+        let mar3 = ISO8601DateFormatter().date(from: "2026-03-03T20:00:00Z")
+
+        let events = [
+            NearbyEvent(id: "A", name: "Hamilton", startDate: mar2, venueName: "Richard Rodgers", address: nil, coordinate: nil, url: nil),
+            NearbyEvent(id: "A", name: "Hamilton", startDate: mar2, venueName: "Richard Rodgers", address: nil, coordinate: nil, url: nil), // exact ID repeat
+            NearbyEvent(id: "B", name: "Hamilton", startDate: mar3, venueName: "Richard Rodgers", address: nil, coordinate: nil, url: nil), // same run, later night
+            NearbyEvent(id: "C", name: "hamilton", startDate: mar1, venueName: "Richard Rodgers", address: nil, coordinate: nil, url: nil), // same run, earliest, different case
+            NearbyEvent(id: "D", name: "Hamilton", startDate: mar2, venueName: "Other Theater", address: nil, coordinate: nil, url: nil),    // different venue → kept
+        ]
+
+        let deduped = EventSuggestionsService.dedupe(events)
+
+        #expect(deduped.count == 2)
+        let hamiltonAtRR = try #require(deduped.first { $0.venueName == "Richard Rodgers" })
+        #expect(hamiltonAtRR.startDate == mar1) // soonest of the run is surfaced
+        #expect(deduped.contains { $0.venueName == "Other Theater" })
+    }
 }
 
 private struct HangingEventSource: EventSource {
