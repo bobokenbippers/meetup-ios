@@ -98,6 +98,17 @@ final class TruthOrDareService {
         return await refreshProofURLs(turns)
     }
 
+    func fetchVotes(turnIds: [UUID]) async throws -> [GameTurnVote] {
+        guard !turnIds.isEmpty else { return [] }
+        return try await supabase
+            .from("game_turn_votes")
+            .select()
+            .in("turn_id", values: turnIds)
+            .order("created_at", ascending: true)
+            .execute()
+            .value
+    }
+
     // MARK: - State transitions (RPCs)
 
     /// Start a standalone session — no meetup required. Passing a
@@ -193,6 +204,17 @@ final class TruthOrDareService {
         try await supabase
             .rpc("complete_truth_or_dare_turn",
                  params: Params(p_turn_id: turnId, p_action: "pass", p_proof_path: nil))
+            .execute()
+    }
+
+    func voteTurn(turnId: UUID, vote: Bool) async throws {
+        struct Params: Encodable {
+            let p_turn_id: UUID
+            let p_vote: Bool
+        }
+
+        try await supabase
+            .rpc("vote_truth_or_dare_turn", params: Params(p_turn_id: turnId, p_vote: vote))
             .execute()
     }
 

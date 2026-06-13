@@ -100,8 +100,10 @@ struct GameTurn: Codable, Identifiable, Equatable {
 
     var isPending: Bool { status == "pending" }
     var isPrompted: Bool { status == "prompted" }
+    var isVoting: Bool { status == "voting" }
     var isCompleted: Bool { status == "completed" }
     var isPassed: Bool { status == "passed" }
+    var isFailed: Bool { status == "failed" }
     var isTruth: Bool { promptKind == "truth" }
     var isDare: Bool { promptKind == "dare" }
     var playerDisplayName: String? { profiles?.displayName }
@@ -143,6 +145,23 @@ struct GameTurn: Codable, Identifiable, Equatable {
             completedAt: completedAt,
             profiles: profiles
         )
+    }
+}
+
+/// A squad verdict vote for a completed Truth or Dare turn.
+struct GameTurnVote: Codable, Identifiable, Equatable {
+    let turnId: UUID
+    let voterId: UUID
+    let vote: Bool
+    let createdAt: Date
+
+    var id: String { "\(turnId.uuidString)-\(voterId.uuidString)" }
+
+    enum CodingKeys: String, CodingKey {
+        case vote
+        case turnId = "turn_id"
+        case voterId = "voter_id"
+        case createdAt = "created_at"
     }
 }
 
