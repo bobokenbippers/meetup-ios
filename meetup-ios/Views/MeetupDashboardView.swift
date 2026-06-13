@@ -34,6 +34,7 @@ struct MeetupDashboardView: View {
     @State private var showPhotoPicker = false
     @State private var isUploadingPhotos = false
     @State private var fullscreenPhoto: MeetupPhoto?
+    @State private var now = Date()
 
     private var myUserId: UUID? { auth.session?.user.id }
     private var myStatus: String? { participants.first(where: { $0.userId == myUserId })?.status }
@@ -46,6 +47,20 @@ struct MeetupDashboardView: View {
                 && participant.status != "no"
                 && participant.status != "declined"
         }.count
+    }
+    private var lateParticipants: [MeetupParticipant] {
+        guard meetup.status == "active", let target = meetup.targetArrivalAt else { return [] }
+        return participants.filter { participant in
+            PunctualityStatus.resolve(
+                status: participant.status,
+                targetArrivalAt: target,
+                now: now
+            ) == .runningLate
+        }
+    }
+    private var latePunishment: LatePunishment? {
+        guard !lateParticipants.isEmpty else { return nil }
+        return LatePunishment(meetupId: meetup.id, lateParticipants: lateParticipants)
     }
     private var greeting: String {
         let h = Calendar.current.component(.hour, from: Date())
@@ -205,6 +220,7 @@ struct MeetupDashboardView: View {
                 if meetup.isRecap { showRecap = true }
             }
             .onReceive(Timer.publish(every: 60, on: .main, in: .common).autoconnect()) { _ in
+                now = Date()
                 if meetup.isRecap && !showRecap { showRecap = true }
             }
             .onDisappear {
@@ -385,6 +401,12 @@ struct MeetupDashboardView: View {
             PunctualityLegend(showsRunningLate: meetup.targetArrivalAt != nil)
                 .padding(.horizontal, 16)
                 .padding(.bottom, 8)
+
+            if let latePunishment {
+                LatePunishmentCard(punishment: latePunishment)
+                    .padding(.horizontal, 16)
+                    .padding(.bottom, 8)
+            }
 
             // Participant rows
             if hasLoaded {
@@ -640,6 +662,70 @@ private struct ShareInvite: Identifiable {
     var id: String { url.absoluteString }
 }
 
+// MARK: - Late Punishment
+
+private struct LatePunishment {
+    let title: String
+    let detail: String
+
+    init(meetupId: UUID, lateParticipants: [MeetupParticipant]) {
+        let names = lateParticipants
+            .map { $0.displayName?.split(separator: " ").first.map(String.init) ?? "Someone" }
+        let displayNames = names.prefix(2).joined(separator: " + ")
+
+        if lateParticipants.count == 1 {
+            title = "\(displayNames) triggered the late tax"
+        } else if lateParticipants.count == 2 {
+            title = "\(displayNames) triggered the late tax"
+        } else {
+            title = "\(lateParticipants.count) people triggered the late tax"
+        }
+
+        let options = [
+            "They pick up the first appetizer.",
+            "They take the first dare.",
+            "They owe the table a group photo.",
+            "They choose the next brunch spot.",
+            "They tell the best excuse in one sentence."
+        ]
+        let seed = meetupId.uuidString.unicodeScalars.reduce(0) { $0 + Int($1.value) }
+        let index = seed % options.count
+        detail = options[index]
+    }
+}
+
+private struct LatePunishmentCard: View {
+    let punishment: LatePunishment
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 10) {
+            Image(systemName: "clock.badge.exclamationmark.fill")
+                .scaledFont(size: 14, weight: .bold)
+                .foregroundStyle(Color.statusRunningLate)
+                .frame(width: 22, height: 22)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(punishment.title)
+                    .scaledFont(size: 12, weight: .bold)
+                    .foregroundStyle(DS.Color.textPrimary)
+                Text(punishment.detail)
+                    .scaledFont(size: 11, weight: .medium)
+                    .foregroundStyle(DS.Color.textSecondary)
+            }
+
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 9)
+        .background(Color.statusRunningLate.opacity(0.12))
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .strokeBorder(Color.statusRunningLate.opacity(0.28), lineWidth: 1)
+        )
+    }
+}
+
 // MARK: - Share Sheet (UIActivityViewController wrapper)
 
 private struct ShareSheet: UIViewControllerRepresentable {
@@ -792,6 +878,13 @@ private struct DashboardParticipantRow: View {
         }
     }
 
+    private var isRunningLate: Bool {
+        PunctualityStatus.resolve(
+            status: participant.status,
+            targetArrivalAt: targetArrivalAt
+        ) == .runningLate
+    }
+
     var body: some View {
         HStack(spacing: 12) {
             ProfileAvatarView(
@@ -825,6 +918,12 @@ private struct DashboardParticipantRow: View {
                 Text(etaText)
                     .scaledFont(size: 10, weight: .semibold)
                     .foregroundStyle(etaColor)
+                if isRunningLate {
+                    Label("Late tax", systemImage: "bolt.fill")
+                        .scaledFont(size: 9, weight: .bold)
+                        .foregroundStyle(Color.statusRunningLate)
+                        .labelStyle(.titleAndIcon)
+                }
             }
 
             Spacer()
