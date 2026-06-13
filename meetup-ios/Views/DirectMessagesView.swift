@@ -563,6 +563,7 @@ private struct MessageBubble: View {
     let onDelete: () -> Void
 
     private static let availableReactions = ["❤️", "😂", "😮", "😢", "🔥", "👍"]
+    @State private var showsReactionPicker = false
 
     var body: some View {
         HStack {
@@ -577,13 +578,30 @@ private struct MessageBubble: View {
                         .foregroundStyle(isMine ? .white : DS.Color.textPrimary)
                         .multilineTextAlignment(isMine ? .trailing : .leading)
                 }
-                Text(message.createdAt, format: .dateTime.hour().minute())
-                    .scaledFont(size: 9, weight: .medium)
-                    .foregroundStyle(isMine ? .white.opacity(0.45) : DS.Color.textSecondary)
+                HStack(spacing: 6) {
+                    Text(message.createdAt, format: .dateTime.hour().minute())
+                        .scaledFont(size: 9, weight: .medium)
+                        .foregroundStyle(isMine ? .white.opacity(0.45) : DS.Color.textSecondary)
+                    Button {
+                        withAnimation(.spring(response: 0.22, dampingFraction: 0.86)) {
+                            showsReactionPicker.toggle()
+                        }
+                    } label: {
+                        Image(systemName: "face.smiling")
+                            .scaledFont(size: 10, weight: .semibold)
+                            .foregroundStyle(isMine ? .white.opacity(0.62) : DS.Color.textSecondary)
+                            .frame(width: 20, height: 20)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Show reactions")
+                }
                 if message.editedAt != nil {
                     Text("Edited")
                         .scaledFont(size: 9, weight: .medium)
                         .foregroundStyle(isMine ? .white.opacity(0.42) : DS.Color.textSecondary)
+                }
+                if showsReactionPicker {
+                    reactionPickerRow
                 }
                 if !reactionSummaries.isEmpty {
                     reactionRow
@@ -594,13 +612,6 @@ private struct MessageBubble: View {
             .background(isMine ? Color.coral : Color.appSurface)
             .clipShape(RoundedRectangle(cornerRadius: 16))
             .contextMenu {
-                ForEach(Self.availableReactions, id: \.self) { emoji in
-                    Button {
-                        onToggleReaction(emoji)
-                    } label: {
-                        Text(emoji)
-                    }
-                }
                 if isMine {
                     Button(action: onEdit) {
                         Label("Edit", systemImage: "pencil")
@@ -611,6 +622,27 @@ private struct MessageBubble: View {
                 }
             }
             if !isMine { Spacer(minLength: 46) }
+        }
+    }
+
+    private var reactionPickerRow: some View {
+        HStack(spacing: 5) {
+            ForEach(Self.availableReactions, id: \.self) { emoji in
+                Button {
+                    withAnimation(.spring(response: 0.22, dampingFraction: 0.86)) {
+                        showsReactionPicker = false
+                    }
+                    onToggleReaction(emoji)
+                } label: {
+                    Text(emoji)
+                        .scaledFont(size: 13, weight: .semibold)
+                        .frame(width: 28, height: 26)
+                        .background(isMine ? Color.white.opacity(0.18) : Color.black.opacity(0.07))
+                        .clipShape(Capsule())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("React with \(emoji)")
+            }
         }
     }
 
