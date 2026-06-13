@@ -30,8 +30,23 @@ create table if not exists public.meetup_late_punishment_proofs (
 create index if not exists meetup_late_punishment_proofs_meetup_idx
   on public.meetup_late_punishment_proofs(meetup_id, created_at desc);
 
+create table if not exists public.meetup_late_punishment_proof_reactions (
+  proof_id   uuid        not null references public.meetup_late_punishment_proofs(id) on delete cascade,
+  user_id    uuid        not null references public.profiles(id) on delete cascade,
+  emoji      text        not null,
+  created_at timestamptz not null default now(),
+  primary key (proof_id, user_id, emoji),
+  constraint meetup_late_punishment_proof_reactions_emoji_check check (
+    emoji in ('❤️', '😂', '😮', '😢', '🔥', '👍')
+  )
+);
+
+create index if not exists meetup_late_punishment_proof_reactions_proof_idx
+  on public.meetup_late_punishment_proof_reactions(proof_id);
+
 alter table public.meetup_late_punishment_votes enable row level security;
 alter table public.meetup_late_punishment_proofs enable row level security;
+alter table public.meetup_late_punishment_proof_reactions enable row level security;
 
 drop policy if exists "participants read late punishment votes"
   on public.meetup_late_punishment_votes;
@@ -66,6 +81,24 @@ create policy "participants insert late punishment proofs"
     and (
       public.is_meetup_host(meetup_id)
       or public.is_meetup_participant(meetup_id, auth.uid())
+    )
+  );
+
+drop policy if exists "participants read late punishment proof reactions"
+  on public.meetup_late_punishment_proof_reactions;
+
+create policy "participants read late punishment proof reactions"
+  on public.meetup_late_punishment_proof_reactions for select
+  to authenticated
+  using (
+    exists (
+      select 1
+      from public.meetup_late_punishment_proofs proof
+      where proof.id = meetup_late_punishment_proof_reactions.proof_id
+        and (
+          public.is_meetup_host(proof.meetup_id)
+          or public.is_meetup_participant(proof.meetup_id, auth.uid())
+        )
     )
   );
 
@@ -127,6 +160,91 @@ $$;
 revoke all on function public.vote_late_punishment(uuid, text) from public, anon;
 grant execute on function public.vote_late_punishment(uuid, text) to authenticated;
 
+create or replace function public.list_late_punishment_proof_reactions(p_meetup_id uuid)
+returns table (
+  proof_id uuid,
+  emoji text,
+  reaction_count integer,
+  reacted_by_me boolean
+)
+language sql
+security definer
+set search_path = public
+as $$
+  select
+    reaction.proof_id,
+    reaction.emoji,
+    count(*)::integer as reaction_count,
+    bool_or(reaction.user_id = auth.uid()) as reacted_by_me
+  from public.meetup_late_punishment_proof_reactions reaction
+  join public.meetup_late_punishment_proofs proof
+    on proof.id = reaction.proof_id
+  where proof.meetup_id = p_meetup_id
+    and (
+      public.is_meetup_host(p_meetup_id)
+      or public.is_meetup_participant(p_meetup_id, auth.uid())
+    )
+  group by reaction.proof_id, reaction.emoji
+  order by reaction_count desc, reaction.emoji asc;
+$$;
+
+revoke all on function public.list_late_punishment_proof_reactions(uuid) from public, anon;
+grant execute on function public.list_late_punishment_proof_reactions(uuid) to authenticated;
+
+create or replace function public.toggle_late_punishment_proof_reaction(p_proof_id uuid, p_emoji text)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_meetup_id uuid;
+begin
+  if auth.uid() is null then
+    raise exception 'not authenticated';
+  end if;
+
+  if p_emoji not in ('❤️', '😂', '😮', '😢', '🔥', '👍') then
+    raise exception 'unsupported reaction';
+  end if;
+
+  select proof.meetup_id
+    into v_meetup_id
+  from public.meetup_late_punishment_proofs proof
+  where proof.id = p_proof_id;
+
+  if v_meetup_id is null then
+    raise exception 'proof not found';
+  end if;
+
+  if not (
+    public.is_meetup_host(v_meetup_id)
+    or public.is_meetup_participant(v_meetup_id, auth.uid())
+  ) then
+    raise exception 'only meetup participants can react';
+  end if;
+
+  if exists (
+    select 1
+    from public.meetup_late_punishment_proof_reactions
+    where proof_id = p_proof_id
+      and user_id = auth.uid()
+      and emoji = p_emoji
+  ) then
+    delete from public.meetup_late_punishment_proof_reactions
+    where proof_id = p_proof_id
+      and user_id = auth.uid()
+      and emoji = p_emoji;
+  else
+    insert into public.meetup_late_punishment_proof_reactions (proof_id, user_id, emoji)
+    values (p_proof_id, auth.uid(), p_emoji);
+  end if;
+end;
+$$;
+
+revoke all on function public.toggle_late_punishment_proof_reaction(uuid, text) from public, anon;
+grant execute on function public.toggle_late_punishment_proof_reaction(uuid, text) to authenticated;
+
 do $$
 begin
   alter publication supabase_realtime add table public.meetup_late_punishment_votes;
@@ -137,6 +255,13 @@ end $$;
 do $$
 begin
   alter publication supabase_realtime add table public.meetup_late_punishment_proofs;
+exception
+  when duplicate_object then null;
+end $$;
+
+do $$
+begin
+  alter publication supabase_realtime add table public.meetup_late_punishment_proof_reactions;
 exception
   when duplicate_object then null;
 end $$;

@@ -10,7 +10,9 @@ For the conceptual overview, read `GUIDE.md` first.
 
 - `meetup_late_punishment_votes` stores one punishment vote per meetup participant. Votes are keyed by `(meetup_id, voter_id)` and use fixed `option_key` values: `appetizer`, `dare`, `group_photo`, `next_spot`, `best_excuse`.
 - `meetup_late_punishment_proofs` stores proof photos for completed late punishments. Proof images are stored in the existing `meetup-photos` bucket and referenced by storage path.
+- `meetup_late_punishment_proof_reactions` stores lightweight emoji reactions on punishment proof photos, keyed by `(proof_id, user_id, emoji)`.
 - `vote_late_punishment(p_meetup_id, p_option_key)` is the write path for late-punishment votes. It requires the caller to be in the meetup and rejects callers who are currently late for that meetup, so late participants cannot vote on their own punishment.
+- `list_late_punishment_proof_reactions(p_meetup_id)` returns aggregated proof reaction counts and whether the caller reacted with each emoji. `toggle_late_punishment_proof_reaction(p_proof_id, p_emoji)` adds or removes the caller's reaction and rejects non-participants.
 
 ---
 

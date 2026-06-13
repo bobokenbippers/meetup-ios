@@ -37,9 +37,11 @@ struct MeetupDashboardView: View {
     @State private var now = Date()
     @State private var latePunishmentVotes: [LatePunishmentVote] = []
     @State private var latePunishmentProofs: [LatePunishmentProof] = []
+    @State private var lateProofReactionSummaries: [UUID: [LatePunishmentProofReactionSummary]] = [:]
     @State private var selectedLateProofItem: PhotosPickerItem?
     @State private var isVotingLatePunishment = false
     @State private var isUploadingLateProof = false
+    @State private var reactingLateProofId: UUID?
 
     private var myUserId: UUID? { auth.session?.user.id }
     private var myStatus: String? { participants.first(where: { $0.userId == myUserId })?.status }
@@ -235,6 +237,9 @@ struct MeetupDashboardView: View {
             .task(id: meetup.id) {
                 await startLatePunishmentProofRealtime()
             }
+            .task(id: meetup.id) {
+                await startLatePunishmentProofReactionRealtime()
+            }
             .onAppear {
                 if meetup.isRecap { showRecap = true }
             }
@@ -422,14 +427,21 @@ struct MeetupDashboardView: View {
                 .padding(.bottom, 8)
 
             if let latePunishment {
+                let latestProofReactions = latePunishmentProofs.first
+                    .map { lateProofReactionSummaries[$0.id] ?? [] } ?? []
                 LatePunishmentCard(
                     punishment: latePunishment,
                     proofs: latePunishmentProofs,
+                    proofReactionSummaries: latestProofReactions,
                     isVoting: isVotingLatePunishment,
                     isUploadingProof: isUploadingLateProof,
+                    reactingProofId: reactingLateProofId,
                     proofSelection: $selectedLateProofItem,
                     onVote: { option in
                         Task { await voteLatePunishment(option) }
+                    },
+                    onToggleProofReaction: { proof, emoji in
+                        Task { await toggleLateProofReaction(proof: proof, emoji: emoji) }
                     }
                 )
                     .padding(.horizontal, 16)
@@ -624,6 +636,7 @@ struct MeetupDashboardView: View {
             }
             await loadLatePunishmentVotes()
             await loadLatePunishmentProofs()
+            await loadLatePunishmentProofReactions()
         } catch is CancellationError {
             return
         } catch {
@@ -699,6 +712,22 @@ struct MeetupDashboardView: View {
             return
         } catch {
             latePunishmentProofs = []
+            lateProofReactionSummaries = [:]
+        }
+    }
+
+    private func loadLatePunishmentProofReactions() async {
+        guard !latePunishmentProofs.isEmpty else {
+            lateProofReactionSummaries = [:]
+            return
+        }
+        do {
+            lateProofReactionSummaries = try await LatePunishmentService.shared
+                .listProofReactionSummaries(meetupId: meetup.id)
+        } catch is CancellationError {
+            return
+        } catch {
+            lateProofReactionSummaries = [:]
         }
     }
 
@@ -729,6 +758,21 @@ struct MeetupDashboardView: View {
             }
             try await LatePunishmentService.shared.uploadProof(image: image, meetupId: meetup.id)
             await loadLatePunishmentProofs()
+            await loadLatePunishmentProofReactions()
+        } catch is CancellationError {
+            return
+        } catch {
+            self.error = error.localizedDescription
+        }
+    }
+
+    private func toggleLateProofReaction(proof: LatePunishmentProof, emoji: String) async {
+        guard reactingLateProofId == nil else { return }
+        reactingLateProofId = proof.id
+        defer { reactingLateProofId = nil }
+        do {
+            try await LatePunishmentService.shared.toggleProofReaction(proofId: proof.id, emoji: emoji)
+            await loadLatePunishmentProofReactions()
         } catch is CancellationError {
             return
         } catch {
@@ -772,6 +816,27 @@ struct MeetupDashboardView: View {
         for await _ in changes {
             guard !Task.isCancelled else { break }
             await loadLatePunishmentProofs()
+            await loadLatePunishmentProofReactions()
+        }
+        await SupabaseManager.shared.client.realtimeV2.removeChannel(channel)
+    }
+
+    private func startLatePunishmentProofReactionRealtime() async {
+        let channel = SupabaseManager.shared.client.realtimeV2
+            .channel("late-punishment-proof-reactions-\(meetup.id)")
+        let changes = channel.postgresChange(
+            AnyAction.self,
+            schema: "public",
+            table: "meetup_late_punishment_proof_reactions"
+        )
+        do {
+            try await channel.subscribeWithError()
+        } catch {
+            return
+        }
+        for await _ in changes {
+            guard !Task.isCancelled else { break }
+            await loadLatePunishmentProofReactions()
         }
         await SupabaseManager.shared.client.realtimeV2.removeChannel(channel)
     }
@@ -867,10 +932,13 @@ private struct LatePunishment {
 private struct LatePunishmentCard: View {
     let punishment: LatePunishment
     let proofs: [LatePunishmentProof]
+    let proofReactionSummaries: [LatePunishmentProofReactionSummary]
     let isVoting: Bool
     let isUploadingProof: Bool
+    let reactingProofId: UUID?
     @Binding var proofSelection: PhotosPickerItem?
     let onVote: (LatePunishmentOption) -> Void
+    let onToggleProofReaction: (LatePunishmentProof, String) -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -961,6 +1029,14 @@ private struct LatePunishmentCard: View {
                 }
                 .disabled(isUploadingProof)
             }
+
+            if let proof = proofs.first {
+                LatePunishmentProofReactionRow(
+                    summaries: proofReactionSummaries,
+                    isReacting: reactingProofId == proof.id,
+                    onToggle: { emoji in onToggleProofReaction(proof, emoji) }
+                )
+            }
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 9)
@@ -970,6 +1046,61 @@ private struct LatePunishmentCard: View {
             RoundedRectangle(cornerRadius: 12)
                 .strokeBorder(Color.statusRunningLate.opacity(0.28), lineWidth: 1)
         )
+    }
+}
+
+private struct LatePunishmentProofReactionRow: View {
+    private let supportedEmojis = ["❤️", "😂", "😮", "😢", "🔥", "👍"]
+
+    let summaries: [LatePunishmentProofReactionSummary]
+    let isReacting: Bool
+    let onToggle: (String) -> Void
+
+    var body: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 6) {
+                ForEach(supportedEmojis, id: \.self) { emoji in
+                    let summary = summaries.first(where: { $0.emoji == emoji })
+                    Button {
+                        onToggle(emoji)
+                    } label: {
+                        HStack(spacing: 4) {
+                            Text(emoji)
+                                .scaledFont(size: 12, weight: .semibold)
+                            if let count = summary?.reactionCount, count > 0 {
+                                Text("\(count)")
+                                    .scaledFont(size: 10, weight: .bold)
+                            }
+                        }
+                        .foregroundStyle(summary?.reactedByMe == true ? .white : DS.Color.textPrimary)
+                        .frame(minWidth: 34, minHeight: 28)
+                        .padding(.horizontal, 5)
+                        .background(backgroundColor(isSelected: summary?.reactedByMe == true))
+                        .clipShape(Capsule())
+                        .overlay(
+                            Capsule()
+                                .strokeBorder(borderColor(isSelected: summary?.reactedByMe == true), lineWidth: 1)
+                        )
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(isReacting)
+                    .accessibilityLabel(reactionAccessibilityLabel(emoji: emoji, count: summary?.reactionCount ?? 0))
+                }
+            }
+        }
+        .accessibilityElement(children: .contain)
+    }
+
+    private func backgroundColor(isSelected: Bool) -> Color {
+        isSelected ? Color.statusRunningLate : Color.appSurface.opacity(0.92)
+    }
+
+    private func borderColor(isSelected: Bool) -> Color {
+        isSelected ? Color.statusRunningLate : Color.statusRunningLate.opacity(0.18)
+    }
+
+    private func reactionAccessibilityLabel(emoji: String, count: Int) -> String {
+        count == 1 ? "1 \(emoji) reaction" : "\(count) \(emoji) reactions"
     }
 }
 

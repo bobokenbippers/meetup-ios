@@ -86,6 +86,32 @@ final class LatePunishmentService {
         return await refreshProofURLs(proofs)
     }
 
+    func listProofReactionSummaries(meetupId: UUID) async throws -> [UUID: [LatePunishmentProofReactionSummary]] {
+        let summaries: [LatePunishmentProofReactionSummary] = try await supabase
+            .rpc("list_late_punishment_proof_reactions", params: ["p_meetup_id": meetupId.uuidString])
+            .execute()
+            .value
+
+        return Dictionary(grouping: summaries, by: \.proofId)
+            .mapValues { reactions in
+                reactions.sorted {
+                    if $0.reactionCount == $1.reactionCount {
+                        return $0.emoji < $1.emoji
+                    }
+                    return $0.reactionCount > $1.reactionCount
+                }
+            }
+    }
+
+    func toggleProofReaction(proofId: UUID, emoji: String) async throws {
+        try await supabase
+            .rpc("toggle_late_punishment_proof_reaction", params: [
+                "p_proof_id": proofId.uuidString,
+                "p_emoji": emoji
+            ])
+            .execute()
+    }
+
     private func refreshProofURLs(_ proofs: [LatePunishmentProof]) async -> [LatePunishmentProof] {
         var refreshed: [LatePunishmentProof] = []
         refreshed.reserveCapacity(proofs.count)

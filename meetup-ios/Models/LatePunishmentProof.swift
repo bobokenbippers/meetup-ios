@@ -28,3 +28,19 @@ struct LatePunishmentProof: Codable, Identifiable, Equatable {
         )
     }
 }
+
+struct LatePunishmentProofReactionSummary: Codable, Identifiable, Equatable {
+    var id: String { "\(proofId.uuidString)-\(emoji)" }
+
+    let proofId: UUID
+    let emoji: String
+    let reactionCount: Int
+    let reactedByMe: Bool
+
+    enum CodingKeys: String, CodingKey {
+        case proofId = "proof_id"
+        case emoji
+        case reactionCount = "reaction_count"
+        case reactedByMe = "reacted_by_me"
+    }
+}
