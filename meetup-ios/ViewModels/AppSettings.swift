@@ -106,9 +106,11 @@ enum AppColorTheme: String, CaseIterable, Identifiable {
     var categoryGradientFoodEnd: Color {
         switch self {
         case .standard: return Color(red: 0.235, green: 0.180, blue: 0.478)
-        // Blue-forward: Knicks navy #1D428A so brunch cards read blue (the
-        // primary brand color). Orange stays the pop accent, not the wallpaper.
-        case .knicks: return Color(hex: "1D428A")
+        // Blue-forward: a darker shade of the official Knicks Blue #006BB6
+        // (same hue, ~0.67x brightness) so brunch cards read blue — the primary
+        // brand color — with strong white-title contrast (9.6:1). Orange stays
+        // the pop accent, not the wallpaper. Strictly on-palette, no invented navy.
+        case .knicks: return Color(hex: "00477A")
         }
     }
 }

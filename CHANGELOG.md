@@ -36,7 +36,7 @@ Please test:
 - Meetup share sheets now include readable invite text plus the web invite URL.
 
 ### Fixed
-- Knicks theme: active food/brunch meetup cards now use a blue→navy gradient instead of ending in bright burnt orange, so the white card title reads clearly and the card leans Knicks blue instead of being mostly orange.
+- Knicks theme: active food/brunch meetup cards now use a gradient of Knicks Blue into a darker shade of the same blue instead of ending in bright burnt orange, so the white card title reads clearly (9.6:1 contrast) and the card leans Knicks blue instead of being mostly orange. Stays on the official Knicks palette.
 - Meetup dashboard action buttons (Directions, Split Bill, Game) no longer wrap or hyphenate onto two lines now that the row holds three buttons.
 - Invitees can see the meetup host/sender in the participant roster after accepting an invite.
 - Missing host participant rows are backfilled so older meetups can render the inviter.
