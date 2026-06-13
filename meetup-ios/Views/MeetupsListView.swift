@@ -1,42 +1,79 @@
 import SwiftUI
 import Supabase
 
+/// The single source of truth for how a meetup row card is painted.
+///
+/// Card background and text color used to be decided by two separate functions
+/// with duplicated keyword lists. When those drifted, the card could end up with
+/// a light background but white text (or vice versa) — the recurring
+/// "white title on a light card" light-mode bug. Both the background style and
+/// `usesLightText` now come from this one classification, so they can never
+/// disagree again.
+enum MeetupCardSurface {
+    case food          // dark gradient
+    case nightlife     // dark gradient
+    case coffee        // dark gradient
+    case activeNeutral // light surface (active, no themed gradient)
+    case inactive      // resting surface (not active / invited)
+
+    static func classify(category: String?, meetupStatus: String, participantStatus: String) -> MeetupCardSurface {
+        let isActive = meetupStatus == "active"
+        let isInvited = participantStatus == "invited"
+        guard isActive && !isInvited else { return .inactive }
+        let c = (category ?? "").lowercased()
+        if c.contains("brunch") || c.contains("dinner") || c.contains("food") || c.contains("lunch") { return .food }
+        if c.contains("happy hour") || c.contains("cocktail") || c.contains("drink") { return .nightlife }
+        if c.contains("coffee") || c.contains("café") || c.contains("cafe") { return .coffee }
+        return .activeNeutral
+    }
+
+    /// True only for the dark category gradients. Neutral/inactive surfaces use
+    /// the adaptive `DS.Color.textPrimary`, which is already dark in light mode
+    /// and light in dark mode — so this stays correct in both appearances.
+    var usesLightText: Bool {
+        switch self {
+        case .food, .nightlife, .coffee: return true
+        case .activeNeutral, .inactive: return false
+        }
+    }
+
+    var style: AnyShapeStyle {
+        switch self {
+        case .food:
+            return AnyShapeStyle(LinearGradient(
+                colors: [Color.categoryGradientFoodStart,
+                         Color.categoryGradientFoodEnd],
+                startPoint: .topLeading, endPoint: .bottomTrailing))
+        case .nightlife:
+            return AnyShapeStyle(LinearGradient(
+                colors: [Color(red: 0.361, green: 0.247, blue: 0.627),
+                         Color(red: 0.239, green: 0.141, blue: 0.439)],
+                startPoint: .topLeading, endPoint: .bottomTrailing))
+        case .coffee:
+            return AnyShapeStyle(LinearGradient(
+                colors: [Color(red: 0.090, green: 0.376, blue: 0.208),
+                         Color(red: 0.047, green: 0.239, blue: 0.125)],
+                startPoint: .topLeading, endPoint: .bottomTrailing))
+        case .activeNeutral:
+            // Light mode: a clearer tinted card so an active meetup doesn't wash
+            // out against the white page. Dark mode keeps the elevated surface.
+            return AnyShapeStyle(Color(light: Color(hex: "D6E8FB"), dark: Color.appSurface))
+        case .inactive:
+            return AnyShapeStyle(Color.appSurface)
+        }
+    }
+}
+
 func meetupCategoryGradient(category: String?, meetupStatus: String, participantStatus: String) -> AnyShapeStyle {
-    let isActive = meetupStatus == "active"
-    let isInvited = participantStatus == "invited"
-    guard isActive && !isInvited else {
-        return AnyShapeStyle(Color.appSurface)
-    }
-    let c = (category ?? "").lowercased()
-    if c.contains("brunch") || c.contains("dinner") || c.contains("food") || c.contains("lunch") {
-        return AnyShapeStyle(LinearGradient(
-            colors: [Color.categoryGradientFoodStart,
-                     Color.categoryGradientFoodEnd],
-            startPoint: .topLeading, endPoint: .bottomTrailing))
-    }
-    if c.contains("happy hour") || c.contains("cocktail") || c.contains("drink") {
-        return AnyShapeStyle(LinearGradient(
-            colors: [Color(red: 0.361, green: 0.247, blue: 0.627),
-                     Color(red: 0.239, green: 0.141, blue: 0.439)],
-            startPoint: .topLeading, endPoint: .bottomTrailing))
-    }
-    if c.contains("coffee") || c.contains("café") || c.contains("cafe") {
-        return AnyShapeStyle(LinearGradient(
-            colors: [Color(red: 0.090, green: 0.376, blue: 0.208),
-                     Color(red: 0.047, green: 0.239, blue: 0.125)],
-            startPoint: .topLeading, endPoint: .bottomTrailing))
-    }
-    return AnyShapeStyle(Color(light: Color(hex: "E8F2FC"), dark: Color.appSurface))
+    MeetupCardSurface.classify(
+        category: category, meetupStatus: meetupStatus, participantStatus: participantStatus
+    ).style
 }
 
 func meetupHasDarkBackground(category: String?, meetupStatus: String, participantStatus: String) -> Bool {
-    let isActive = meetupStatus == "active"
-    let isInvited = participantStatus == "invited"
-    guard isActive && !isInvited else { return false }
-    let c = (category ?? "").lowercased()
-    return c.contains("brunch") || c.contains("dinner") || c.contains("food") || c.contains("lunch") ||
-           c.contains("happy hour") || c.contains("cocktail") || c.contains("drink") ||
-           c.contains("coffee") || c.contains("café") || c.contains("cafe")
+    MeetupCardSurface.classify(
+        category: category, meetupStatus: meetupStatus, participantStatus: participantStatus
+    ).usesLightText
 }
 
 func meetupCategoryEmoji(_ category: String?) -> String {
