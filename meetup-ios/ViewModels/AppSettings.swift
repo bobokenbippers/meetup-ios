@@ -43,7 +43,14 @@ enum AppColorTheme: String, CaseIterable, Identifiable {
         case .standard:
             return Color(light: Color(hex: "6C57C5"), dark: Color(hex: "8A78E0"))
         case .knicks:
-            return Color(light: Color(hex: "F58426"), dark: Color(hex: "FF9F45"))
+            return Color(light: Color(hex: "006BB6"), dark: Color(hex: "3BA3FF"))
+        }
+    }
+
+    var accentForegroundColor: Color {
+        switch self {
+        case .standard, .knicks:
+            return Color(light: .white, dark: .black)
         }
     }
 
@@ -52,7 +59,14 @@ enum AppColorTheme: String, CaseIterable, Identifiable {
         case .standard:
             return Color(light: Color(hex: "6C57C5"), dark: Color(hex: "8A78E0"))
         case .knicks:
-            return Color(light: Color(hex: "006BB6"), dark: Color(hex: "3BA3FF"))
+            return Color(light: Color(hex: "C65312"), dark: Color(hex: "FFB36B"))
+        }
+    }
+
+    var secondaryAccentForegroundColor: Color {
+        switch self {
+        case .standard, .knicks:
+            return Color(light: .white, dark: .black)
         }
     }
 
@@ -69,12 +83,12 @@ enum AppColorTheme: String, CaseIterable, Identifiable {
             ]
         case .knicks:
             return [
-                Color(hex: "F58426"),
                 Color(hex: "006BB6"),
-                Color(hex: "BEC0C2"),
-                Color(hex: "FF9F45"),
-                Color(hex: "3BA3FF"),
+                Color(hex: "C65312"),
                 Color(hex: "1D428A"),
+                Color(hex: "B9560F"),
+                Color(hex: "005EA8"),
+                Color(hex: "4B5563"),
             ]
         }
     }
@@ -82,14 +96,14 @@ enum AppColorTheme: String, CaseIterable, Identifiable {
     var categoryGradientFoodStart: Color {
         switch self {
         case .standard: return Color(red: 0.388, green: 0.302, blue: 0.718)
-        case .knicks: return Color(hex: "F58426")
+        case .knicks: return Color(hex: "006BB6")
         }
     }
 
     var categoryGradientFoodEnd: Color {
         switch self {
         case .standard: return Color(red: 0.235, green: 0.180, blue: 0.478)
-        case .knicks: return Color(hex: "006BB6")
+        case .knicks: return Color(hex: "C65312")
         }
     }
 }

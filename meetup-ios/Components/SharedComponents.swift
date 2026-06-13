@@ -24,7 +24,7 @@ struct AvatarView: View {
     var body: some View {
         ZStack {
             Circle()
-                .fill(backgroundColor.opacity(0.85))
+                .fill(backgroundColor)
             Text(initials)
                 .font(.system(size: size * 0.38, weight: .semibold))
                 .foregroundStyle(.white)
@@ -67,11 +67,11 @@ struct PrimaryButton: View {
                 }
                 Text(title)
                     .font(.system(size: 15, weight: .semibold))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(Color.appAccentForeground)
             }
             .frame(maxWidth: .infinity)
             .padding(.vertical, 14)
-            .background(isDisabled ? Color.secondary : Color.indigo)
+            .background(isDisabled ? Color.secondary : Color.coral)
             .clipShape(Capsule())
         }
         .disabled(isDisabled || isLoading)
@@ -87,10 +87,10 @@ struct SecondaryButton: View {
         Button(action: action) {
             Text(title)
                 .font(.system(size: 15, weight: .semibold))
-                .foregroundStyle(Color.indigo)
+                .foregroundStyle(Color.coral)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 14)
-                .background(Color.indigo.opacity(0.12))
+                .background(Color.coral.opacity(0.12))
                 .clipShape(Capsule())
         }
     }

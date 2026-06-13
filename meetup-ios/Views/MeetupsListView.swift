@@ -26,7 +26,7 @@ func meetupCategoryGradient(category: String?, meetupStatus: String, participant
                      Color(red: 0.047, green: 0.239, blue: 0.125)],
             startPoint: .topLeading, endPoint: .bottomTrailing))
     }
-    return AnyShapeStyle(Color.appSurface)
+    return AnyShapeStyle(Color(light: Color(hex: "E8F2FC"), dark: Color.appSurface))
 }
 
 func meetupHasDarkBackground(category: String?, meetupStatus: String, participantStatus: String) -> Bool {
@@ -240,7 +240,7 @@ struct MeetupsListView: View {
                 Button(action: { presentedSheet = .create }) {
                     Image(systemName: "plus")
                         .scaledFont(size: 17, weight: .semibold)
-                        .foregroundStyle(.white)
+                        .foregroundStyle(Color.appAccentForeground)
                         .frame(width: 34, height: 34)
                         .background(Color.coral)
                         .clipShape(Circle())
@@ -320,7 +320,7 @@ struct MeetupsListView: View {
                         sectionHeader("Invited")
                         Text("\(invited.count)")
                             .scaledFont(size: 10, weight: .bold)
-                            .foregroundStyle(.white)
+                            .foregroundStyle(Color.appAccentForeground)
                             .padding(.horizontal, 6)
                             .padding(.vertical, 2)
                             .background(Color.coral)
@@ -593,7 +593,7 @@ private struct MeetupsEmptyState: View {
 
             Button("Plan a Meetup", action: onCreate)
                 .scaledFont(size: 14, weight: .bold)
-                .foregroundStyle(.white)
+                .foregroundStyle(Color.appAccentForeground)
                 .padding(.horizontal, 24)
                 .padding(.vertical, 12)
                 .background(Color.coral)
@@ -756,10 +756,20 @@ struct MeetupRowCard: View {
         )
     }
 
-    private var primaryTextColor: Color { .white }
+    private var primaryTextColor: Color {
+        hasDarkBackground ? .white : DS.Color.textPrimary
+    }
 
     private var secondaryTextColor: Color {
-        hasDarkBackground ? .white.opacity(0.5) : Color(white: 0.55)
+        hasDarkBackground ? .white.opacity(0.72) : DS.Color.textSecondary
+    }
+
+    private var activeBorderColor: Color {
+        Color(light: Color(hex: "006BB6").opacity(0.55), dark: Color.coral.opacity(0.45))
+    }
+
+    private var inactiveBorderColor: Color {
+        Color(light: Color(hex: "D1D5DB"), dark: Color(white: 0.15))
     }
 
     var body: some View {
@@ -804,10 +814,10 @@ struct MeetupRowCard: View {
             if !needsBorder && participation.meetup.status == "active" {
                 // Glowing accent border for active meetups
                 RoundedRectangle(cornerRadius: 18)
-                    .strokeBorder(Color.coral.opacity(0.45), lineWidth: 1.5)
+                    .strokeBorder(activeBorderColor, lineWidth: 1.5)
             } else {
                 RoundedRectangle(cornerRadius: 18)
-                    .strokeBorder(Color(white: 0.15), lineWidth: 1)
+                    .strokeBorder(inactiveBorderColor, lineWidth: 1)
             }
         }
         .shadow(

@@ -341,7 +341,7 @@ struct PeopleListView: View {
                     addFriend(user)
                 }
                 .scaledFont(size: 13, weight: .bold)
-                .foregroundStyle(.white)
+                .foregroundStyle(Color.appAccentForeground)
                 .padding(.horizontal, 16)
                 .padding(.vertical, 8)
                 .background(Color.coral)
@@ -351,7 +351,7 @@ struct PeopleListView: View {
                     addFriend(user)
                 }
                 .scaledFont(size: 13, weight: .bold)
-                .foregroundStyle(.white)
+                .foregroundStyle(Color.appAccentForeground)
                 .padding(.horizontal, 16)
                 .padding(.vertical, 8)
                 .background(Color.coral)
@@ -839,7 +839,7 @@ private struct SuggestionProfileSheet: View {
             Button(action: onAddFriend) {
                 Label("Add Friend", systemImage: "person.badge.plus")
                     .scaledFont(size: 16, weight: .bold)
-                    .foregroundStyle(.white)
+                    .foregroundStyle(Color.appAccentForeground)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 14)
                     .background(Color.coral)

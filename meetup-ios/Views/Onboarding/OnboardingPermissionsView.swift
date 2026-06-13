@@ -49,7 +49,7 @@ struct OnboardingPermissionsView: View {
                 } label: {
                     Text(isRequesting ? "Requesting…" : "Allow →")
                         .scaledFont(size: 18, weight: .semibold)
-                        .foregroundStyle(.white) // on coral background
+                        .foregroundStyle(Color.appAccentForeground)
                         .frame(maxWidth: .infinity)
                         .frame(height: 56)
                         .background(Color.coral)

@@ -142,7 +142,7 @@ struct NearbyEventsView: View {
                 Button(action: requestLocation) {
                     Text(locationButtonTitle)
                         .scaledFont(size: 12, weight: .bold)
-                        .foregroundStyle(.white)
+                        .foregroundStyle(Color.appAccentForeground)
                         .padding(.horizontal, 12)
                         .padding(.vertical, 7)
                         .background(Color.coral)
@@ -212,7 +212,7 @@ struct NearbyEventsView: View {
                 } label: {
                     Text("Retry")
                         .scaledFont(size: 12, weight: .bold)
-                        .foregroundStyle(.white)
+                        .foregroundStyle(Color.appAccentForeground)
                         .padding(.horizontal, 12)
                         .padding(.vertical, 7)
                         .background(Color.coral)

@@ -121,12 +121,12 @@ extension View {
 }
 
 // MARK: - DS primary button
-/// Pill-shaped primary button using the brand indigo accent (#6C57C5).
+/// Pill-shaped primary button using the selected app theme accent.
 struct DSButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .font(.system(size: 17, weight: .semibold))
-            .foregroundStyle(.white)
+            .foregroundStyle(Color.appAccentForeground)
             .padding(.horizontal, DS.Spacing.lg)
             .padding(.vertical, 13)
             .frame(maxWidth: .infinity)

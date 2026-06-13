@@ -132,7 +132,7 @@ struct JoinMeetupSheet: View {
                         .frame(maxWidth: .infinity)
                         .frame(height: 52)
                         .background(Color.coral)
-                        .foregroundStyle(.white)
+                        .foregroundStyle(Color.appAccentForeground)
                         .clipShape(RoundedRectangle(cornerRadius: 14))
                     }
                     .disabled(isJoining)

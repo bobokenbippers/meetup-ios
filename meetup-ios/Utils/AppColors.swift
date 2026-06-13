@@ -13,7 +13,9 @@ extension Color {
     // MARK: - Primary accent
 
     static var coral: Color { AppColorTheme.current.accentColor }
+    static var appAccentForeground: Color { AppColorTheme.current.accentForegroundColor }
     static var appSecondaryAccent: Color { AppColorTheme.current.secondaryAccentColor }
+    static var appSecondaryAccentForeground: Color { AppColorTheme.current.secondaryAccentForegroundColor }
 
     // MARK: - Status semantic colors
 
