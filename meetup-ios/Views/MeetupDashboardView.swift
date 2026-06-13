@@ -35,6 +35,8 @@ struct MeetupDashboardView: View {
     @State private var isUploadingPhotos = false
     @State private var fullscreenPhoto: MeetupPhoto?
     @State private var now = Date()
+    @State private var latePunishmentVotes: [LatePunishmentVote] = []
+    @State private var isVotingLatePunishment = false
 
     private var myUserId: UUID? { auth.session?.user.id }
     private var myStatus: String? { participants.first(where: { $0.userId == myUserId })?.status }
@@ -60,7 +62,11 @@ struct MeetupDashboardView: View {
     }
     private var latePunishment: LatePunishment? {
         guard !lateParticipants.isEmpty else { return nil }
-        return LatePunishment(meetupId: meetup.id, lateParticipants: lateParticipants)
+        return LatePunishment(
+            lateParticipants: lateParticipants,
+            votes: latePunishmentVotes,
+            currentUserId: myUserId
+        )
     }
     private var greeting: String {
         let h = Calendar.current.component(.hour, from: Date())
@@ -215,6 +221,9 @@ struct MeetupDashboardView: View {
                 await loadPhotos()
                 await startRealtime()
                 await startPhotoRealtime()
+            }
+            .task(id: meetup.id) {
+                await startLatePunishmentRealtime()
             }
             .onAppear {
                 if meetup.isRecap { showRecap = true }
@@ -403,7 +412,13 @@ struct MeetupDashboardView: View {
                 .padding(.bottom, 8)
 
             if let latePunishment {
-                LatePunishmentCard(punishment: latePunishment)
+                LatePunishmentCard(
+                    punishment: latePunishment,
+                    isVoting: isVotingLatePunishment,
+                    onVote: { option in
+                        Task { await voteLatePunishment(option) }
+                    }
+                )
                     .padding(.horizontal, 16)
                     .padding(.bottom, 8)
             }
@@ -594,6 +609,7 @@ struct MeetupDashboardView: View {
                LocationManager.shared.isTracking {
                 LocationManager.shared.stopTracking()
             }
+            await loadLatePunishmentVotes()
         } catch is CancellationError {
             return
         } catch {
@@ -651,6 +667,48 @@ struct MeetupDashboardView: View {
         }
         isActing = false
     }
+
+    private func loadLatePunishmentVotes() async {
+        do {
+            latePunishmentVotes = try await LatePunishmentService.shared.fetchVotes(meetupId: meetup.id)
+        } catch is CancellationError {
+            return
+        } catch {
+            latePunishmentVotes = []
+        }
+    }
+
+    private func voteLatePunishment(_ option: LatePunishmentOption) async {
+        guard !isVotingLatePunishment else { return }
+        isVotingLatePunishment = true
+        defer { isVotingLatePunishment = false }
+        do {
+            try await LatePunishmentService.shared.vote(meetupId: meetup.id, optionKey: option.key)
+            await loadLatePunishmentVotes()
+        } catch {
+            self.error = error.localizedDescription
+        }
+    }
+
+    private func startLatePunishmentRealtime() async {
+        let channel = SupabaseManager.shared.client.realtimeV2
+            .channel("late-punishment-votes-\(meetup.id)")
+        let changes = channel.postgresChange(
+            AnyAction.self,
+            schema: "public",
+            table: "meetup_late_punishment_votes"
+        )
+        do {
+            try await channel.subscribeWithError()
+        } catch {
+            return
+        }
+        for await _ in changes {
+            guard !Task.isCancelled else { break }
+            await loadLatePunishmentVotes()
+        }
+        await SupabaseManager.shared.client.realtimeV2.removeChannel(channel)
+    }
 }
 
 // MARK: - Share Invite Payload
@@ -664,11 +722,36 @@ private struct ShareInvite: Identifiable {
 
 // MARK: - Late Punishment
 
+private struct LatePunishmentOption: Identifiable, Equatable {
+    let key: String
+    let title: String
+    let systemImage: String
+
+    var id: String { key }
+
+    static let all: [LatePunishmentOption] = [
+        LatePunishmentOption(key: "appetizer", title: "Appetizer", systemImage: "fork.knife"),
+        LatePunishmentOption(key: "dare", title: "First dare", systemImage: "flame.fill"),
+        LatePunishmentOption(key: "group_photo", title: "Group photo", systemImage: "camera.fill"),
+        LatePunishmentOption(key: "next_spot", title: "Next spot", systemImage: "map.fill"),
+        LatePunishmentOption(key: "best_excuse", title: "Best excuse", systemImage: "text.bubble.fill")
+    ]
+}
+
 private struct LatePunishment {
     let title: String
     let detail: String
+    let options: [LatePunishmentOption]
+    let voteCounts: [String: Int]
+    let selectedOptionKey: String?
+    let winningOptionKey: String?
+    let canVote: Bool
 
-    init(meetupId: UUID, lateParticipants: [MeetupParticipant]) {
+    init(
+        lateParticipants: [MeetupParticipant],
+        votes: [LatePunishmentVote],
+        currentUserId: UUID?
+    ) {
         let names = lateParticipants
             .map { $0.displayName?.split(separator: " ").first.map(String.init) ?? "Someone" }
         let displayNames = names.prefix(2).joined(separator: " + ")
@@ -681,39 +764,77 @@ private struct LatePunishment {
             title = "\(lateParticipants.count) people triggered the late tax"
         }
 
-        let options = [
-            "They pick up the first appetizer.",
-            "They take the first dare.",
-            "They owe the table a group photo.",
-            "They choose the next brunch spot.",
-            "They tell the best excuse in one sentence."
-        ]
-        let seed = meetupId.uuidString.unicodeScalars.reduce(0) { $0 + Int($1.value) }
-        let index = seed % options.count
-        detail = options[index]
+        let allOptions = LatePunishmentOption.all
+        let counts = Dictionary(grouping: votes, by: \.optionKey).mapValues(\.count)
+        let selected = currentUserId.flatMap { userId in
+            votes.first(where: { $0.voterId == userId })?.optionKey
+        }
+        let userCanVote = currentUserId.map { userId in
+            !lateParticipants.contains(where: { $0.userId == userId })
+        } ?? false
+
+        let winner = votes.isEmpty ? nil : allOptions.max { lhs, rhs in
+            let lhsCount = counts[lhs.key, default: 0]
+            let rhsCount = counts[rhs.key, default: 0]
+            if lhsCount == rhsCount {
+                return lhs.title > rhs.title
+            }
+            return lhsCount < rhsCount
+        }?.key
+
+        options = allOptions
+        voteCounts = counts
+        selectedOptionKey = selected
+        canVote = userCanVote
+        winningOptionKey = winner
+
+        if !userCanVote {
+            detail = "Late folks sit this vote out."
+        } else if selected != nil {
+            detail = "Your vote is in. Change it until the group settles it."
+        } else {
+            detail = "Vote on the punishment. Late folks cannot vote."
+        }
     }
 }
 
 private struct LatePunishmentCard: View {
     let punishment: LatePunishment
+    let isVoting: Bool
+    let onVote: (LatePunishmentOption) -> Void
 
     var body: some View {
-        HStack(alignment: .top, spacing: 10) {
-            Image(systemName: "clock.badge.exclamationmark.fill")
-                .scaledFont(size: 14, weight: .bold)
-                .foregroundStyle(Color.statusRunningLate)
-                .frame(width: 22, height: 22)
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(alignment: .top, spacing: 10) {
+                Image(systemName: "clock.badge.exclamationmark.fill")
+                    .scaledFont(size: 14, weight: .bold)
+                    .foregroundStyle(Color.statusRunningLate)
+                    .frame(width: 22, height: 22)
 
-            VStack(alignment: .leading, spacing: 2) {
-                Text(punishment.title)
-                    .scaledFont(size: 12, weight: .bold)
-                    .foregroundStyle(DS.Color.textPrimary)
-                Text(punishment.detail)
-                    .scaledFont(size: 11, weight: .medium)
-                    .foregroundStyle(DS.Color.textSecondary)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(punishment.title)
+                        .scaledFont(size: 12, weight: .bold)
+                        .foregroundStyle(DS.Color.textPrimary)
+                    Text(punishment.detail)
+                        .scaledFont(size: 11, weight: .medium)
+                        .foregroundStyle(DS.Color.textSecondary)
+                }
+
+                Spacer(minLength: 0)
             }
 
-            Spacer(minLength: 0)
+            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 6) {
+                ForEach(punishment.options) { option in
+                    LatePunishmentVoteButton(
+                        option: option,
+                        count: punishment.voteCounts[option.key, default: 0],
+                        isSelected: punishment.selectedOptionKey == option.key,
+                        isWinning: punishment.winningOptionKey == option.key,
+                        isDisabled: !punishment.canVote || isVoting,
+                        onTap: { onVote(option) }
+                    )
+                }
+            }
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 9)
@@ -723,6 +844,57 @@ private struct LatePunishmentCard: View {
             RoundedRectangle(cornerRadius: 12)
                 .strokeBorder(Color.statusRunningLate.opacity(0.28), lineWidth: 1)
         )
+    }
+}
+
+private struct LatePunishmentVoteButton: View {
+    let option: LatePunishmentOption
+    let count: Int
+    let isSelected: Bool
+    let isWinning: Bool
+    let isDisabled: Bool
+    let onTap: () -> Void
+
+    var body: some View {
+        Button(action: onTap) {
+            HStack(spacing: 6) {
+                Image(systemName: option.systemImage)
+                    .scaledFont(size: 10, weight: .bold)
+                Text(option.title)
+                    .scaledFont(size: 10, weight: .semibold)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+                Spacer(minLength: 2)
+                Text("\(count)")
+                    .scaledFont(size: 10, weight: .bold)
+            }
+            .foregroundStyle(foregroundColor)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 7)
+            .background(backgroundColor)
+            .clipShape(RoundedRectangle(cornerRadius: 9))
+            .overlay(
+                RoundedRectangle(cornerRadius: 9)
+                    .strokeBorder(borderColor, lineWidth: 1)
+            )
+        }
+        .buttonStyle(.plain)
+        .disabled(isDisabled)
+        .opacity(isDisabled && !isSelected ? 0.58 : 1)
+    }
+
+    private var foregroundColor: Color {
+        isSelected || isWinning ? Color.statusRunningLate : DS.Color.textPrimary
+    }
+
+    private var backgroundColor: Color {
+        if isSelected { return Color.statusRunningLate.opacity(0.20) }
+        if isWinning { return Color.statusRunningLate.opacity(0.12) }
+        return Color.appSurface
+    }
+
+    private var borderColor: Color {
+        isSelected || isWinning ? Color.statusRunningLate.opacity(0.45) : Color.statusInvited.opacity(0.25)
     }
 }
 
