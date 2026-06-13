@@ -76,7 +76,6 @@ enum DS {
     }
 }
 
-
 // MARK: - Card style
 struct CardStyle: ViewModifier {
     func body(content: Content) -> some View {
