@@ -57,19 +57,6 @@ final class TruthOrDareService {
         return sessions.first
     }
 
-    /// Look up a session by its invite code. Only resolves for games
-    /// the caller can already see (RLS) — joining a new game goes
-    /// through `joinSessionByCode` instead.
-    func fetchSessionByCode(code: String) async throws -> GameSession? {
-        let sessions: [GameSession] = try await supabase
-            .from("game_sessions")
-            .select()
-            .eq("invite_code", value: code.trimmingCharacters(in: .whitespaces).uppercased())
-            .execute()
-            .value
-        return sessions.first
-    }
-
     /// Sessions the current user has joined, newest first, for the
     /// Games tab list.
     func fetchMyGames() async throws -> [MyGameEntry] {
@@ -113,10 +100,8 @@ final class TruthOrDareService {
 
     // MARK: - State transitions (RPCs)
 
-    /// Start a standalone session — no meetup required. The returned
-    /// invite code is what friends type in to join. Passing a
-    /// `groupId` stamps the session with the game group and pushes
-    /// the code to every other member.
+    /// Start a standalone session — no meetup required. Passing a
+    /// `groupId` stamps the session with the game group.
     func startSession(tier: String, groupId: UUID? = nil) async throws -> StartGameResult {
         struct Params: Encodable {
             let p_tier: String
@@ -142,19 +127,6 @@ final class TruthOrDareService {
             .value
         guard let result = results.first else { throw TruthOrDareError.startFailed }
         return result
-    }
-
-    /// Join a session by invite code. Returns the session id so the
-    /// caller can open the game directly.
-    func joinSessionByCode(code: String) async throws -> UUID {
-        struct Params: Encodable {
-            let p_code: String
-        }
-        return try await supabase
-            .rpc("join_truth_or_dare_by_code",
-                 params: Params(p_code: code.trimmingCharacters(in: .whitespaces).uppercased()))
-            .execute()
-            .value
     }
 
     func joinSession(sessionId: UUID) async throws {
@@ -192,6 +164,22 @@ final class TruthOrDareService {
         try await supabase
             .rpc("complete_truth_or_dare_turn",
                  params: Params(p_turn_id: turnId, p_action: "done", p_proof_path: proofPath))
+            .execute()
+    }
+
+    /// Assign (or override) the dare for the current turn.
+    /// Called by any game player who is NOT the doer. Passing the
+    /// existing `promptText` keeps the server suggestion; passing a
+    /// non-empty string replaces it. The first caller wins — a race
+    /// from a second player is silently ignored by the server.
+    func assignDare(turnId: UUID, promptText: String) async throws {
+        struct Params: Encodable {
+            let p_turn_id: UUID
+            let p_prompt_text: String
+        }
+        try await supabase
+            .rpc("assign_dare_prompt",
+                 params: Params(p_turn_id: turnId, p_prompt_text: promptText))
             .execute()
     }
 

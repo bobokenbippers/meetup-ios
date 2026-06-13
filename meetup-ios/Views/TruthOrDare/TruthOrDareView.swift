@@ -8,9 +8,8 @@ import UIKit
 /// proof/answer/pass), and the end-of-game scoreboard. All game
 /// state is server-authoritative and synced over Supabase Realtime.
 ///
-/// Runs in two modes: standalone (the default — friends join with
-/// the session's invite code) or embedded in a meetup, where any
-/// meetup participant can play.
+/// Runs in two modes: standalone (the default) or embedded in a
+/// meetup, where any meetup participant can play.
 struct TruthOrDareView: View {
     let meetup: Meetup?
 
@@ -20,8 +19,7 @@ struct TruthOrDareView: View {
 
     /// Standalone mode: open an existing session directly, or start
     /// from the tier-pick setup screen when nil. Pass `groupId` when
-    /// starting on behalf of a game group — the session is stamped
-    /// with the group and members get a push with the invite code.
+    /// starting on behalf of a game group.
     init(sessionId: UUID? = nil, groupId: UUID? = nil) {
         self.meetup = nil
         self.groupId = groupId
@@ -65,7 +63,11 @@ struct TruthOrDareView: View {
 
     @State private var showPassConfirm = false
     @State private var showEndConfirm = false
-    @State private var copiedCode = false
+
+    // Custom dare assignment
+    @State private var customDareText: String = ""
+    @State private var showCustomDareInput = false
+    @State private var isAssigningDare = false
 
     private var myUserId: UUID? { auth.session?.user.id }
 
@@ -162,6 +164,10 @@ struct TruthOrDareView: View {
             .onChange(of: libraryItem) { _, item in
                 guard let item else { return }
                 Task { await submitProof(from: item) }
+            }
+            .onChange(of: currentTurn?.id) { _, _ in
+                customDareText = ""
+                showCustomDareInput = false
             }
             .alert("Error", isPresented: Binding(get: { error != nil }, set: { if !$0 { error = nil } })) {
                 Button("OK") { error = nil }
@@ -267,10 +273,6 @@ struct TruthOrDareView: View {
             }
             .padding(.top, 24)
 
-            if let code = session.inviteCode {
-                inviteCodeChip(code)
-            }
-
             ScrollView {
                 VStack(spacing: 0) {
                     ForEach(players) { player in
@@ -339,45 +341,6 @@ struct TruthOrDareView: View {
             .padding(.horizontal, 20)
             .padding(.bottom, 16)
         }
-    }
-
-    /// Copyable invite-code chip so the host can read the code out or
-    /// paste it into any chat.
-    private func inviteCodeChip(_ code: String) -> some View {
-        Button {
-            UIPasteboard.general.string = code
-            copiedCode = true
-            Task {
-                try? await Task.sleep(for: .seconds(2))
-                copiedCode = false
-            }
-        } label: {
-            HStack(spacing: 10) {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Share code")
-                        .scaledFont(size: 10, weight: .semibold)
-                        .foregroundStyle(Color(white: 0.55))
-                    Text(code)
-                        .scaledFont(size: 24, weight: .black)
-                        .foregroundStyle(Color.coral)
-                        .tracking(6)
-                }
-                Image(systemName: copiedCode ? "checkmark.circle.fill" : "doc.on.doc")
-                    .scaledFont(size: 16)
-                    .foregroundStyle(copiedCode ? Color.statusLive : Color(white: 0.6))
-            }
-            .padding(.horizontal, 18)
-            .padding(.vertical, 10)
-            .background(Color.appSurface)
-            .clipShape(RoundedRectangle(cornerRadius: 14))
-            .overlay(
-                RoundedRectangle(cornerRadius: 14)
-                    .strokeBorder(Color.coral.opacity(0.35), lineWidth: 1)
-            )
-        }
-        .buttonStyle(.plain)
-        .accessibilityIdentifier("chip_invite_code")
-        .accessibilityLabel("Share code \(code). Tap to copy.")
     }
 
     private var starterName: String {
@@ -462,88 +425,202 @@ struct TruthOrDareView: View {
         VStack(spacing: 20) {
             Spacer()
 
-            VStack(spacing: 14) {
-                Label(
-                    turn.isDare ? "TAILS — DARE" : "HEADS — TRUTH",
-                    systemImage: turn.isDare ? "flame.fill" : "quote.bubble.fill"
-                )
-                .scaledFont(size: 13, weight: .black)
-                .foregroundStyle(turn.isDare ? Color(red: 0.95, green: 0.45, blue: 0.25) : Color.coral)
-                .tracking(2)
-
-                Text(turn.promptText ?? "")
-                    .scaledFont(size: 22, weight: .bold)
-                    .foregroundStyle(.white)
-                    .multilineTextAlignment(.center)
-                    .padding(.horizontal, 8)
-
-                Text(isMyTurn ? promptInstruction(turn) : "\(currentPlayerName) is on the clock…")
-                    .scaledFont(size: 12)
-                    .foregroundStyle(Color(white: 0.55))
-            }
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 28)
-            .padding(.horizontal, 16)
-            .background(Color.appSurface)
-            .clipShape(RoundedRectangle(cornerRadius: 20))
-            .overlay(
-                RoundedRectangle(cornerRadius: 20)
-                    .strokeBorder(
-                        (turn.isDare ? Color(red: 0.95, green: 0.45, blue: 0.25) : Color.coral).opacity(0.35),
-                        lineWidth: 1.5
-                    )
-            )
-            .padding(.horizontal, 20)
-
-            if isMyTurn {
-                VStack(spacing: 10) {
-                    if turn.isDare {
-                        Button {
-                            captureProof()
-                        } label: {
-                            if isUploadingProof {
-                                ProgressView().frame(maxWidth: .infinity)
-                            } else {
-                                Label("Post Photo Proof", systemImage: "camera.fill")
-                                    .frame(maxWidth: .infinity)
-                            }
-                        }
-                        .buttonStyle(.glassProminent)
-                        .disabled(isActing || isUploadingProof)
-                        .accessibilityIdentifier("btn_post_proof")
-                    } else {
-                        Button {
-                            Task { await completeTruth() }
-                        } label: {
-                            Label("Answered", systemImage: "checkmark.circle.fill")
-                                .frame(maxWidth: .infinity)
-                        }
-                        .buttonStyle(.glassProminent)
-                        .disabled(isActing)
-                        .accessibilityIdentifier("btn_truth_answered")
-                    }
-
-                    Button {
-                        showPassConfirm = true
-                    } label: {
-                        Label("Chicken out", systemImage: "figure.run")
-                            .frame(maxWidth: .infinity)
-                    }
-                    .buttonStyle(.glass)
-                    .disabled(isActing || isUploadingProof)
-                    .accessibilityIdentifier("btn_pass_turn")
-                }
+            promptCard(turn)
                 .padding(.horizontal, 20)
+
+            // Action area depends on role and dare assignment state.
+            if turn.isDare && !turn.dareLocked {
+                // Assigning phase: the doer waits; other players assign the dare.
+                if amPlayer && !isMyTurn {
+                    dareAssignmentActions(turn)
+                        .padding(.horizontal, 20)
+                } else if isMyTurn {
+                    dareWaitingIndicator
+                        .padding(.horizontal, 20)
+                }
+            } else if isMyTurn {
+                // Dare is locked (or it's a truth): doer acts.
+                dareOrTruthActions(turn)
+                    .padding(.horizontal, 20)
             }
 
             Spacer()
         }
     }
 
-    private func promptInstruction(_ turn: GameTurn) -> String {
-        turn.isDare
-            ? "Do it and post a photo of yourself — or chicken out."
-            : "Answer out loud, then tap Answered."
+    /// The card showing the prompt kind label + text + subtitle.
+    private func promptCard(_ turn: GameTurn) -> some View {
+        let accentColor = turn.isDare
+            ? Color(red: 0.95, green: 0.45, blue: 0.25)
+            : Color.coral
+        return VStack(spacing: 14) {
+            Label(
+                turn.isDare ? "TAILS — DARE" : "HEADS — TRUTH",
+                systemImage: turn.isDare ? "flame.fill" : "quote.bubble.fill"
+            )
+            .scaledFont(size: 13, weight: .black)
+            .foregroundStyle(accentColor)
+            .tracking(2)
+
+            Text(turn.promptText ?? "")
+                .scaledFont(size: 22, weight: .bold)
+                .foregroundStyle(.white)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, 8)
+
+            Text(promptCardSubtitle(turn))
+                .scaledFont(size: 12)
+                .foregroundStyle(Color(white: 0.55))
+                .multilineTextAlignment(.center)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 28)
+        .padding(.horizontal, 16)
+        .background(Color.appSurface)
+        .clipShape(RoundedRectangle(cornerRadius: 20))
+        .overlay(
+            RoundedRectangle(cornerRadius: 20)
+                .strokeBorder(accentColor.opacity(0.35), lineWidth: 1.5)
+        )
+    }
+
+    private func promptCardSubtitle(_ turn: GameTurn) -> String {
+        if turn.isDare && !turn.dareLocked {
+            if isMyTurn {
+                return "Waiting for your dare to be set…"
+            } else if amPlayer {
+                return "Keep or customize this dare for \(currentPlayerName)."
+            } else {
+                return "Waiting for a dare to be set for \(currentPlayerName)…"
+            }
+        }
+        if isMyTurn {
+            return turn.isDare
+                ? "Do it and post a photo of yourself — or chicken out."
+                : "Answer out loud, then tap Answered."
+        }
+        return "\(currentPlayerName) is on the clock…"
+    }
+
+    /// Shown to the doer while the assigner is picking the dare.
+    private var dareWaitingIndicator: some View {
+        HStack(spacing: 10) {
+            ProgressView()
+                .tint(Color(white: 0.55))
+            Text("Waiting for someone to set your dare…")
+                .scaledFont(size: 13)
+                .foregroundStyle(Color(white: 0.55))
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 14)
+    }
+
+    /// Shown to the assigner(s) — let them keep or replace the suggested dare.
+    private func dareAssignmentActions(_ turn: GameTurn) -> some View {
+        VStack(spacing: 12) {
+            // Keep the suggestion
+            Button {
+                Task { await assignDare(turn: turn, text: turn.promptText ?? "") }
+            } label: {
+                Label("Keep this dare", systemImage: "checkmark.circle.fill")
+                    .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.glassProminent)
+            .disabled(isAssigningDare)
+            .accessibilityIdentifier("btn_keep_dare")
+
+            // Toggle custom input
+            Button {
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    showCustomDareInput.toggle()
+                    if !showCustomDareInput { customDareText = "" }
+                }
+            } label: {
+                Label(
+                    showCustomDareInput ? "Cancel custom dare" : "Set a custom dare",
+                    systemImage: showCustomDareInput ? "xmark.circle" : "pencil"
+                )
+                .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.glass)
+            .disabled(isAssigningDare)
+            .accessibilityIdentifier("btn_toggle_custom_dare")
+
+            if showCustomDareInput {
+                VStack(spacing: 8) {
+                    TextField("Type a dare…", text: $customDareText, axis: .vertical)
+                        .lineLimit(3, reservesSpace: true)
+                        .scaledFont(size: 15)
+                        .foregroundStyle(.white)
+                        .tint(Color.coral)
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 10)
+                        .background(Color.appSurface)
+                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 12)
+                                .strokeBorder(Color.coral.opacity(0.4), lineWidth: 1)
+                        )
+                        .accessibilityIdentifier("field_custom_dare")
+
+                    Button {
+                        Task { await assignDare(turn: turn, text: customDareText) }
+                    } label: {
+                        if isAssigningDare {
+                            ProgressView().frame(maxWidth: .infinity)
+                        } else {
+                            Label("Assign this dare", systemImage: "flame.fill")
+                                .frame(maxWidth: .infinity)
+                        }
+                    }
+                    .buttonStyle(.glassProminent)
+                    .disabled(isAssigningDare || customDareText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                    .accessibilityIdentifier("btn_assign_custom_dare")
+                }
+                .transition(.move(edge: .top).combined(with: .opacity))
+            }
+        }
+    }
+
+    /// Standard action buttons for the doer once the dare is locked (or for truths).
+    private func dareOrTruthActions(_ turn: GameTurn) -> some View {
+        VStack(spacing: 10) {
+            if turn.isDare {
+                Button {
+                    captureProof()
+                } label: {
+                    if isUploadingProof {
+                        ProgressView().frame(maxWidth: .infinity)
+                    } else {
+                        Label("Post Photo Proof", systemImage: "camera.fill")
+                            .frame(maxWidth: .infinity)
+                    }
+                }
+                .buttonStyle(.glassProminent)
+                .disabled(isActing || isUploadingProof)
+                .accessibilityIdentifier("btn_post_proof")
+            } else {
+                Button {
+                    Task { await completeTruth() }
+                } label: {
+                    Label("Answered", systemImage: "checkmark.circle.fill")
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.glassProminent)
+                .disabled(isActing)
+                .accessibilityIdentifier("btn_truth_answered")
+            }
+
+            Button {
+                showPassConfirm = true
+            } label: {
+                Label("Chicken out", systemImage: "figure.run")
+                    .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.glass)
+            .disabled(isActing || isUploadingProof)
+            .accessibilityIdentifier("btn_pass_turn")
+        }
     }
 
     // MARK: - Game feed
@@ -854,6 +931,27 @@ struct TruthOrDareView: View {
             return
         } catch {
             self.error = error.localizedDescription
+        }
+    }
+
+    private func assignDare(turn: GameTurn, text: String) async {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        isAssigningDare = true
+        defer { isAssigningDare = false }
+        do {
+            try await TruthOrDareService.shared.assignDare(turnId: turn.id, promptText: trimmed)
+            showCustomDareInput = false
+            customDareText = ""
+            await load(showErrors: true)
+        } catch is CancellationError {
+            return
+        } catch {
+            // Silently ignore "already locked" races; surface other errors.
+            let msg = error.localizedDescription
+            if !msg.contains("already assigned") {
+                self.error = msg
+            }
         }
     }
 

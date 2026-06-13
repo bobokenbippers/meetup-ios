@@ -1,7 +1,7 @@
 import Foundation
 
 /// A Truth or Dare game session. Standalone sessions have no meetup
-/// (`meetupId == nil`) and are joined via their short invite code.
+/// (`meetupId == nil`).
 struct GameSession: Codable, Identifiable, Equatable {
     let id: UUID
     let meetupId: UUID?
@@ -11,7 +11,6 @@ struct GameSession: Codable, Identifiable, Equatable {
     let status: String               // "lobby" | "active" | "ended"
     let turnOrder: [UUID]
     let currentTurnIndex: Int
-    let inviteCode: String?
     let createdAt: Date
     let endedAt: Date?
 
@@ -22,7 +21,6 @@ struct GameSession: Codable, Identifiable, Equatable {
         case startedBy = "started_by"
         case turnOrder = "turn_order"
         case currentTurnIndex = "current_turn_index"
-        case inviteCode = "invite_code"
         case createdAt = "created_at"
         case endedAt = "ended_at"
     }
@@ -66,6 +64,11 @@ struct GamePlayer: Codable, Identifiable, Equatable {
 ///
 /// Status lifecycle: `pending` (waiting for coin flip) → `prompted`
 /// (coin landed, prompt drawn) → `completed` or `passed`.
+///
+/// For dare turns, `dareLocked` gates the doer: false = assigning
+/// phase (another player picks/edits the dare text); true = dare is
+/// set and the doer can act. Truths skip the assigning phase and
+/// are always locked immediately after the coin flip.
 struct GameTurn: Codable, Identifiable, Equatable {
     let id: UUID
     let sessionId: UUID
@@ -76,6 +79,7 @@ struct GameTurn: Codable, Identifiable, Equatable {
     let promptKind: String?          // "truth" | "dare"
     let promptText: String?
     let proofPhotoUrl: String?
+    let dareLocked: Bool             // false = assigning phase; true = dare confirmed
     let createdAt: Date
     let completedAt: Date?
     let profiles: GamePlayer.PlayerProfile?
@@ -89,6 +93,7 @@ struct GameTurn: Codable, Identifiable, Equatable {
         case promptKind = "prompt_kind"
         case promptText = "prompt_text"
         case proofPhotoUrl = "proof_photo_url"
+        case dareLocked = "dare_locked"
         case createdAt = "created_at"
         case completedAt = "completed_at"
     }
@@ -103,7 +108,7 @@ struct GameTurn: Codable, Identifiable, Equatable {
 
     /// Local copy of this turn with the server's flip result applied,
     /// so the flipping player's animation starts before the Realtime
-    /// echo arrives.
+    /// echo arrives. Truths are immediately locked; dares start unlocked.
     func applyingFlip(_ result: CoinFlipResult) -> GameTurn {
         GameTurn(
             id: id,
@@ -115,6 +120,7 @@ struct GameTurn: Codable, Identifiable, Equatable {
             promptKind: result.promptKind,
             promptText: result.promptText,
             proofPhotoUrl: proofPhotoUrl,
+            dareLocked: result.promptKind == "truth",
             createdAt: createdAt,
             completedAt: completedAt,
             profiles: profiles
@@ -132,6 +138,7 @@ struct GameTurn: Codable, Identifiable, Equatable {
             promptKind: promptKind,
             promptText: promptText,
             proofPhotoUrl: url,
+            dareLocked: dareLocked,
             createdAt: createdAt,
             completedAt: completedAt,
             profiles: profiles
@@ -139,15 +146,12 @@ struct GameTurn: Codable, Identifiable, Equatable {
     }
 }
 
-/// Result of the start-session RPC: the new session and the short
-/// invite code friends use to join it.
+/// Result of the start-session RPC.
 struct StartGameResult: Codable, Equatable {
     let sessionId: UUID
-    let inviteCode: String
 
     enum CodingKeys: String, CodingKey {
         case sessionId = "session_id"
-        case inviteCode = "invite_code"
     }
 }
 

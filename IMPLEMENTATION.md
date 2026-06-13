@@ -2523,9 +2523,11 @@ Schema:
   `current_turn_index`.
 - `game_players (session_id, user_id, joined_at)`: who joined the session.
 - `game_turns (id, session_id, turn_number, player_id, status, coin_result, prompt_kind,
-  prompt_text, proof_photo_url, created_at, completed_at)`: one row per turn;
+  prompt_text, proof_photo_url, dare_locked, created_at, completed_at)`: one row per turn;
   `status: pending → prompted → completed | passed`. Dare proofs store the storage path
-  in `proof_photo_url`.
+  in `proof_photo_url`. `dare_locked` gates custom dare assignment: false while another
+  player is picking/editing the dare text, true once confirmed (truths are always
+  immediately locked). Migration: `20260613000000_custom_dare_assignment.sql`.
 
 Server-authoritative flow — clients are read-only on these tables; every mutation is a
 SECURITY DEFINER RPC so the coin flip and prompt draw happen once, in Postgres, and sync
@@ -2538,7 +2540,12 @@ to all players via Realtime:
   `turn_order` (`order by random()`) and creates the first turn.
 - `flip_truth_or_dare_coin(p_turn_id)`: current player only; server picks heads/tails
   (`random() < 0.5` → heads = truth, tails = dare) and draws an unused prompt of the
-  session's tier (falls back to reuse if the deck is exhausted).
+  session's tier (falls back to reuse if the deck is exhausted). Sets `dare_locked = true`
+  for truths immediately; dares start with `dare_locked = false` pending assignment.
+- `assign_dare_prompt(p_turn_id, p_prompt_text)`: any game player who is NOT the current
+  turn's player; confirms the app-suggested dare text or replaces it with a custom one,
+  then sets `dare_locked = true`. First caller wins (race-safe). Doer is gated by
+  `dare_locked` in the iOS UI.
 - `complete_truth_or_dare_turn(p_turn_id, p_action, p_proof_path)`: current player only;
   `done` on a dare requires a proof path (the turn cannot advance without it), `pass`
   marks the chicken-out. Advances `current_turn_index` and inserts the next turn.

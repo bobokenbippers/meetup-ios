@@ -1,15 +1,12 @@
 import SwiftUI
 
 /// Landing screen for the Games tab. Start a standalone Truth or
-/// Dare session, join a friend's game with their invite code, or
-/// jump back into a recent game.
+/// Dare session or jump back into a recent game.
 struct GamesHomeView: View {
     @Environment(AuthViewModel.self) private var auth
 
     @State private var myGames: [MyGameEntry] = []
     @State private var myGroups: [GameGroup] = []
-    @State private var joinCode = ""
-    @State private var isJoining = false
     @State private var error: String?
 
     @State private var showNewGame = false
@@ -34,7 +31,6 @@ struct GamesHomeView: View {
             ScrollView {
                 VStack(spacing: 20) {
                     heroCard
-                    joinSection
                     groupsSection
                     if !recentGames.isEmpty {
                         recentGamesSection
@@ -88,7 +84,7 @@ struct GamesHomeView: View {
                 Text("Truth or Dare")
                     .scaledFont(size: 24, weight: .black)
                     .foregroundStyle(.white)
-                Text("The coin picks. Dares need photo proof.\nShare the code, no meetup required.")
+                Text("The coin picks. Dares need photo proof.\nNo meetup required.")
                     .scaledFont(size: 12)
                     .foregroundStyle(Color(white: 0.6))
                     .multilineTextAlignment(.center)
@@ -113,57 +109,6 @@ struct GamesHomeView: View {
             RoundedRectangle(cornerRadius: 20)
                 .strokeBorder(Color.coral.opacity(0.25), lineWidth: 1)
         )
-    }
-
-    // MARK: - Join with code
-
-    private var joinSection: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text("Join with Code")
-                .scaledFont(size: 13, weight: .bold)
-                .foregroundStyle(Color(white: 0.6))
-
-            HStack(spacing: 10) {
-                TextField("ABC123", text: $joinCode)
-                    .textInputAutocapitalization(.characters)
-                    .autocorrectionDisabled()
-                    .scaledFont(size: 18, weight: .bold)
-                    .tracking(4)
-                    .foregroundStyle(.white)
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 12)
-                    .background(Color.appBackground)
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 12)
-                            .strokeBorder(Color.white.opacity(0.1), lineWidth: 1)
-                    )
-                    .accessibilityIdentifier("field_invite_code")
-
-                Button {
-                    Task { await joinByCode() }
-                } label: {
-                    if isJoining {
-                        ProgressView()
-                            .frame(width: 44)
-                    } else {
-                        Text("Join")
-                            .scaledFont(size: 15, weight: .bold)
-                            .frame(width: 44)
-                    }
-                }
-                .buttonStyle(.glassProminent)
-                .disabled(isJoining || trimmedCode.isEmpty)
-                .accessibilityIdentifier("btn_join_by_code")
-            }
-        }
-        .padding(16)
-        .background(Color.appSurface)
-        .clipShape(RoundedRectangle(cornerRadius: 20))
-    }
-
-    private var trimmedCode: String {
-        joinCode.trimmingCharacters(in: .whitespaces)
     }
 
     // MARK: - Groups
@@ -282,16 +227,9 @@ struct GamesHomeView: View {
                 Text(session.isSpicy ? "Spicy round" : "Normal round")
                     .scaledFont(size: 15, weight: .semibold)
                     .foregroundStyle(.white)
-                HStack(spacing: 6) {
-                    Text(session.createdAt, format: .dateTime.month(.abbreviated).day())
-                        .scaledFont(size: 11)
-                        .foregroundStyle(Color(white: 0.55))
-                    if let code = session.inviteCode, !session.isEnded {
-                        Text("· \(code)")
-                            .scaledFont(size: 11, weight: .bold)
-                            .foregroundStyle(Color.coral.opacity(0.8))
-                    }
-                }
+                Text(session.createdAt, format: .dateTime.month(.abbreviated).day())
+                    .scaledFont(size: 11)
+                    .foregroundStyle(Color(white: 0.55))
             }
 
             Spacer()
@@ -348,18 +286,4 @@ struct GamesHomeView: View {
         }
     }
 
-    private func joinByCode() async {
-        guard !trimmedCode.isEmpty else { return }
-        isJoining = true
-        defer { isJoining = false }
-        do {
-            let sessionId = try await TruthOrDareService.shared.joinSessionByCode(code: trimmedCode)
-            joinCode = ""
-            openedSession = OpenedGameSession(id: sessionId)
-        } catch is CancellationError {
-            return
-        } catch {
-            self.error = error.localizedDescription
-        }
-    }
 }
