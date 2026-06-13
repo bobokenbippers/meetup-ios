@@ -563,54 +563,124 @@ private struct MessageBubble: View {
     let onDelete: () -> Void
 
     private static let availableReactions = ["❤️", "😂", "😮", "😢", "🔥", "👍"]
+    @State private var showsReactionPicker = false
 
     var body: some View {
         HStack {
             if isMine { Spacer(minLength: 46) }
-            VStack(alignment: isMine ? .trailing : .leading, spacing: 6) {
-                if let path = message.imagePath {
-                    MessageImage(path: path, onOpen: onOpenPhoto)
+            ZStack(alignment: isMine ? .topTrailing : .topLeading) {
+                bubbleContent
+
+                if showsReactionPicker {
+                    reactionPickerRow
+                        .offset(y: -44)
+                        .transition(
+                            .opacity.combined(
+                                with: .scale(
+                                    scale: 0.96,
+                                    anchor: isMine ? .bottomTrailing : .bottomLeading
+                                )
+                            )
+                        )
+                        .zIndex(1)
                 }
-                if let body = message.body, !body.isEmpty {
-                    Text(body)
-                        .scaledFont(size: 14)
-                        .foregroundStyle(isMine ? .white : DS.Color.textPrimary)
-                        .multilineTextAlignment(isMine ? .trailing : .leading)
-                }
+            }
+            .zIndex(showsReactionPicker ? 2 : 0)
+            if !isMine { Spacer(minLength: 46) }
+        }
+    }
+
+    private var bubbleContent: some View {
+        VStack(alignment: isMine ? .trailing : .leading, spacing: 6) {
+            if let path = message.imagePath {
+                MessageImage(path: path, onOpen: onOpenPhoto)
+            }
+            if let body = message.body, !body.isEmpty {
+                Text(body)
+                    .scaledFont(size: 14)
+                    .foregroundStyle(isMine ? .white : DS.Color.textPrimary)
+                    .multilineTextAlignment(isMine ? .trailing : .leading)
+            }
+            HStack(spacing: 6) {
                 Text(message.createdAt, format: .dateTime.hour().minute())
                     .scaledFont(size: 9, weight: .medium)
                     .foregroundStyle(isMine ? .white.opacity(0.45) : DS.Color.textSecondary)
-                if message.editedAt != nil {
-                    Text("Edited")
-                        .scaledFont(size: 9, weight: .medium)
-                        .foregroundStyle(isMine ? .white.opacity(0.42) : DS.Color.textSecondary)
+            }
+            if message.editedAt != nil {
+                Text("Edited")
+                    .scaledFont(size: 9, weight: .medium)
+                    .foregroundStyle(isMine ? .white.opacity(0.42) : DS.Color.textSecondary)
+            }
+            if !reactionSummaries.isEmpty {
+                reactionRow
+            }
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 9)
+        .background(isMine ? Color.coral : Color.appSurface)
+        .clipShape(RoundedRectangle(cornerRadius: 16))
+        .onLongPressGesture(minimumDuration: 0.22) {
+            showReactionPicker()
+        }
+        .contextMenu {
+            if isMine {
+                Button(action: onEdit) {
+                    Label("Edit", systemImage: "pencil")
                 }
-                if !reactionSummaries.isEmpty {
-                    reactionRow
+                Button(role: .destructive, action: onDelete) {
+                    Label("Delete", systemImage: "trash")
                 }
             }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 9)
-            .background(isMine ? Color.coral : Color.appSurface)
-            .clipShape(RoundedRectangle(cornerRadius: 16))
-            .contextMenu {
-                ForEach(Self.availableReactions, id: \.self) { emoji in
-                    Button {
-                        onToggleReaction(emoji)
-                    } label: {
-                        Text(emoji)
+        }
+    }
+
+    private var reactionPickerRow: some View {
+        HStack(spacing: 4) {
+            ForEach(Self.availableReactions, id: \.self) { emoji in
+                Button {
+                    withAnimation(.spring(response: 0.22, dampingFraction: 0.86)) {
+                        showsReactionPicker = false
                     }
+                    onToggleReaction(emoji)
+                } label: {
+                    Text(emoji)
+                        .scaledFont(size: 13, weight: .semibold)
+                        .frame(width: 27, height: 27)
+                        .background(Color.white.opacity(0.001))
+                        .clipShape(Capsule())
                 }
-                if isMine {
-                    Button(action: onEdit) {
-                        Label("Edit", systemImage: "pencil")
-                    }
-                    Button(role: .destructive, action: onDelete) {
-                        Label("Delete", systemImage: "trash")
-                    }
-                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("React with \(emoji)")
             }
-            if !isMine { Spacer(minLength: 46) }
+            Button {
+                withAnimation(.spring(response: 0.22, dampingFraction: 0.86)) {
+                    showsReactionPicker = false
+                }
+            } label: {
+                Image(systemName: "plus")
+                    .scaledFont(size: 11, weight: .bold)
+                    .foregroundStyle(DS.Color.textSecondary)
+                    .frame(width: 27, height: 27)
+                    .background(Color.white.opacity(0.55))
+                    .clipShape(Circle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("More reactions")
+        }
+        .padding(.horizontal, 7)
+        .padding(.vertical, 5)
+        .background(.ultraThinMaterial)
+        .clipShape(Capsule())
+        .overlay(
+            Capsule()
+                .strokeBorder(.white.opacity(0.12), lineWidth: 1)
+        )
+        .shadow(color: .black.opacity(0.18), radius: 10, x: 0, y: 4)
+    }
+
+    private func showReactionPicker() {
+        withAnimation(.spring(response: 0.22, dampingFraction: 0.86)) {
+            showsReactionPicker = true
         }
     }
 

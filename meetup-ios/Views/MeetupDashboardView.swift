@@ -34,6 +34,14 @@ struct MeetupDashboardView: View {
     @State private var showPhotoPicker = false
     @State private var isUploadingPhotos = false
     @State private var fullscreenPhoto: MeetupPhoto?
+    @State private var now = Date()
+    @State private var latePunishmentVotes: [LatePunishmentVote] = []
+    @State private var latePunishmentProofs: [LatePunishmentProof] = []
+    @State private var lateProofReactionSummaries: [UUID: [LatePunishmentProofReactionSummary]] = [:]
+    @State private var selectedLateProofItem: PhotosPickerItem?
+    @State private var isVotingLatePunishment = false
+    @State private var isUploadingLateProof = false
+    @State private var reactingLateProofId: UUID?
 
     private var myUserId: UUID? { auth.session?.user.id }
     private var myStatus: String? { participants.first(where: { $0.userId == myUserId })?.status }
@@ -46,6 +54,24 @@ struct MeetupDashboardView: View {
                 && participant.status != "no"
                 && participant.status != "declined"
         }.count
+    }
+    private var lateParticipants: [MeetupParticipant] {
+        guard meetup.status == "active", let target = meetup.targetArrivalAt else { return [] }
+        return participants.filter { participant in
+            PunctualityStatus.resolve(
+                status: participant.status,
+                targetArrivalAt: target,
+                now: now
+            ) == .runningLate
+        }
+    }
+    private var latePunishment: LatePunishment? {
+        guard !lateParticipants.isEmpty else { return nil }
+        return LatePunishment(
+            lateParticipants: lateParticipants,
+            votes: latePunishmentVotes,
+            currentUserId: myUserId
+        )
     }
     private var greeting: String {
         let h = Calendar.current.component(.hour, from: Date())
@@ -150,6 +176,10 @@ struct MeetupDashboardView: View {
                 guard !items.isEmpty else { return }
                 Task { await uploadPickedPhotos(items) }
             }
+            .onChange(of: selectedLateProofItem) { _, item in
+                guard let item else { return }
+                Task { await uploadLatePunishmentProof(item) }
+            }
             .sheet(isPresented: $showBill) {
                 BillView(meetup: meetup, participants: participants)
                     .environment(auth)
@@ -201,10 +231,20 @@ struct MeetupDashboardView: View {
                 await startRealtime()
                 await startPhotoRealtime()
             }
+            .task(id: meetup.id) {
+                await startLatePunishmentRealtime()
+            }
+            .task(id: meetup.id) {
+                await startLatePunishmentProofRealtime()
+            }
+            .task(id: meetup.id) {
+                await startLatePunishmentProofReactionRealtime()
+            }
             .onAppear {
                 if meetup.isRecap { showRecap = true }
             }
             .onReceive(Timer.publish(every: 60, on: .main, in: .common).autoconnect()) { _ in
+                now = Date()
                 if meetup.isRecap && !showRecap { showRecap = true }
             }
             .onDisappear {
@@ -385,6 +425,28 @@ struct MeetupDashboardView: View {
             PunctualityLegend(showsRunningLate: meetup.targetArrivalAt != nil)
                 .padding(.horizontal, 16)
                 .padding(.bottom, 8)
+
+            if let latePunishment {
+                let latestProofReactions = latePunishmentProofs.first
+                    .map { lateProofReactionSummaries[$0.id] ?? [] } ?? []
+                LatePunishmentCard(
+                    punishment: latePunishment,
+                    proofs: latePunishmentProofs,
+                    proofReactionSummaries: latestProofReactions,
+                    isVoting: isVotingLatePunishment,
+                    isUploadingProof: isUploadingLateProof,
+                    reactingProofId: reactingLateProofId,
+                    proofSelection: $selectedLateProofItem,
+                    onVote: { option in
+                        Task { await voteLatePunishment(option) }
+                    },
+                    onToggleProofReaction: { proof, emoji in
+                        Task { await toggleLateProofReaction(proof: proof, emoji: emoji) }
+                    }
+                )
+                    .padding(.horizontal, 16)
+                    .padding(.bottom, 8)
+            }
 
             // Participant rows
             if hasLoaded {
@@ -572,6 +634,9 @@ struct MeetupDashboardView: View {
                LocationManager.shared.isTracking {
                 LocationManager.shared.stopTracking()
             }
+            await loadLatePunishmentVotes()
+            await loadLatePunishmentProofs()
+            await loadLatePunishmentProofReactions()
         } catch is CancellationError {
             return
         } catch {
@@ -629,6 +694,152 @@ struct MeetupDashboardView: View {
         }
         isActing = false
     }
+
+    private func loadLatePunishmentVotes() async {
+        do {
+            latePunishmentVotes = try await LatePunishmentService.shared.fetchVotes(meetupId: meetup.id)
+        } catch is CancellationError {
+            return
+        } catch {
+            latePunishmentVotes = []
+        }
+    }
+
+    private func loadLatePunishmentProofs() async {
+        do {
+            latePunishmentProofs = try await LatePunishmentService.shared.fetchProofs(meetupId: meetup.id)
+        } catch is CancellationError {
+            return
+        } catch {
+            latePunishmentProofs = []
+            lateProofReactionSummaries = [:]
+        }
+    }
+
+    private func loadLatePunishmentProofReactions() async {
+        guard !latePunishmentProofs.isEmpty else {
+            lateProofReactionSummaries = [:]
+            return
+        }
+        do {
+            lateProofReactionSummaries = try await LatePunishmentService.shared
+                .listProofReactionSummaries(meetupId: meetup.id)
+        } catch is CancellationError {
+            return
+        } catch {
+            lateProofReactionSummaries = [:]
+        }
+    }
+
+    private func voteLatePunishment(_ option: LatePunishmentOption) async {
+        guard !isVotingLatePunishment else { return }
+        isVotingLatePunishment = true
+        defer { isVotingLatePunishment = false }
+        do {
+            try await LatePunishmentService.shared.vote(meetupId: meetup.id, optionKey: option.key)
+            await loadLatePunishmentVotes()
+        } catch {
+            self.error = error.localizedDescription
+        }
+    }
+
+    private func uploadLatePunishmentProof(_ item: PhotosPickerItem) async {
+        guard !isUploadingLateProof else { return }
+        isUploadingLateProof = true
+        defer {
+            isUploadingLateProof = false
+            selectedLateProofItem = nil
+        }
+        do {
+            guard let data = try await item.loadTransferable(type: Data.self),
+                  let image = UIImage(data: data) else {
+                error = "Could not read that evidence photo."
+                return
+            }
+            try await LatePunishmentService.shared.uploadProof(image: image, meetupId: meetup.id)
+            await loadLatePunishmentProofs()
+            await loadLatePunishmentProofReactions()
+        } catch is CancellationError {
+            return
+        } catch {
+            self.error = error.localizedDescription
+        }
+    }
+
+    private func toggleLateProofReaction(proof: LatePunishmentProof, emoji: String) async {
+        guard reactingLateProofId == nil else { return }
+        reactingLateProofId = proof.id
+        defer { reactingLateProofId = nil }
+        do {
+            try await LatePunishmentService.shared.toggleProofReaction(proofId: proof.id, emoji: emoji)
+            await loadLatePunishmentProofReactions()
+        } catch is CancellationError {
+            return
+        } catch {
+            self.error = error.localizedDescription
+        }
+    }
+
+    private func startLatePunishmentRealtime() async {
+        let channel = SupabaseManager.shared.client.realtimeV2
+            .channel("late-punishment-votes-\(meetup.id)")
+        let changes = channel.postgresChange(
+            AnyAction.self,
+            schema: "public",
+            table: "meetup_late_punishment_votes"
+        )
+        do {
+            try await channel.subscribeWithError()
+        } catch {
+            return
+        }
+        for await _ in changes {
+            guard !Task.isCancelled else { break }
+            await loadLatePunishmentVotes()
+        }
+        await SupabaseManager.shared.client.realtimeV2.removeChannel(channel)
+    }
+
+    private func startLatePunishmentProofRealtime() async {
+        let channel = SupabaseManager.shared.client.realtimeV2
+            .channel("late-punishment-proofs-\(meetup.id)")
+        let changes = channel.postgresChange(
+            AnyAction.self,
+            schema: "public",
+            table: "meetup_late_punishment_proofs"
+        )
+        do {
+            try await channel.subscribeWithError()
+        } catch {
+            return
+        }
+        for await _ in changes {
+            guard !Task.isCancelled else { break }
+            await loadLatePunishmentProofs()
+            await loadLatePunishmentProofReactions()
+        }
+        await SupabaseManager.shared.client.realtimeV2.removeChannel(channel)
+    }
+
+    private func startLatePunishmentProofReactionRealtime() async {
+        let channel = SupabaseManager.shared.client.realtimeV2
+            .channel("late-punishment-proof-reactions-\(meetup.id)")
+        let changes = channel.postgresChange(
+            AnyAction.self,
+            schema: "public",
+            table: "meetup_late_punishment_proof_reactions"
+        )
+        do {
+            try await channel.subscribeWithError()
+        } catch {
+            return
+        }
+        for await _ in changes {
+            guard !Task.isCancelled else { break }
+            await loadLatePunishmentProofReactions()
+        }
+        await SupabaseManager.shared.client.realtimeV2.removeChannel(channel)
+    }
 }
 
 // MARK: - Share Invite Payload
@@ -638,6 +849,310 @@ private struct ShareInvite: Identifiable {
     let message: String
 
     var id: String { url.absoluteString }
+}
+
+// MARK: - Late Punishment
+
+private struct LatePunishmentOption: Identifiable, Equatable {
+    let key: String
+    let title: String
+    let systemImage: String
+
+    var id: String { key }
+
+    static let all: [LatePunishmentOption] = [
+        LatePunishmentOption(key: "appetizer", title: "Appetizer", systemImage: "fork.knife"),
+        LatePunishmentOption(key: "dare", title: "First dare", systemImage: "flame.fill"),
+        LatePunishmentOption(key: "group_photo", title: "Group photo", systemImage: "camera.fill"),
+        LatePunishmentOption(key: "next_spot", title: "Next spot", systemImage: "map.fill"),
+        LatePunishmentOption(key: "best_excuse", title: "Best excuse", systemImage: "text.bubble.fill")
+    ]
+}
+
+private struct LatePunishment {
+    let title: String
+    let detail: String
+    let options: [LatePunishmentOption]
+    let voteCounts: [String: Int]
+    let selectedOptionKey: String?
+    let winningOptionKey: String?
+    let canVote: Bool
+
+    init(
+        lateParticipants: [MeetupParticipant],
+        votes: [LatePunishmentVote],
+        currentUserId: UUID?
+    ) {
+        let names = lateParticipants
+            .map { $0.displayName?.split(separator: " ").first.map(String.init) ?? "Someone" }
+        let displayNames = names.prefix(2).joined(separator: " + ")
+
+        if lateParticipants.count == 1 {
+            title = "\(displayNames) triggered the late tax"
+        } else if lateParticipants.count == 2 {
+            title = "\(displayNames) triggered the late tax"
+        } else {
+            title = "\(lateParticipants.count) people triggered the late tax"
+        }
+
+        let allOptions = LatePunishmentOption.all
+        let counts = Dictionary(grouping: votes, by: \.optionKey).mapValues(\.count)
+        let selected = currentUserId.flatMap { userId in
+            votes.first(where: { $0.voterId == userId })?.optionKey
+        }
+        let userCanVote = currentUserId.map { userId in
+            !lateParticipants.contains(where: { $0.userId == userId })
+        } ?? false
+
+        let winner = votes.isEmpty ? nil : allOptions.max { lhs, rhs in
+            let lhsCount = counts[lhs.key, default: 0]
+            let rhsCount = counts[rhs.key, default: 0]
+            if lhsCount == rhsCount {
+                return lhs.title > rhs.title
+            }
+            return lhsCount < rhsCount
+        }?.key
+
+        options = allOptions
+        voteCounts = counts
+        selectedOptionKey = selected
+        canVote = userCanVote
+        winningOptionKey = winner
+
+        if !userCanVote {
+            detail = "Late folks sit this vote out."
+        } else if selected != nil {
+            detail = "Your vote is in. Change it until the group settles it."
+        } else {
+            detail = "Vote on the punishment. Late folks cannot vote."
+        }
+    }
+}
+
+private struct LatePunishmentCard: View {
+    let punishment: LatePunishment
+    let proofs: [LatePunishmentProof]
+    let proofReactionSummaries: [LatePunishmentProofReactionSummary]
+    let isVoting: Bool
+    let isUploadingProof: Bool
+    let reactingProofId: UUID?
+    @Binding var proofSelection: PhotosPickerItem?
+    let onVote: (LatePunishmentOption) -> Void
+    let onToggleProofReaction: (LatePunishmentProof, String) -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(alignment: .top, spacing: 10) {
+                Image(systemName: "clock.badge.exclamationmark.fill")
+                    .scaledFont(size: 14, weight: .bold)
+                    .foregroundStyle(Color.statusRunningLate)
+                    .frame(width: 22, height: 22)
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(punishment.title)
+                        .scaledFont(size: 12, weight: .bold)
+                        .foregroundStyle(DS.Color.textPrimary)
+                    Text(punishment.detail)
+                        .scaledFont(size: 11, weight: .medium)
+                        .foregroundStyle(DS.Color.textSecondary)
+                }
+
+                Spacer(minLength: 0)
+            }
+
+            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 6) {
+                ForEach(punishment.options) { option in
+                    LatePunishmentVoteButton(
+                        option: option,
+                        count: punishment.voteCounts[option.key, default: 0],
+                        isSelected: punishment.selectedOptionKey == option.key,
+                        isWinning: punishment.winningOptionKey == option.key,
+                        isDisabled: !punishment.canVote || isVoting,
+                        onTap: { onVote(option) }
+                    )
+                }
+            }
+
+            Divider()
+                .overlay(Color.statusRunningLate.opacity(0.20))
+
+            HStack(spacing: 10) {
+                if let proof = proofs.first,
+                   let url = URL(string: proof.photoUrl) {
+                    AsyncImage(url: url) { phase in
+                        switch phase {
+                        case .success(let image):
+                            image
+                                .resizable()
+                                .scaledToFill()
+                        case .failure:
+                            Color.appSurface
+                                .overlay(Image(systemName: "photo"))
+                        default:
+                            Color.appSurface
+                                .overlay(ProgressView().scaleEffect(0.65))
+                        }
+                    }
+                    .frame(width: 42, height: 42)
+                    .clipped()
+                    .clipShape(RoundedRectangle(cornerRadius: 9))
+
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text("Evidence posted")
+                            .scaledFont(size: 11, weight: .bold)
+                            .foregroundStyle(DS.Color.textPrimary)
+                        Text(proof.createdAt, format: .dateTime.hour().minute())
+                            .scaledFont(size: 10, weight: .medium)
+                            .foregroundStyle(DS.Color.textSecondary)
+                    }
+                } else {
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text("Evidence required")
+                            .scaledFont(size: 11, weight: .bold)
+                            .foregroundStyle(DS.Color.textPrimary)
+                        Text("Post proof when the punishment is complete.")
+                            .scaledFont(size: 10, weight: .medium)
+                            .foregroundStyle(DS.Color.textSecondary)
+                    }
+                }
+
+                Spacer(minLength: 0)
+
+                PhotosPicker(selection: $proofSelection, matching: .images) {
+                    Label(isUploadingProof ? "Posting" : "Post", systemImage: "camera.fill")
+                        .scaledFont(size: 11, weight: .bold)
+                        .foregroundStyle(Color.statusRunningLate)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 7)
+                        .background(Color.statusRunningLate.opacity(0.14))
+                        .clipShape(RoundedRectangle(cornerRadius: 9))
+                }
+                .disabled(isUploadingProof)
+            }
+
+            if let proof = proofs.first {
+                LatePunishmentProofReactionRow(
+                    summaries: proofReactionSummaries,
+                    isReacting: reactingProofId == proof.id,
+                    onToggle: { emoji in onToggleProofReaction(proof, emoji) }
+                )
+            }
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 9)
+        .background(Color.statusRunningLate.opacity(0.12))
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .strokeBorder(Color.statusRunningLate.opacity(0.28), lineWidth: 1)
+        )
+    }
+}
+
+private struct LatePunishmentProofReactionRow: View {
+    private let supportedEmojis = ["❤️", "😂", "😮", "😢", "🔥", "👍"]
+
+    let summaries: [LatePunishmentProofReactionSummary]
+    let isReacting: Bool
+    let onToggle: (String) -> Void
+
+    var body: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 6) {
+                ForEach(supportedEmojis, id: \.self) { emoji in
+                    let summary = summaries.first(where: { $0.emoji == emoji })
+                    Button {
+                        onToggle(emoji)
+                    } label: {
+                        HStack(spacing: 4) {
+                            Text(emoji)
+                                .scaledFont(size: 12, weight: .semibold)
+                            if let count = summary?.reactionCount, count > 0 {
+                                Text("\(count)")
+                                    .scaledFont(size: 10, weight: .bold)
+                            }
+                        }
+                        .foregroundStyle(summary?.reactedByMe == true ? .white : DS.Color.textPrimary)
+                        .frame(minWidth: 34, minHeight: 28)
+                        .padding(.horizontal, 5)
+                        .background(backgroundColor(isSelected: summary?.reactedByMe == true))
+                        .clipShape(Capsule())
+                        .overlay(
+                            Capsule()
+                                .strokeBorder(borderColor(isSelected: summary?.reactedByMe == true), lineWidth: 1)
+                        )
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(isReacting)
+                    .accessibilityLabel(reactionAccessibilityLabel(emoji: emoji, count: summary?.reactionCount ?? 0))
+                }
+            }
+        }
+        .accessibilityElement(children: .contain)
+    }
+
+    private func backgroundColor(isSelected: Bool) -> Color {
+        isSelected ? Color.statusRunningLate : Color.appSurface.opacity(0.92)
+    }
+
+    private func borderColor(isSelected: Bool) -> Color {
+        isSelected ? Color.statusRunningLate : Color.statusRunningLate.opacity(0.18)
+    }
+
+    private func reactionAccessibilityLabel(emoji: String, count: Int) -> String {
+        count == 1 ? "1 \(emoji) reaction" : "\(count) \(emoji) reactions"
+    }
+}
+
+private struct LatePunishmentVoteButton: View {
+    let option: LatePunishmentOption
+    let count: Int
+    let isSelected: Bool
+    let isWinning: Bool
+    let isDisabled: Bool
+    let onTap: () -> Void
+
+    var body: some View {
+        Button(action: onTap) {
+            HStack(spacing: 6) {
+                Image(systemName: option.systemImage)
+                    .scaledFont(size: 10, weight: .bold)
+                Text(option.title)
+                    .scaledFont(size: 10, weight: .semibold)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+                Spacer(minLength: 2)
+                Text("\(count)")
+                    .scaledFont(size: 10, weight: .bold)
+            }
+            .foregroundStyle(foregroundColor)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 7)
+            .background(backgroundColor)
+            .clipShape(RoundedRectangle(cornerRadius: 9))
+            .overlay(
+                RoundedRectangle(cornerRadius: 9)
+                    .strokeBorder(borderColor, lineWidth: 1)
+            )
+        }
+        .buttonStyle(.plain)
+        .disabled(isDisabled)
+        .opacity(isDisabled && !isSelected ? 0.58 : 1)
+    }
+
+    private var foregroundColor: Color {
+        isSelected || isWinning ? Color.statusRunningLate : DS.Color.textPrimary
+    }
+
+    private var backgroundColor: Color {
+        if isSelected { return Color.statusRunningLate.opacity(0.20) }
+        if isWinning { return Color.statusRunningLate.opacity(0.12) }
+        return Color.appSurface
+    }
+
+    private var borderColor: Color {
+        isSelected || isWinning ? Color.statusRunningLate.opacity(0.45) : Color.statusInvited.opacity(0.25)
+    }
 }
 
 // MARK: - Share Sheet (UIActivityViewController wrapper)
@@ -792,6 +1307,13 @@ private struct DashboardParticipantRow: View {
         }
     }
 
+    private var isRunningLate: Bool {
+        PunctualityStatus.resolve(
+            status: participant.status,
+            targetArrivalAt: targetArrivalAt
+        ) == .runningLate
+    }
+
     var body: some View {
         HStack(spacing: 12) {
             ProfileAvatarView(
@@ -825,6 +1347,12 @@ private struct DashboardParticipantRow: View {
                 Text(etaText)
                     .scaledFont(size: 10, weight: .semibold)
                     .foregroundStyle(etaColor)
+                if isRunningLate {
+                    Label("Late tax", systemImage: "bolt.fill")
+                        .scaledFont(size: 9, weight: .bold)
+                        .foregroundStyle(Color.statusRunningLate)
+                        .labelStyle(.titleAndIcon)
+                }
             }
 
             Spacer()
