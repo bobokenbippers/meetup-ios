@@ -41,6 +41,8 @@ Recent history uses short conventional prefixes, especially `fix:` and `feat:`. 
 
 PRs should include a concise description, issue or feature context, test results, and screenshots or recordings for UI changes. Note Supabase migrations, Edge Function changes, signing changes, or privacy-sensitive behavior.
 
+Before merging any PR, rebase the PR branch onto the latest `main`, resolve conflicts there, rerun required checks, and use squash merge only. Do not use regular merge commits or GitHub's "Rebase and merge" path for PRs.
+
 ## Security & Configuration Tips
 
 Do not commit local credentials, provisioning files, or generated secrets. Keep Supabase schema changes in `supabase/migrations/` and update implementation docs when behavior changes. Sign in with Apple and push notifications may require a real device or configured simulator/account.
