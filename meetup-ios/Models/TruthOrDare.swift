@@ -5,6 +5,7 @@ import Foundation
 struct GameSession: Codable, Identifiable, Equatable {
     let id: UUID
     let meetupId: UUID?
+    let groupId: UUID?
     let startedBy: UUID
     let tier: String                 // "normal" | "spicy"
     let status: String               // "lobby" | "active" | "ended"
@@ -17,6 +18,7 @@ struct GameSession: Codable, Identifiable, Equatable {
     enum CodingKeys: String, CodingKey {
         case id, tier, status
         case meetupId = "meetup_id"
+        case groupId = "group_id"
         case startedBy = "started_by"
         case turnOrder = "turn_order"
         case currentTurnIndex = "current_turn_index"

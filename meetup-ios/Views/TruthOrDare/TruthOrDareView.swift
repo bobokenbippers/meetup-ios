@@ -14,10 +14,17 @@ import UIKit
 struct TruthOrDareView: View {
     let meetup: Meetup?
 
+    /// Game group to stamp a newly started session with. Only set in
+    /// standalone mode when starting from a group's detail screen.
+    let groupId: UUID?
+
     /// Standalone mode: open an existing session directly, or start
-    /// from the tier-pick setup screen when nil.
-    init(sessionId: UUID? = nil) {
+    /// from the tier-pick setup screen when nil. Pass `groupId` when
+    /// starting on behalf of a game group — the session is stamped
+    /// with the group and members get a push with the invite code.
+    init(sessionId: UUID? = nil, groupId: UUID? = nil) {
         self.meetup = nil
+        self.groupId = groupId
         self._standaloneSessionId = State(initialValue: sessionId)
         self.channelScope = sessionId?.uuidString ?? UUID().uuidString
     }
@@ -25,6 +32,7 @@ struct TruthOrDareView: View {
     /// Meetup-embedded mode: shows the meetup's live game, if any.
     init(meetup: Meetup) {
         self.meetup = meetup
+        self.groupId = nil
         self._standaloneSessionId = State(initialValue: nil)
         self.channelScope = meetup.id.uuidString
     }
@@ -750,7 +758,7 @@ struct TruthOrDareView: View {
             if let meetup {
                 result = try await TruthOrDareService.shared.startSession(meetupId: meetup.id, tier: selectedTier)
             } else {
-                result = try await TruthOrDareService.shared.startSession(tier: selectedTier)
+                result = try await TruthOrDareService.shared.startSession(tier: selectedTier, groupId: groupId)
             }
             standaloneSessionId = result.sessionId
             await load(showErrors: true)
