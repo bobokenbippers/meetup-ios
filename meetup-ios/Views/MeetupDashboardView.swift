@@ -36,7 +36,10 @@ struct MeetupDashboardView: View {
     @State private var fullscreenPhoto: MeetupPhoto?
     @State private var now = Date()
     @State private var latePunishmentVotes: [LatePunishmentVote] = []
+    @State private var latePunishmentProofs: [LatePunishmentProof] = []
+    @State private var selectedLateProofItem: PhotosPickerItem?
     @State private var isVotingLatePunishment = false
+    @State private var isUploadingLateProof = false
 
     private var myUserId: UUID? { auth.session?.user.id }
     private var myStatus: String? { participants.first(where: { $0.userId == myUserId })?.status }
@@ -171,6 +174,10 @@ struct MeetupDashboardView: View {
                 guard !items.isEmpty else { return }
                 Task { await uploadPickedPhotos(items) }
             }
+            .onChange(of: selectedLateProofItem) { _, item in
+                guard let item else { return }
+                Task { await uploadLatePunishmentProof(item) }
+            }
             .sheet(isPresented: $showBill) {
                 BillView(meetup: meetup, participants: participants)
                     .environment(auth)
@@ -224,6 +231,9 @@ struct MeetupDashboardView: View {
             }
             .task(id: meetup.id) {
                 await startLatePunishmentRealtime()
+            }
+            .task(id: meetup.id) {
+                await startLatePunishmentProofRealtime()
             }
             .onAppear {
                 if meetup.isRecap { showRecap = true }
@@ -414,7 +424,10 @@ struct MeetupDashboardView: View {
             if let latePunishment {
                 LatePunishmentCard(
                     punishment: latePunishment,
+                    proofs: latePunishmentProofs,
                     isVoting: isVotingLatePunishment,
+                    isUploadingProof: isUploadingLateProof,
+                    proofSelection: $selectedLateProofItem,
                     onVote: { option in
                         Task { await voteLatePunishment(option) }
                     }
@@ -610,6 +623,7 @@ struct MeetupDashboardView: View {
                 LocationManager.shared.stopTracking()
             }
             await loadLatePunishmentVotes()
+            await loadLatePunishmentProofs()
         } catch is CancellationError {
             return
         } catch {
@@ -678,6 +692,16 @@ struct MeetupDashboardView: View {
         }
     }
 
+    private func loadLatePunishmentProofs() async {
+        do {
+            latePunishmentProofs = try await LatePunishmentService.shared.fetchProofs(meetupId: meetup.id)
+        } catch is CancellationError {
+            return
+        } catch {
+            latePunishmentProofs = []
+        }
+    }
+
     private func voteLatePunishment(_ option: LatePunishmentOption) async {
         guard !isVotingLatePunishment else { return }
         isVotingLatePunishment = true
@@ -685,6 +709,28 @@ struct MeetupDashboardView: View {
         do {
             try await LatePunishmentService.shared.vote(meetupId: meetup.id, optionKey: option.key)
             await loadLatePunishmentVotes()
+        } catch {
+            self.error = error.localizedDescription
+        }
+    }
+
+    private func uploadLatePunishmentProof(_ item: PhotosPickerItem) async {
+        guard !isUploadingLateProof else { return }
+        isUploadingLateProof = true
+        defer {
+            isUploadingLateProof = false
+            selectedLateProofItem = nil
+        }
+        do {
+            guard let data = try await item.loadTransferable(type: Data.self),
+                  let image = UIImage(data: data) else {
+                error = "Could not read that evidence photo."
+                return
+            }
+            try await LatePunishmentService.shared.uploadProof(image: image, meetupId: meetup.id)
+            await loadLatePunishmentProofs()
+        } catch is CancellationError {
+            return
         } catch {
             self.error = error.localizedDescription
         }
@@ -706,6 +752,26 @@ struct MeetupDashboardView: View {
         for await _ in changes {
             guard !Task.isCancelled else { break }
             await loadLatePunishmentVotes()
+        }
+        await SupabaseManager.shared.client.realtimeV2.removeChannel(channel)
+    }
+
+    private func startLatePunishmentProofRealtime() async {
+        let channel = SupabaseManager.shared.client.realtimeV2
+            .channel("late-punishment-proofs-\(meetup.id)")
+        let changes = channel.postgresChange(
+            AnyAction.self,
+            schema: "public",
+            table: "meetup_late_punishment_proofs"
+        )
+        do {
+            try await channel.subscribeWithError()
+        } catch {
+            return
+        }
+        for await _ in changes {
+            guard !Task.isCancelled else { break }
+            await loadLatePunishmentProofs()
         }
         await SupabaseManager.shared.client.realtimeV2.removeChannel(channel)
     }
@@ -800,7 +866,10 @@ private struct LatePunishment {
 
 private struct LatePunishmentCard: View {
     let punishment: LatePunishment
+    let proofs: [LatePunishmentProof]
     let isVoting: Bool
+    let isUploadingProof: Bool
+    @Binding var proofSelection: PhotosPickerItem?
     let onVote: (LatePunishmentOption) -> Void
 
     var body: some View {
@@ -834,6 +903,63 @@ private struct LatePunishmentCard: View {
                         onTap: { onVote(option) }
                     )
                 }
+            }
+
+            Divider()
+                .overlay(Color.statusRunningLate.opacity(0.20))
+
+            HStack(spacing: 10) {
+                if let proof = proofs.first,
+                   let url = URL(string: proof.photoUrl) {
+                    AsyncImage(url: url) { phase in
+                        switch phase {
+                        case .success(let image):
+                            image
+                                .resizable()
+                                .scaledToFill()
+                        case .failure:
+                            Color.appSurface
+                                .overlay(Image(systemName: "photo"))
+                        default:
+                            Color.appSurface
+                                .overlay(ProgressView().scaleEffect(0.65))
+                        }
+                    }
+                    .frame(width: 42, height: 42)
+                    .clipped()
+                    .clipShape(RoundedRectangle(cornerRadius: 9))
+
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text("Evidence posted")
+                            .scaledFont(size: 11, weight: .bold)
+                            .foregroundStyle(DS.Color.textPrimary)
+                        Text(proof.createdAt, format: .dateTime.hour().minute())
+                            .scaledFont(size: 10, weight: .medium)
+                            .foregroundStyle(DS.Color.textSecondary)
+                    }
+                } else {
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text("Evidence required")
+                            .scaledFont(size: 11, weight: .bold)
+                            .foregroundStyle(DS.Color.textPrimary)
+                        Text("Post proof when the punishment is complete.")
+                            .scaledFont(size: 10, weight: .medium)
+                            .foregroundStyle(DS.Color.textSecondary)
+                    }
+                }
+
+                Spacer(minLength: 0)
+
+                PhotosPicker(selection: $proofSelection, matching: .images) {
+                    Label(isUploadingProof ? "Posting" : "Post", systemImage: "camera.fill")
+                        .scaledFont(size: 11, weight: .bold)
+                        .foregroundStyle(Color.statusRunningLate)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 7)
+                        .background(Color.statusRunningLate.opacity(0.14))
+                        .clipShape(RoundedRectangle(cornerRadius: 9))
+                }
+                .disabled(isUploadingProof)
             }
         }
         .padding(.horizontal, 12)

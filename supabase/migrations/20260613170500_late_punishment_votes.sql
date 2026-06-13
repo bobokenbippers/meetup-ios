@@ -18,7 +18,20 @@ create table if not exists public.meetup_late_punishment_votes (
 create index if not exists meetup_late_punishment_votes_meetup_idx
   on public.meetup_late_punishment_votes(meetup_id);
 
+create table if not exists public.meetup_late_punishment_proofs (
+  id               uuid        primary key default gen_random_uuid(),
+  meetup_id        uuid        not null references public.meetups(id) on delete cascade,
+  uploader_user_id uuid        not null references public.profiles(id) on delete cascade,
+  photo_url        text        not null,
+  caption          text,
+  created_at       timestamptz not null default now()
+);
+
+create index if not exists meetup_late_punishment_proofs_meetup_idx
+  on public.meetup_late_punishment_proofs(meetup_id, created_at desc);
+
 alter table public.meetup_late_punishment_votes enable row level security;
+alter table public.meetup_late_punishment_proofs enable row level security;
 
 drop policy if exists "participants read late punishment votes"
   on public.meetup_late_punishment_votes;
@@ -29,6 +42,31 @@ create policy "participants read late punishment votes"
   using (
     public.is_meetup_host(meetup_id)
     or public.is_meetup_participant(meetup_id, auth.uid())
+  );
+
+drop policy if exists "participants read late punishment proofs"
+  on public.meetup_late_punishment_proofs;
+
+create policy "participants read late punishment proofs"
+  on public.meetup_late_punishment_proofs for select
+  to authenticated
+  using (
+    public.is_meetup_host(meetup_id)
+    or public.is_meetup_participant(meetup_id, auth.uid())
+  );
+
+drop policy if exists "participants insert late punishment proofs"
+  on public.meetup_late_punishment_proofs;
+
+create policy "participants insert late punishment proofs"
+  on public.meetup_late_punishment_proofs for insert
+  to authenticated
+  with check (
+    uploader_user_id = auth.uid()
+    and (
+      public.is_meetup_host(meetup_id)
+      or public.is_meetup_participant(meetup_id, auth.uid())
+    )
   );
 
 create or replace function public.is_meetup_user_late(p_meetup_id uuid, p_user_id uuid)
@@ -92,6 +130,13 @@ grant execute on function public.vote_late_punishment(uuid, text) to authenticat
 do $$
 begin
   alter publication supabase_realtime add table public.meetup_late_punishment_votes;
+exception
+  when duplicate_object then null;
+end $$;
+
+do $$
+begin
+  alter publication supabase_realtime add table public.meetup_late_punishment_proofs;
 exception
   when duplicate_object then null;
 end $$;
