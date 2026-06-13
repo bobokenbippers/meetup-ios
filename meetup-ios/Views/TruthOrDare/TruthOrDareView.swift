@@ -45,6 +45,7 @@ struct TruthOrDareView: View {
     @State private var session: GameSession?
     @State private var players: [GamePlayer] = []
     @State private var turns: [GameTurn] = []
+    @State private var votes: [GameTurnVote] = []
     @State private var hasLoaded = false
     @State private var isActing = false
     @State private var error: String?
@@ -72,11 +73,11 @@ struct TruthOrDareView: View {
     private var myUserId: UUID? { auth.session?.user.id }
 
     private var currentTurn: GameTurn? {
-        turns.last(where: { $0.isPending || $0.isPrompted })
+        turns.last(where: { $0.isPending || $0.isPrompted || $0.isVoting })
     }
 
     private var finishedTurns: [GameTurn] {
-        turns.filter { $0.isCompleted || $0.isPassed }
+        turns.filter { $0.isCompleted || $0.isPassed || $0.isFailed }
     }
 
     private var amPlayer: Bool {
@@ -140,7 +141,8 @@ struct TruthOrDareView: View {
                 async let sessionChanges: Void = subscribeToTable("game_sessions", channelSuffix: "sessions")
                 async let playerChanges: Void = subscribeToTable("game_players", channelSuffix: "players")
                 async let turnChanges: Void = subscribeToTable("game_turns", channelSuffix: "turns")
-                _ = await (sessionChanges, playerChanges, turnChanges)
+                async let voteChanges: Void = subscribeToTable("game_turn_votes", channelSuffix: "votes")
+                _ = await (sessionChanges, playerChanges, turnChanges, voteChanges)
             }
             .confirmationDialog("End the game for everyone?", isPresented: $showEndConfirm, titleVisibility: .visible) {
                 Button("End Game", role: .destructive) {
@@ -368,7 +370,9 @@ struct TruthOrDareView: View {
             // The stage: coin flip until the coin settles, then the prompt.
             Group {
                 if let turn = currentTurn {
-                    if turn.isPending || !revealedTurnIds.contains(turn.id) {
+                    if turn.isVoting {
+                        verdictStage(turn)
+                    } else if turn.isPending || !revealedTurnIds.contains(turn.id) {
                         CoinFlipView(
                             isMyTurn: isMyTurn,
                             playerName: currentPlayerName,
@@ -422,6 +426,119 @@ struct TruthOrDareView: View {
 
     private func tierAccent(for tier: String) -> Color {
         tier == "spicy" ? Color.appSecondaryAccent : Color.coral
+    }
+
+    // MARK: - Verdict vote
+
+    private func verdictStage(_ turn: GameTurn) -> some View {
+        let turnVotes = votesForTurn(turn)
+        let yesCount = turnVotes.filter { $0.vote }.count
+        let noCount = turnVotes.filter { !$0.vote }.count
+        let eligibleCount = max(players.count - 1, 0)
+        let myVote = myUserId.flatMap { userId in turnVotes.first(where: { $0.voterId == userId })?.vote }
+        let canVote = amPlayer && !isMyTurn
+
+        return VStack(spacing: 20) {
+            Spacer()
+
+            promptCard(turn)
+                .padding(.horizontal, 20)
+
+            VStack(spacing: 12) {
+                Label("Squad verdict", systemImage: "checkmark.seal.fill")
+                    .scaledFont(size: 13, weight: .black)
+                    .foregroundStyle(Color.appSecondaryAccent)
+
+                Text(verdictMessage(for: turn, yesCount: yesCount, noCount: noCount, eligibleCount: eligibleCount))
+                    .scaledFont(size: 13)
+                    .foregroundStyle(DS.Color.textSecondary)
+                    .multilineTextAlignment(.center)
+
+                HStack(spacing: 10) {
+                    verdictVoteButton(
+                        title: "Counts",
+                        systemImage: "hand.thumbsup.fill",
+                        count: yesCount,
+                        isSelected: myVote == true,
+                        isDisabled: !canVote || isActing,
+                        action: { Task { await voteOnTurn(turn, counts: true) } }
+                    )
+                    verdictVoteButton(
+                        title: "Doesn't",
+                        systemImage: "hand.thumbsdown.fill",
+                        count: noCount,
+                        isSelected: myVote == false,
+                        isDisabled: !canVote || isActing,
+                        action: { Task { await voteOnTurn(turn, counts: false) } }
+                    )
+                }
+
+                if !canVote {
+                    Text(isMyTurn ? "You did the turn. Let the squad judge this one." : "Players are voting.")
+                        .scaledFont(size: 12)
+                        .foregroundStyle(DS.Color.textSecondary)
+                }
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 16)
+            .padding(.horizontal, 16)
+            .background(Color.appSurface)
+            .clipShape(RoundedRectangle(cornerRadius: 18))
+            .padding(.horizontal, 20)
+
+            Spacer()
+        }
+    }
+
+    private func verdictVoteButton(
+        title: String,
+        systemImage: String,
+        count: Int,
+        isSelected: Bool,
+        isDisabled: Bool,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            HStack(spacing: 8) {
+                Image(systemName: systemImage)
+                    .scaledFont(size: 12, weight: .bold)
+                Text(title)
+                    .scaledFont(size: 13, weight: .bold)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+                Spacer(minLength: 0)
+                Text("\(count)")
+                    .scaledFont(size: 13, weight: .black)
+            }
+            .foregroundStyle(isSelected ? Color.white : DS.Color.textPrimary)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 12)
+            .background(isSelected ? Color.appSecondaryAccent : Color.appBackground)
+            .clipShape(RoundedRectangle(cornerRadius: 12))
+            .overlay(
+                RoundedRectangle(cornerRadius: 12)
+                    .strokeBorder(isSelected ? Color.clear : Color.white.opacity(0.08), lineWidth: 1)
+            )
+        }
+        .buttonStyle(.plain)
+        .disabled(isDisabled)
+        .opacity(isDisabled && !isSelected ? 0.55 : 1)
+    }
+
+    private func verdictMessage(for turn: GameTurn, yesCount: Int, noCount: Int, eligibleCount: Int) -> String {
+        let noun = turn.isDare ? "dare" : "truth"
+        if eligibleCount <= 0 {
+            return "No one else can vote on this \(noun), so it is waiting for another player."
+        }
+        let remaining = max(eligibleCount - yesCount - noCount, 0)
+        if remaining == 0 {
+            return "All votes are in. The server will settle the next turn."
+        }
+        return "\(yesCount) count it, \(noCount) don't. \(remaining) vote\(remaining == 1 ? "" : "s") left."
+    }
+
+    private func votesForTurn(_ turn: GameTurn) -> [GameTurnVote] {
+        votes.filter { $0.turnId == turn.id }
     }
 
     // MARK: - Prompt stage (coin has landed)
@@ -666,7 +783,7 @@ struct TruthOrDareView: View {
                 .frame(width: 110, height: 110)
                 .clipShape(RoundedRectangle(cornerRadius: 12))
             } else {
-                feedPlaceholder(symbol: turn.isPassed ? "bird.fill" : "quote.bubble.fill")
+                feedPlaceholder(symbol: feedSymbol(for: turn))
                     .frame(width: 110, height: 110)
                     .background(Color.appBackground)
                     .clipShape(RoundedRectangle(cornerRadius: 12))
@@ -681,6 +798,10 @@ struct TruthOrDareView: View {
                 if turn.isPassed {
                     Text("🐔")
                         .scaledFont(size: 10)
+                } else if turn.isFailed {
+                    Image(systemName: "xmark.circle.fill")
+                        .scaledFont(size: 9)
+                        .foregroundStyle(Color.statusLate)
                 } else {
                     Image(systemName: turn.isDare ? "flame.fill" : "checkmark.circle.fill")
                         .scaledFont(size: 9)
@@ -689,6 +810,12 @@ struct TruthOrDareView: View {
             }
             .frame(width: 110)
         }
+    }
+
+    private func feedSymbol(for turn: GameTurn) -> String {
+        if turn.isPassed { return "bird.fill" }
+        if turn.isFailed { return "xmark.circle.fill" }
+        return "quote.bubble.fill"
     }
 
     private func feedPlaceholder(symbol: String) -> some View {
@@ -802,6 +929,11 @@ struct TruthOrDareView: View {
             if let session {
                 players = try await TruthOrDareService.shared.fetchPlayers(sessionId: session.id)
                 turns = try await TruthOrDareService.shared.fetchTurns(sessionId: session.id)
+                votes = try await TruthOrDareService.shared.fetchVotes(turnIds: turns.map(\.id))
+            } else {
+                players = []
+                turns = []
+                votes = []
             }
             hasLoaded = true
         } catch is CancellationError {
@@ -917,6 +1049,20 @@ struct TruthOrDareView: View {
         defer { isActing = false }
         do {
             try await TruthOrDareService.shared.passTurn(turnId: turn.id)
+            await load(showErrors: true)
+        } catch is CancellationError {
+            return
+        } catch {
+            self.error = error.localizedDescription
+        }
+    }
+
+    private func voteOnTurn(_ turn: GameTurn, counts: Bool) async {
+        guard turn.isVoting, amPlayer, !isMyTurn else { return }
+        isActing = true
+        defer { isActing = false }
+        do {
+            try await TruthOrDareService.shared.voteTurn(turnId: turn.id, vote: counts)
             await load(showErrors: true)
         } catch is CancellationError {
             return
