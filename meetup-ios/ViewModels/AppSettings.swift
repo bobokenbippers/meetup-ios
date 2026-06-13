@@ -1,9 +1,23 @@
 import SwiftUI
 
-enum ThemePreference: String {
-    case light
-    case dark
-    case system
+enum ThemePreference: String, CaseIterable {
+    case system, light, dark
+
+    var colorScheme: ColorScheme? {
+        switch self {
+        case .system: return nil
+        case .light: return .light
+        case .dark: return .dark
+        }
+    }
+
+    var label: String {
+        switch self {
+        case .system: return "System"
+        case .light: return "Light"
+        case .dark: return "Dark"
+        }
+    }
 }
 
 enum EventSuggestionCategoryPreference: String, CaseIterable, Identifiable {

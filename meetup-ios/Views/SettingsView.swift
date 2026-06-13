@@ -88,10 +88,10 @@ struct SettingsView: View {
 
                 // MARK: Appearance
                 Section {
-                    Picker("Theme", selection: $settings.themePreference) {
-                        Text("System").tag(ThemePreference.system)
-                        Text("Light").tag(ThemePreference.light)
-                        Text("Dark").tag(ThemePreference.dark)
+                    Picker("Appearance", selection: $settings.themePreference) {
+                        ForEach(ThemePreference.allCases, id: \.self) { pref in
+                            Text(pref.label).tag(pref)
+                        }
                     }
                     .pickerStyle(.segmented)
                     .listRowBackground(Color.appSurface)
