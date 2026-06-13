@@ -204,8 +204,14 @@ private enum CoinFace {
     var bodyColors: [Color] {
         switch self {
         case .truth:
+            if AppColorTheme.current == .knicks {
+                return [Color(hex: "006BB6"), Color(hex: "1D428A")]
+            }
             return [Color(red: 0.45, green: 0.36, blue: 0.85), Color(red: 0.25, green: 0.18, blue: 0.55)]
         case .dare:
+            if AppColorTheme.current == .knicks {
+                return [Color(hex: "F58426"), Color(hex: "C75B12")]
+            }
             return [Color(red: 0.95, green: 0.45, blue: 0.25), Color(red: 0.70, green: 0.18, blue: 0.15)]
         case .unknown:
             return [Color(red: 0.85, green: 0.70, blue: 0.30), Color(red: 0.60, green: 0.45, blue: 0.12)]
@@ -214,8 +220,8 @@ private enum CoinFace {
 
     var glowColor: Color {
         switch self {
-        case .truth:   return Color.coral
-        case .dare:    return Color(red: 0.95, green: 0.45, blue: 0.25)
+        case .truth:   return Color.appSecondaryAccent
+        case .dare:    return Color.coral
         case .unknown: return Color(red: 0.85, green: 0.70, blue: 0.30)
         }
     }

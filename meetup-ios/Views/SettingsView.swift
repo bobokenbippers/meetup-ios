@@ -95,6 +95,15 @@ struct SettingsView: View {
                     }
                     .pickerStyle(.segmented)
                     .listRowBackground(Color.appSurface)
+
+                    Picker("Team Theme", selection: $settings.colorTheme) {
+                        ForEach(AppColorTheme.allCases) { theme in
+                            Text(theme.label).tag(theme)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+                    .tint(Color.coral)
+                    .listRowBackground(Color.appSurface)
                 } header: {
                     sectionHeader("APPEARANCE")
                 }

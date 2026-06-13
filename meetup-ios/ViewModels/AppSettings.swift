@@ -20,6 +20,80 @@ enum ThemePreference: String, CaseIterable {
     }
 }
 
+enum AppColorTheme: String, CaseIterable, Identifiable {
+    case standard
+    case knicks
+
+    var id: String { rawValue }
+
+    static var current: AppColorTheme {
+        let rawTheme = UserDefaults.standard.string(forKey: "appColorTheme") ?? ""
+        return AppColorTheme(rawValue: rawTheme) ?? .standard
+    }
+
+    var label: String {
+        switch self {
+        case .standard: return "Standard"
+        case .knicks: return "Knicks"
+        }
+    }
+
+    var accentColor: Color {
+        switch self {
+        case .standard:
+            return Color(light: Color(hex: "6C57C5"), dark: Color(hex: "8A78E0"))
+        case .knicks:
+            return Color(light: Color(hex: "F58426"), dark: Color(hex: "FF9F45"))
+        }
+    }
+
+    var secondaryAccentColor: Color {
+        switch self {
+        case .standard:
+            return Color(light: Color(hex: "6C57C5"), dark: Color(hex: "8A78E0"))
+        case .knicks:
+            return Color(light: Color(hex: "006BB6"), dark: Color(hex: "3BA3FF"))
+        }
+    }
+
+    var participantPalette: [Color] {
+        switch self {
+        case .standard:
+            return [
+                Color(red: 0.424, green: 0.341, blue: 0.773),
+                Color(red: 0.482, green: 0.361, blue: 0.749),
+                Color(red: 0.118, green: 0.565, blue: 1.000),
+                Color(red: 0.180, green: 0.800, blue: 0.443),
+                Color(red: 0.910, green: 0.212, blue: 0.278),
+                Color(red: 0.000, green: 0.780, blue: 0.941),
+            ]
+        case .knicks:
+            return [
+                Color(hex: "F58426"),
+                Color(hex: "006BB6"),
+                Color(hex: "BEC0C2"),
+                Color(hex: "FF9F45"),
+                Color(hex: "3BA3FF"),
+                Color(hex: "1D428A"),
+            ]
+        }
+    }
+
+    var categoryGradientFoodStart: Color {
+        switch self {
+        case .standard: return Color(red: 0.388, green: 0.302, blue: 0.718)
+        case .knicks: return Color(hex: "F58426")
+        }
+    }
+
+    var categoryGradientFoodEnd: Color {
+        switch self {
+        case .standard: return Color(red: 0.235, green: 0.180, blue: 0.478)
+        case .knicks: return Color(hex: "006BB6")
+        }
+    }
+}
+
 enum EventSuggestionCategoryPreference: String, CaseIterable, Identifiable {
     case all
     case music
@@ -55,6 +129,9 @@ enum EventSuggestionCategoryPreference: String, CaseIterable, Identifiable {
 final class AppSettings {
     var themePreference: ThemePreference {
         didSet { UserDefaults.standard.set(themePreference.rawValue, forKey: "themePreference") }
+    }
+    var colorTheme: AppColorTheme {
+        didSet { UserDefaults.standard.set(colorTheme.rawValue, forKey: "appColorTheme") }
     }
     var boldText: Bool {
         didSet { UserDefaults.standard.set(boldText, forKey: "boldText") }
@@ -94,6 +171,8 @@ final class AppSettings {
         let d = UserDefaults.standard
         let rawTheme = d.string(forKey: "themePreference") ?? ""
         themePreference = ThemePreference(rawValue: rawTheme) ?? .system
+        let rawColorTheme = d.string(forKey: "appColorTheme") ?? ""
+        colorTheme = AppColorTheme(rawValue: rawColorTheme) ?? .standard
         boldText = d.bool(forKey: "boldText")
         largerText = d.bool(forKey: "largerText")
         reduceMotion = d.bool(forKey: "reduceMotion")

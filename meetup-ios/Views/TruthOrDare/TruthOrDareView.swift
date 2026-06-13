@@ -176,6 +176,7 @@ struct TruthOrDareView: View {
             }
 
         }
+        .tint(Color.coral)
     }
 
     // MARK: - Setup (no live session yet)
@@ -241,7 +242,7 @@ struct TruthOrDareView: View {
             VStack(spacing: 6) {
                 Image(systemName: symbol)
                     .scaledFont(size: 26)
-                    .foregroundStyle(isSelected ? Color.coral : Color(white: 0.5))
+                    .foregroundStyle(isSelected ? tierAccent(for: tier) : Color(white: 0.5))
                 Text(title)
                     .scaledFont(size: 15, weight: .bold)
                     .foregroundStyle(DS.Color.textPrimary)
@@ -255,7 +256,7 @@ struct TruthOrDareView: View {
             .clipShape(RoundedRectangle(cornerRadius: 16))
             .overlay(
                 RoundedRectangle(cornerRadius: 16)
-                    .strokeBorder(isSelected ? Color.coral : Color.white.opacity(0.08), lineWidth: isSelected ? 2 : 1)
+                    .strokeBorder(isSelected ? tierAccent(for: tier) : Color.white.opacity(0.08), lineWidth: isSelected ? 2 : 1)
             )
         }
         .buttonStyle(.plain)
@@ -289,10 +290,10 @@ struct TruthOrDareView: View {
                             if player.userId == session.startedBy {
                                 Text("HOST")
                                     .scaledFont(size: 9, weight: .black)
-                                    .foregroundStyle(Color.coral)
+                                    .foregroundStyle(Color.appSecondaryAccent)
                                     .padding(.horizontal, 6)
                                     .padding(.vertical, 3)
-                                    .background(Color.coral.opacity(0.15))
+                                    .background(Color.appSecondaryAccent.opacity(0.15))
                                     .clipShape(Capsule())
                             }
                             Spacer()
@@ -412,11 +413,15 @@ struct TruthOrDareView: View {
             systemImage: session.isSpicy ? "flame.fill" : "face.smiling.inverse"
         )
         .scaledFont(size: 11, weight: .bold)
-        .foregroundStyle(session.isSpicy ? Color(red: 0.95, green: 0.45, blue: 0.25) : Color.coral)
+        .foregroundStyle(tierAccent(for: session.tier))
         .padding(.horizontal, 10)
         .padding(.vertical, 5)
         .background(Color.appSurface)
         .clipShape(Capsule())
+    }
+
+    private func tierAccent(for tier: String) -> Color {
+        tier == "spicy" ? Color.coral : Color.appSecondaryAccent
     }
 
     // MARK: - Prompt stage (coin has landed)
@@ -451,8 +456,8 @@ struct TruthOrDareView: View {
     /// The card showing the prompt kind label + text + subtitle.
     private func promptCard(_ turn: GameTurn) -> some View {
         let accentColor = turn.isDare
-            ? Color(red: 0.95, green: 0.45, blue: 0.25)
-            : Color.coral
+            ? Color.coral
+            : Color.appSecondaryAccent
         return VStack(spacing: 14) {
             Label(
                 turn.isDare ? "TAILS — DARE" : "HEADS — TRUTH",
@@ -679,7 +684,7 @@ struct TruthOrDareView: View {
                 } else {
                     Image(systemName: turn.isDare ? "flame.fill" : "checkmark.circle.fill")
                         .scaledFont(size: 9)
-                        .foregroundStyle(turn.isDare ? Color(red: 0.95, green: 0.45, blue: 0.25) : Color.statusLive)
+                        .foregroundStyle(turn.isDare ? Color.coral : Color.statusLive)
                 }
             }
             .frame(width: 110)
