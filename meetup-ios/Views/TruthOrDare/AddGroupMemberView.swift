@@ -49,7 +49,6 @@ struct AddGroupMemberView: View {
             } message: {
                 Text(error ?? "")
             }
-            .preferredColorScheme(.dark)
         }
     }
 
@@ -89,7 +88,7 @@ struct AddGroupMemberView: View {
 
                 Text(friend.displayName ?? "Friend")
                     .scaledFont(size: 15, weight: .semibold)
-                    .foregroundStyle(isMember ? Color(white: 0.45) : .white)
+                    .foregroundStyle(isMember ? DS.Color.textSecondary : DS.Color.textPrimary)
 
                 Spacer()
 
@@ -98,7 +97,7 @@ struct AddGroupMemberView: View {
                 } else if isMember {
                     Text("Member")
                         .scaledFont(size: 11, weight: .bold)
-                        .foregroundStyle(Color(white: 0.45))
+                        .foregroundStyle(DS.Color.textSecondary)
                 } else {
                     Image(systemName: "plus.circle.fill")
                         .scaledFont(size: 20)

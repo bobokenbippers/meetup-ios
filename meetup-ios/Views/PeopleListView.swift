@@ -139,10 +139,10 @@ struct PeopleListView: View {
                                 .padding(.top, 48)
                             Text("No connections yet")
                                 .scaledFont(size: 16, weight: .bold)
-                                .foregroundStyle(.white)
+                                .foregroundStyle(DS.Color.textPrimary)
                             Text("People you've had meetups with will appear here.")
                                 .scaledFont(size: 13)
-                                .foregroundStyle(Color(white: 0.5))
+                                .foregroundStyle(DS.Color.textSecondary)
                                 .multilineTextAlignment(.center)
                                 .padding(.horizontal, 40)
                         }
@@ -424,7 +424,7 @@ struct PeopleListView: View {
     private func sectionLabel(_ title: String) -> some View {
         Text(title.uppercased())
             .scaledFont(size: 10, weight: .bold)
-            .foregroundStyle(Color(white: 0.45))
+            .foregroundStyle(DS.Color.textSecondary)
     }
 
     // MARK: - Logic
@@ -906,7 +906,7 @@ private struct PersonCard: View {
                     VStack(alignment: .leading, spacing: 2) {
                         Text(displayedName)
                             .scaledFont(size: 13, weight: .semibold)
-                            .foregroundStyle(.white)
+                            .foregroundStyle(DS.Color.textPrimary)
                         if let phone = person.phoneE164 {
                             Text(phone)
                                 .scaledFont(size: 11)
