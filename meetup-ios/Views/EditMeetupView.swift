@@ -34,7 +34,7 @@ struct EditMeetupView: View {
                 } header: {
                     Text("CURRENT")
                         .font(.caption.weight(.semibold))
-                        .foregroundStyle(Color(white: 0.4))
+                        .foregroundStyle(DS.Color.textSecondary)
                         .textCase(nil)
                 }
 
@@ -101,16 +101,16 @@ struct EditMeetupView: View {
                 .overlay {
                     Image(systemName: "mappin.circle.fill")
                         .font(.system(size: 18))
-                        .foregroundStyle(.white)
+                        .foregroundStyle(.white) // on coral background
                 }
             VStack(alignment: .leading, spacing: 2) {
                 Text(meetup.destinationName)
                     .font(.subheadline).bold()
-                    .foregroundStyle(.white)
+                    .foregroundStyle(DS.Color.textPrimary)
                 if let addr = meetup.destinationAddress {
                     Text(addr)
                         .font(.caption)
-                        .foregroundStyle(Color(white: 0.6))
+                        .foregroundStyle(DS.Color.textSecondary)
                 }
             }
             Spacer()
@@ -126,7 +126,7 @@ struct EditMeetupView: View {
                 in: Date()...,
                 displayedComponents: [.date, .hourAndMinute]
             )
-            .foregroundStyle(.white)
+            .foregroundStyle(DS.Color.textPrimary)
             .tint(Color.coral)
             .listRowBackground(Color.appSurface)
             .accessibilityIdentifier("picker_target_arrival")
@@ -134,13 +134,13 @@ struct EditMeetupView: View {
         } header: {
             Text("TARGET ARRIVAL TIME")
                 .font(.caption.weight(.semibold))
-                .foregroundStyle(Color(white: 0.4))
+                .foregroundStyle(DS.Color.textSecondary)
                 .textCase(nil)
         } footer: {
             if meetup.targetArrivalAt == nil {
                 Text("No time set yet — pick one to schedule the meetup.")
                     .font(.caption)
-                    .foregroundStyle(Color(white: 0.5))
+                    .foregroundStyle(DS.Color.textSecondary)
             }
         }
     }
@@ -191,9 +191,9 @@ private struct EditDestinationSection: View {
             if let place = selectedPlace {
                 HStack {
                     VStack(alignment: .leading, spacing: 2) {
-                        Text(place.name).font(.subheadline).bold().foregroundStyle(.white)
+                        Text(place.name).font(.subheadline).bold().foregroundStyle(DS.Color.textPrimary)
                         if let addr = place.address {
-                            Text(addr).font(.caption).foregroundStyle(Color(white: 0.6))
+                            Text(addr).font(.caption).foregroundStyle(DS.Color.textSecondary)
                         }
                     }
                     Spacer()
@@ -208,7 +208,7 @@ private struct EditDestinationSection: View {
             } else {
                 TextField("Search for a new place", text: $searchQuery)
                     .autocorrectionDisabled()
-                    .foregroundStyle(.white)
+                    .foregroundStyle(DS.Color.textPrimary)
                     .tint(Color.coral)
                     .accessibilityIdentifier("field_new_destination")
                     .listRowBackground(Color.appSurface)
@@ -219,15 +219,15 @@ private struct EditDestinationSection: View {
                 if let searchError {
                     Text(searchError)
                         .font(.caption)
-                        .foregroundStyle(Color(white: 0.6))
+                        .foregroundStyle(DS.Color.textSecondary)
                         .listRowBackground(Color.appSurface)
                 }
                 ForEach(predictions) { prediction in
                     Button(action: { selectPrediction(prediction) }) {
                         VStack(alignment: .leading, spacing: 2) {
-                            Text(prediction.mainText).foregroundStyle(.white)
+                            Text(prediction.mainText).foregroundStyle(DS.Color.textPrimary)
                             if !prediction.secondaryText.isEmpty {
-                                Text(prediction.secondaryText).font(.caption).foregroundStyle(Color(white: 0.6))
+                                Text(prediction.secondaryText).font(.caption).foregroundStyle(DS.Color.textSecondary)
                             }
                         }
                     }
@@ -237,7 +237,7 @@ private struct EditDestinationSection: View {
         } header: {
             Text("NEW DESTINATION")
                 .font(.caption.weight(.semibold))
-                .foregroundStyle(Color(white: 0.4))
+                .foregroundStyle(DS.Color.textSecondary)
                 .textCase(nil)
         }
         .task(id: searchQuery) {

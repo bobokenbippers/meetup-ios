@@ -33,10 +33,10 @@ struct CoinFlipView: View {
             VStack(spacing: 6) {
                 Text(isMyTurn ? "Your turn" : "\(playerName)'s turn")
                     .scaledFont(size: 26, weight: .black)
-                    .foregroundStyle(.white)
+                    .foregroundStyle(DS.Color.textPrimary)
                 Text(statusLine)
                     .scaledFont(size: 14)
-                    .foregroundStyle(Color(white: 0.6))
+                    .foregroundStyle(DS.Color.textSecondary)
             }
 
             coin
@@ -59,10 +59,10 @@ struct CoinFlipView: View {
             VStack(spacing: 4) {
                 Text("Heads = Truth   ·   Tails = Dare")
                     .scaledFont(size: 12, weight: .semibold)
-                    .foregroundStyle(Color(white: 0.55))
+                    .foregroundStyle(DS.Color.textSecondary)
                 Text("The coin decides. No takebacks.")
                     .scaledFont(size: 11)
-                    .foregroundStyle(Color(white: 0.4))
+                    .foregroundStyle(DS.Color.textSecondary)
             }
 
             Spacer()

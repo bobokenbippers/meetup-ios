@@ -45,7 +45,7 @@ struct AddParticipantsSheet: View {
                     } header: {
                         Text("FROM YOUR SQUAD")
                             .font(.caption.weight(.semibold))
-                            .foregroundStyle(Color(white: 0.4))
+                            .foregroundStyle(DS.Color.textSecondary)
                             .textCase(nil)
                     }
                 }
@@ -55,7 +55,7 @@ struct AddParticipantsSheet: View {
                         TextField("+1 (646) 946-6861", text: $inviteePhone)
                             .keyboardType(.phonePad)
                             .autocorrectionDisabled()
-                            .foregroundStyle(.white)
+                            .foregroundStyle(DS.Color.textPrimary)
                             .tint(Color.coral)
                         if isSearchingUser || isAdding {
                             ProgressView()
@@ -80,10 +80,10 @@ struct AddParticipantsSheet: View {
                                 VStack(alignment: .leading, spacing: 2) {
                                     Text(user.displayName)
                                         .font(.subheadline)
-                                        .foregroundStyle(.white)
+                                        .foregroundStyle(DS.Color.textPrimary)
                                     Text(user.phone)
                                         .font(.caption)
-                                        .foregroundStyle(Color(white: 0.6))
+                                        .foregroundStyle(DS.Color.textSecondary)
                                 }
                                 Spacer()
                                 foundUserAction(for: user)
@@ -91,7 +91,7 @@ struct AddParticipantsSheet: View {
                             if let hint = foundUserHint {
                                 Text(hint)
                                     .font(.caption2)
-                                    .foregroundStyle(Color(white: 0.55))
+                                    .foregroundStyle(DS.Color.textSecondary)
                             }
                         }
                         .listRowBackground(Color.appSurface)
@@ -99,7 +99,7 @@ struct AddParticipantsSheet: View {
                 } header: {
                     Text("SEARCH BY PHONE")
                         .font(.caption.weight(.semibold))
-                        .foregroundStyle(Color(white: 0.4))
+                        .foregroundStyle(DS.Color.textSecondary)
                         .textCase(nil)
                 }
 
@@ -110,14 +110,14 @@ struct AddParticipantsSheet: View {
                                 Image(systemName: "checkmark.circle.fill")
                                     .foregroundStyle(Color.statusLive)
                                 Text(name)
-                                    .foregroundStyle(.white)
+                                    .foregroundStyle(DS.Color.textPrimary)
                             }
                             .listRowBackground(Color.appSurface)
                         }
                     } header: {
                         Text("ADDED THIS SESSION")
                             .font(.caption.weight(.semibold))
-                            .foregroundStyle(Color(white: 0.4))
+                            .foregroundStyle(DS.Color.textSecondary)
                             .textCase(nil)
                     }
                 }
@@ -162,7 +162,7 @@ struct AddParticipantsSheet: View {
             case .pendingOutgoing:
                 Text("Request pending")
                     .font(.caption.weight(.semibold))
-                    .foregroundStyle(Color(white: 0.6))
+                    .foregroundStyle(DS.Color.textSecondary)
             case .pendingIncoming:
                 Button("Accept request") { Task { await sendFriendRequest(to: user) } }
                     .buttonStyle(.borderedProminent)
@@ -261,7 +261,7 @@ private struct AddFriendChip: View {
                     .overlay(Circle().strokeBorder(Color.coral.opacity(0.35), lineWidth: 1))
                 Text(shortName)
                     .scaledFont(size: 11, weight: .medium)
-                    .foregroundStyle(Color(white: 0.6))
+                    .foregroundStyle(DS.Color.textSecondary)
                     .lineLimit(1)
             }
             .frame(width: 56)

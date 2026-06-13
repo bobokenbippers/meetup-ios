@@ -98,7 +98,7 @@ struct CreateMeetupView: View {
                 Section {
                     Toggle("Set a target arrival time", isOn: $setTargetTime)
                         .tint(Color.coral)
-                        .foregroundStyle(.white)
+                        .foregroundStyle(DS.Color.textPrimary)
                         .listRowBackground(Color.appSurface)
                     TimePresetRow(
                         targetTime: $targetTime,
@@ -108,7 +108,7 @@ struct CreateMeetupView: View {
                     .listRowBackground(Color.appSurface)
                     if setTargetTime {
                         DatePicker("Date", selection: $targetTime, in: Date()..., displayedComponents: [.date])
-                            .foregroundStyle(.white)
+                            .foregroundStyle(DS.Color.textPrimary)
                             .tint(Color.coral)
                             .listRowBackground(Color.appSurface)
                             .onChange(of: targetTime) { _, _ in syncPickerState() }
@@ -145,7 +145,7 @@ struct CreateMeetupView: View {
                 } header: {
                     Text("TIME")
                         .font(.caption.weight(.semibold))
-                        .foregroundStyle(Color(white: 0.4))
+                        .foregroundStyle(DS.Color.textSecondary)
                         .textCase(nil)
                 }
 
@@ -181,7 +181,7 @@ struct CreateMeetupView: View {
                     .listRowBackground(Color.appSurface)
                     if showingCustomCategory {
                         TextField("e.g. Squad Picnic", text: $customCategoryText)
-                            .foregroundStyle(.white)
+                            .foregroundStyle(DS.Color.textPrimary)
                             .tint(Color.coral)
                             .listRowBackground(Color.appSurface)
                             .onChange(of: customCategoryText) { _, v in
@@ -191,7 +191,7 @@ struct CreateMeetupView: View {
                 } header: {
                     Text("CATEGORY")
                         .font(.caption.weight(.semibold))
-                        .foregroundStyle(Color(white: 0.4))
+                        .foregroundStyle(DS.Color.textSecondary)
                         .textCase(nil)
                 }
 
@@ -361,7 +361,7 @@ private struct CreatePlanSummary: View {
                 VStack(alignment: .leading, spacing: 4) {
                     Text(place?.name ?? "Where are we meeting?")
                         .scaledFont(size: 20, weight: .bold)
-                        .foregroundStyle(.white)
+                        .foregroundStyle(DS.Color.textPrimary)
                         .lineLimit(2)
                     Text(category)
                         .scaledFont(size: 12, weight: .semibold)
@@ -382,7 +382,7 @@ private struct CreatePlanSummary: View {
                         ForEach(invitees, id: \.id) { invitee in
                             Label(invitee.displayName, systemImage: "checkmark.circle.fill")
                                 .scaledFont(size: 12, weight: .semibold)
-                                .foregroundStyle(.white)
+                                .foregroundStyle(DS.Color.textPrimary)
                                 .lineLimit(1)
                                 .padding(.horizontal, 10)
                                 .padding(.vertical, 7)
@@ -410,7 +410,7 @@ private struct CreateSummaryPill: View {
     var body: some View {
         Label(title, systemImage: systemImage)
             .scaledFont(size: 11, weight: .semibold)
-            .foregroundStyle(Color(white: 0.78))
+            .foregroundStyle(DS.Color.textSecondary)
             .lineLimit(1)
             .minimumScaleFactor(0.82)
             .padding(.horizontal, 10)
@@ -443,7 +443,7 @@ private struct TimePresetRow: View {
                     } label: {
                         Text(preset.title)
                             .scaledFont(size: 12, weight: .semibold)
-                            .foregroundStyle(.white)
+                            .foregroundStyle(DS.Color.textPrimary)
                             .padding(.horizontal, 12)
                             .padding(.vertical, 8)
                             .background(Color.white.opacity(0.10))
@@ -546,9 +546,9 @@ private struct DestinationSection: View {
             if let place = selectedPlace {
                 HStack {
                     VStack(alignment: .leading, spacing: 2) {
-                        Text(place.name).font(.subheadline).bold().foregroundStyle(.white)
+                        Text(place.name).font(.subheadline).bold().foregroundStyle(DS.Color.textPrimary)
                         if let addr = place.address {
-                            Text(addr).font(.caption).foregroundStyle(Color(white: 0.6))
+                            Text(addr).font(.caption).foregroundStyle(DS.Color.textSecondary)
                         }
                     }
                     Spacer()
@@ -563,7 +563,7 @@ private struct DestinationSection: View {
             } else {
                 TextField("Search for a place", text: $searchQuery)
                     .autocorrectionDisabled()
-                    .foregroundStyle(.white)
+                    .foregroundStyle(DS.Color.textPrimary)
                     .tint(Color.coral)
                     .accessibilityIdentifier("field_destination")
                     .listRowBackground(Color.appSurface)
@@ -574,15 +574,15 @@ private struct DestinationSection: View {
                 if let searchError {
                     Text(searchError)
                         .font(.caption)
-                        .foregroundStyle(Color(white: 0.6))
+                        .foregroundStyle(DS.Color.textSecondary)
                         .listRowBackground(Color.appSurface)
                 }
                 ForEach(predictions) { prediction in
                     Button(action: { selectPrediction(prediction) }) {
                         VStack(alignment: .leading, spacing: 2) {
-                            Text(prediction.mainText).foregroundStyle(.white)
+                            Text(prediction.mainText).foregroundStyle(DS.Color.textPrimary)
                             if !prediction.secondaryText.isEmpty {
-                                Text(prediction.secondaryText).font(.caption).foregroundStyle(Color(white: 0.6))
+                                Text(prediction.secondaryText).font(.caption).foregroundStyle(DS.Color.textSecondary)
                             }
                         }
                     }
@@ -592,7 +592,7 @@ private struct DestinationSection: View {
         } header: {
             Text("DESTINATION")
                 .font(.caption.weight(.semibold))
-                .foregroundStyle(Color(white: 0.4))
+                .foregroundStyle(DS.Color.textSecondary)
                 .textCase(nil)
         }
         .task(id: searchQuery) {
@@ -656,7 +656,7 @@ private struct InviteSection: View {
                 TextField("Name or +1 (646) 946-6861", text: $inviteePhone)
                     .keyboardType(.default)
                     .autocorrectionDisabled()
-                    .foregroundStyle(.white)
+                    .foregroundStyle(DS.Color.textPrimary)
                     .tint(Color.coral)
                     .onChange(of: inviteePhone) { _, v in
                         refreshContactSuggestions(for: v)
@@ -673,9 +673,9 @@ private struct InviteSection: View {
             ForEach(contactSuggestions) { contact in
                 Button { Task { await selectContact(contact) } } label: {
                     VStack(alignment: .leading, spacing: 2) {
-                        Text(contact.displayName).foregroundStyle(.white)
+                        Text(contact.displayName).foregroundStyle(DS.Color.textPrimary)
                         Text(contact.phones.first ?? contact.emails.first ?? "")
-                            .font(.caption).foregroundStyle(Color(white: 0.6))
+                            .font(.caption).foregroundStyle(DS.Color.textSecondary)
                     }
                 }
                 .listRowBackground(Color.appSurface)
@@ -691,8 +691,8 @@ private struct InviteSection: View {
                             fontSize: 15
                         )
                         VStack(alignment: .leading, spacing: 2) {
-                            Text(user.displayName).font(.subheadline).foregroundStyle(.white)
-                            Text(user.phone).font(.caption).foregroundStyle(Color(white: 0.6))
+                            Text(user.displayName).font(.subheadline).foregroundStyle(DS.Color.textPrimary)
+                            Text(user.phone).font(.caption).foregroundStyle(DS.Color.textSecondary)
                         }
                         Spacer()
                         foundUserAction(for: user)
@@ -700,7 +700,7 @@ private struct InviteSection: View {
                     if let hint = foundUserHint {
                         Text(hint)
                             .font(.caption2)
-                            .foregroundStyle(Color(white: 0.55))
+                            .foregroundStyle(DS.Color.textSecondary)
                     }
                 }
                 .listRowBackground(Color.appSurface)
@@ -714,9 +714,9 @@ private struct InviteSection: View {
                         size: 34,
                         fontSize: 13
                     )
-                    Text(invitee.displayName).foregroundStyle(.white)
+                    Text(invitee.displayName).foregroundStyle(DS.Color.textPrimary)
                     Spacer()
-                    Text(invitee.phone).font(.caption).foregroundStyle(Color(white: 0.6))
+                    Text(invitee.phone).font(.caption).foregroundStyle(DS.Color.textSecondary)
                 }
                 .listRowBackground(Color.appSurface)
             }
@@ -724,7 +724,7 @@ private struct InviteSection: View {
         } header: {
             Text("INVITE PEOPLE")
                 .font(.caption.weight(.semibold))
-                .foregroundStyle(Color(white: 0.4))
+                .foregroundStyle(DS.Color.textSecondary)
                 .textCase(nil)
         }
         .task { await loadContactsIfEnabled() }
@@ -760,7 +760,7 @@ private struct InviteSection: View {
             case .pendingOutgoing:
                 Text("Request pending")
                     .font(.caption.weight(.semibold))
-                    .foregroundStyle(Color(white: 0.6))
+                    .foregroundStyle(DS.Color.textSecondary)
             case .pendingIncoming:
                 Button("Accept request") { Task { await sendFriendRequest(to: user) } }
                     .buttonStyle(.borderedProminent)
@@ -883,7 +883,7 @@ private struct FriendSuggestionsRow: View {
                 VStack(alignment: .leading, spacing: 8) {
                     Text("From your squad")
                         .font(.caption)
-                        .foregroundStyle(Color(white: 0.6))
+                        .foregroundStyle(DS.Color.textSecondary)
                         .textCase(.uppercase)
                     ScrollView(.horizontal, showsIndicators: false) {
                         HStack(spacing: 12) {
@@ -952,7 +952,7 @@ private struct FriendChip: View {
                 }
                 Text(shortName)
                     .scaledFont(size: 11, weight: .medium)
-                    .foregroundStyle(isInvited ? Color.coral : Color(white: 0.6))
+                    .foregroundStyle(isInvited ? Color.coral : DS.Color.textSecondary)
                     .lineLimit(1)
             }
             .frame(width: 56)
