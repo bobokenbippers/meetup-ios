@@ -16,6 +16,23 @@ class AppDelegate: NSObject, UIApplicationDelegate {
         UINavigationBar.appearance().standardAppearance = navAppearance
         UINavigationBar.appearance().compactAppearance = navAppearance
         UINavigationBar.appearance().scrollEdgeAppearance = navAppearance
+
+        // Compact tab bar — iOS 26 defaults to a large floating pill; pin it to
+        // a standard height with smaller item labels so it doesn't dominate the screen.
+        let tabItemAppearance = UITabBarItemAppearance(style: .stacked)
+        let smallLabel = UIFont.systemFont(ofSize: 10, weight: .medium)
+        tabItemAppearance.normal.titleTextAttributes = [.font: smallLabel]
+        tabItemAppearance.selected.titleTextAttributes = [.font: smallLabel]
+
+        let tabAppearance = UITabBarAppearance()
+        tabAppearance.configureWithDefaultBackground()
+        tabAppearance.stackedLayoutAppearance = tabItemAppearance
+        tabAppearance.inlineLayoutAppearance = tabItemAppearance
+        tabAppearance.compactInlineLayoutAppearance = tabItemAppearance
+        UITabBar.appearance().standardAppearance = tabAppearance
+        if #available(iOS 15.0, *) {
+            UITabBar.appearance().scrollEdgeAppearance = tabAppearance
+        }
         UNUserNotificationCenter.current().delegate = self
         UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .badge, .sound]) { granted, _ in
             guard granted else { return }
