@@ -1,9 +1,7 @@
 import Foundation
 
 /// A persistent named group of friends for playing Truth or Dare
-/// together. The owner adds accepted friends as members; starting a
-/// game from the group stamps the session and pushes the invite code
-/// to every other member.
+/// together. The owner adds accepted friends as members.
 struct GameGroup: Codable, Identifiable, Equatable, Hashable {
     let id: UUID
     let name: String
