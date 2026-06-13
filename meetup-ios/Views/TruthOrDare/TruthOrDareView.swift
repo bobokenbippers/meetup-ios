@@ -69,6 +69,11 @@ struct TruthOrDareView: View {
     @State private var showCustomDareInput = false
     @State private var isAssigningDare = false
 
+    // Custom dare assignment
+    @State private var customDareText: String = ""
+    @State private var showCustomDareInput = false
+    @State private var isAssigningDare = false
+
     private var myUserId: UUID? { auth.session?.user.id }
 
     private var currentTurn: GameTurn? {
