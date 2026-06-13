@@ -1,4 +1,5 @@
 import SwiftUI
+import Auth
 
 /// Game group detail: the member roster, owner management (add /
 /// remove members, delete group), leave for non-owners, and the
