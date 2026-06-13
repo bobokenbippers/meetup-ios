@@ -60,6 +60,7 @@ struct MeetupDashboardView: View {
         return participants.filter { participant in
             PunctualityStatus.resolve(
                 status: participant.status,
+                hasLiveETA: participant.hasLiveETA,
                 targetArrivalAt: target,
                 now: now
             ) == .runningLate
@@ -1191,20 +1192,22 @@ struct DashboardParticipantPin: View {
     let isMe: Bool
     let targetArrivalAt: Date?
 
+    private var punctualityStatus: PunctualityStatus {
+        PunctualityStatus.resolve(
+            status: participant.status,
+            hasLiveETA: participant.hasLiveETA,
+            targetArrivalAt: targetArrivalAt
+        )
+    }
+
     private var etaText: String {
-        if participant.status == "arrived" { return "✓ Here" }
-        if participant.status == "no" || participant.status == "declined" { return "Not coming" }
-        if participant.status == "maybe" { return "Maybe" }
         if let late = participant.lateLabel(target: targetArrivalAt) { return late }
-        return participant.etaLabel() ?? "On the way"
+        return participant.etaLabel() ?? punctualityStatus.label
     }
 
     private var etaColor: Color {
-        if participant.status == "arrived" { return .secondary }
-        if participant.status == "no" || participant.status == "declined" { return .statusLate.opacity(0.7) }
-        if participant.status == "maybe" { return .statusPending }
         if participant.lateLabel(target: targetArrivalAt) != nil { return .statusLate }
-        return .statusLive
+        return punctualityStatus.color
     }
 
     var body: some View {
@@ -1261,22 +1264,22 @@ private struct DashboardParticipantRow: View {
     let isMe: Bool
     let targetArrivalAt: Date?
 
+    private var punctualityStatus: PunctualityStatus {
+        PunctualityStatus.resolve(
+            status: participant.status,
+            hasLiveETA: participant.hasLiveETA,
+            targetArrivalAt: targetArrivalAt
+        )
+    }
+
     private var etaText: String {
-        if participant.status == "arrived"  { return "✓ Here" }
-        if participant.status == "no" || participant.status == "declined" { return "Not coming" }
-        if participant.status == "maybe"    { return "Maybe coming" }
-        if participant.status == "invited"  { return "Invited" }
         if let late = participant.lateLabel(target: targetArrivalAt) { return late }
-        return participant.etaLabel() ?? "On the way"
+        return participant.etaLabel() ?? punctualityStatus.label
     }
 
     private var etaColor: Color {
-        if participant.status == "arrived" { return .secondary }
-        if participant.status == "no" || participant.status == "declined" { return .statusLate.opacity(0.7) }
-        if participant.status == "maybe"   { return .statusPending }
-        if participant.status == "invited" { return .statusPending }
         if participant.lateLabel(target: targetArrivalAt) != nil { return .statusLate }
-        return .statusLive
+        return punctualityStatus.color
     }
 
     private var punctualityTint: Color? {
@@ -1308,10 +1311,7 @@ private struct DashboardParticipantRow: View {
     }
 
     private var isRunningLate: Bool {
-        PunctualityStatus.resolve(
-            status: participant.status,
-            targetArrivalAt: targetArrivalAt
-        ) == .runningLate
+        punctualityStatus == .runningLate
     }
 
     var body: some View {
@@ -1359,6 +1359,7 @@ private struct DashboardParticipantRow: View {
 
             PunctualityTile(
                 rawStatus: participant.status,
+                hasLiveETA: participant.hasLiveETA,
                 targetArrivalAt: targetArrivalAt
             )
         }

@@ -26,6 +26,7 @@ extension Color {
     // MARK: - Punctuality tile colors
 
     static let statusEnRoute     = Color(red: 0.118, green: 0.565, blue: 1.000)
+    static let statusGoing       = Color(red: 0.000, green: 0.643, blue: 0.522)
     static let statusInvited     = Color(red: 0.560, green: 0.560, blue: 0.620)
     static let statusRunningLate = Color(red: 1.000, green: 0.620, blue: 0.000)
 
