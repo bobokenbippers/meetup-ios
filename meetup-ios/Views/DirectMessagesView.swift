@@ -57,10 +57,10 @@ struct DirectMessagesView: View {
                 .foregroundStyle(Color.coral.opacity(0.45))
             Text("No messages yet")
                 .scaledFont(size: 17, weight: .bold)
-                .foregroundStyle(.white)
+                .foregroundStyle(DS.Color.textPrimary)
             Text("Open a friend from People to start a DM.")
                 .scaledFont(size: 13)
-                .foregroundStyle(Color(white: 0.55))
+                .foregroundStyle(DS.Color.textSecondary)
                 .multilineTextAlignment(.center)
         }
         .padding(.horizontal, 32)
@@ -116,20 +116,20 @@ private struct ConversationRow: View {
                 HStack {
                     Text(displayName)
                         .scaledFont(size: 14, weight: .semibold)
-                        .foregroundStyle(.white)
+                        .foregroundStyle(DS.Color.textPrimary)
                         .lineLimit(1)
                     Spacer()
                     if let date = summary.lastMessageAt {
                         Text(date, format: .dateTime.month(.abbreviated).day())
                             .scaledFont(size: 10, weight: .medium)
-                            .foregroundStyle(Color(white: 0.45))
+                            .foregroundStyle(DS.Color.textSecondary)
                     }
                 }
 
                 HStack(spacing: 8) {
                     Text(summary.preview)
                         .scaledFont(size: 12)
-                        .foregroundStyle(Color(white: 0.58))
+                        .foregroundStyle(DS.Color.textSecondary)
                         .lineLimit(1)
                     Spacer()
                     if summary.unreadCount > 0 {
@@ -302,7 +302,7 @@ struct MessageThreadView: View {
                         .clipShape(RoundedRectangle(cornerRadius: 10))
                     Text("Photo ready")
                         .scaledFont(size: 12, weight: .medium)
-                        .foregroundStyle(Color(white: 0.65))
+                        .foregroundStyle(DS.Color.textSecondary)
                     Spacer()
                     Button {
                         self.selectedImage = nil
@@ -310,7 +310,7 @@ struct MessageThreadView: View {
                     } label: {
                         Image(systemName: "xmark.circle.fill")
                             .scaledFont(size: 20)
-                            .foregroundStyle(Color(white: 0.55))
+                            .foregroundStyle(DS.Color.textSecondary)
                     }
                     .buttonStyle(.plain)
                 }
@@ -321,7 +321,7 @@ struct MessageThreadView: View {
                         .tint(Color.coral)
                     Text("Preparing photo…")
                         .scaledFont(size: 12, weight: .medium)
-                        .foregroundStyle(Color(white: 0.65))
+                        .foregroundStyle(DS.Color.textSecondary)
                     Spacer()
                 }
                 .padding(.horizontal, 12)
@@ -332,14 +332,14 @@ struct MessageThreadView: View {
                         .foregroundStyle(Color.coral)
                     Text(failedPhotoSelection)
                         .scaledFont(size: 12, weight: .medium)
-                        .foregroundStyle(Color(white: 0.65))
+                        .foregroundStyle(DS.Color.textSecondary)
                     Spacer()
                     Button {
                         self.failedPhotoSelection = nil
                     } label: {
                         Image(systemName: "xmark.circle.fill")
                             .scaledFont(size: 20)
-                            .foregroundStyle(Color(white: 0.55))
+                            .foregroundStyle(DS.Color.textSecondary)
                     }
                     .buttonStyle(.plain)
                 }
@@ -574,16 +574,16 @@ private struct MessageBubble: View {
                 if let body = message.body, !body.isEmpty {
                     Text(body)
                         .scaledFont(size: 14)
-                        .foregroundStyle(.white)
+                        .foregroundStyle(isMine ? .white : DS.Color.textPrimary)
                         .multilineTextAlignment(isMine ? .trailing : .leading)
                 }
                 Text(message.createdAt, format: .dateTime.hour().minute())
                     .scaledFont(size: 9, weight: .medium)
-                    .foregroundStyle(.white.opacity(0.45))
+                    .foregroundStyle(isMine ? .white.opacity(0.45) : DS.Color.textSecondary)
                 if message.editedAt != nil {
                     Text("Edited")
                         .scaledFont(size: 9, weight: .medium)
-                        .foregroundStyle(.white.opacity(0.42))
+                        .foregroundStyle(isMine ? .white.opacity(0.42) : DS.Color.textSecondary)
                 }
                 if !reactionSummaries.isEmpty {
                     reactionRow

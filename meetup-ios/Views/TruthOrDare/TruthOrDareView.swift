@@ -190,17 +190,17 @@ struct TruthOrDareView: View {
                     .foregroundStyle(Color.coral)
                 Text("Truth or Dare")
                     .scaledFont(size: 28, weight: .black)
-                    .foregroundStyle(.white)
+                    .foregroundStyle(DS.Color.textPrimary)
                 Text("The coin picks. Dares need photo proof.\nChickening out goes on the scoreboard.")
                     .scaledFont(size: 13)
-                    .foregroundStyle(Color(white: 0.6))
+                    .foregroundStyle(DS.Color.textSecondary)
                     .multilineTextAlignment(.center)
             }
 
             VStack(spacing: 10) {
                 Text("Pick the vibe")
                     .scaledFont(size: 13, weight: .semibold)
-                    .foregroundStyle(Color(white: 0.6))
+                    .foregroundStyle(DS.Color.textSecondary)
                 HStack(spacing: 10) {
                     tierCard(
                         tier: "normal",
@@ -244,10 +244,10 @@ struct TruthOrDareView: View {
                     .foregroundStyle(isSelected ? Color.coral : Color(white: 0.5))
                 Text(title)
                     .scaledFont(size: 15, weight: .bold)
-                    .foregroundStyle(.white)
+                    .foregroundStyle(DS.Color.textPrimary)
                 Text(subtitle)
                     .scaledFont(size: 11)
-                    .foregroundStyle(Color(white: 0.55))
+                    .foregroundStyle(DS.Color.textSecondary)
             }
             .frame(maxWidth: .infinity)
             .padding(.vertical, 18)
@@ -268,7 +268,7 @@ struct TruthOrDareView: View {
             VStack(spacing: 6) {
                 Text("Waiting for the squad")
                     .scaledFont(size: 24, weight: .black)
-                    .foregroundStyle(.white)
+                    .foregroundStyle(DS.Color.textPrimary)
                 tierChip(session)
             }
             .padding(.top, 24)
@@ -285,7 +285,7 @@ struct TruthOrDareView: View {
                             )
                             Text(player.displayName ?? "Player")
                                 .scaledFont(size: 15, weight: .semibold)
-                                .foregroundStyle(.white)
+                                .foregroundStyle(DS.Color.textPrimary)
                             if player.userId == session.startedBy {
                                 Text("HOST")
                                     .scaledFont(size: 9, weight: .black)
@@ -335,7 +335,7 @@ struct TruthOrDareView: View {
                 } else {
                     Text("Waiting for \(starterName) to start the game…")
                         .scaledFont(size: 13)
-                        .foregroundStyle(Color(white: 0.55))
+                        .foregroundStyle(DS.Color.textSecondary)
                 }
             }
             .padding(.horizontal, 20)
@@ -358,7 +358,7 @@ struct TruthOrDareView: View {
                 if let turn = currentTurn {
                     Text("Round \(turn.turnNumber)")
                         .scaledFont(size: 12, weight: .bold)
-                        .foregroundStyle(Color(white: 0.6))
+                        .foregroundStyle(DS.Color.textSecondary)
                 }
             }
             .padding(.horizontal, 20)
@@ -464,13 +464,13 @@ struct TruthOrDareView: View {
 
             Text(turn.promptText ?? "")
                 .scaledFont(size: 22, weight: .bold)
-                .foregroundStyle(.white)
+                .foregroundStyle(DS.Color.textPrimary)
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, 8)
 
             Text(promptCardSubtitle(turn))
                 .scaledFont(size: 12)
-                .foregroundStyle(Color(white: 0.55))
+                .foregroundStyle(DS.Color.textSecondary)
                 .multilineTextAlignment(.center)
         }
         .frame(maxWidth: .infinity)
@@ -509,7 +509,7 @@ struct TruthOrDareView: View {
                 .tint(Color(white: 0.55))
             Text("Waiting for someone to set your dare…")
                 .scaledFont(size: 13)
-                .foregroundStyle(Color(white: 0.55))
+                .foregroundStyle(DS.Color.textSecondary)
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 14)
@@ -551,7 +551,7 @@ struct TruthOrDareView: View {
                     TextField("Type a dare…", text: $customDareText, axis: .vertical)
                         .lineLimit(3, reservesSpace: true)
                         .scaledFont(size: 15)
-                        .foregroundStyle(.white)
+                        .foregroundStyle(DS.Color.textPrimary)
                         .tint(Color.coral)
                         .padding(.horizontal, 14)
                         .padding(.vertical, 10)
@@ -629,7 +629,7 @@ struct TruthOrDareView: View {
         VStack(alignment: .leading, spacing: 8) {
             Text("Game feed")
                 .scaledFont(size: 12, weight: .bold)
-                .foregroundStyle(Color(white: 0.55))
+                .foregroundStyle(DS.Color.textSecondary)
                 .padding(.horizontal, 20)
 
             ScrollView(.horizontal, showsIndicators: false) {
@@ -670,7 +670,7 @@ struct TruthOrDareView: View {
             HStack(spacing: 4) {
                 Text(playerName(for: turn))
                     .scaledFont(size: 10, weight: .semibold)
-                    .foregroundStyle(.white)
+                    .foregroundStyle(DS.Color.textPrimary)
                     .lineLimit(1)
                 Spacer(minLength: 0)
                 if turn.isPassed {
@@ -689,7 +689,7 @@ struct TruthOrDareView: View {
     private func feedPlaceholder(symbol: String) -> some View {
         Image(systemName: symbol)
             .scaledFont(size: 28)
-            .foregroundStyle(Color(white: 0.4))
+            .foregroundStyle(DS.Color.textSecondary)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
@@ -709,10 +709,10 @@ struct TruthOrDareView: View {
                     .scaledFont(size: 48)
                 Text(title)
                     .scaledFont(size: 26, weight: .black)
-                    .foregroundStyle(.white)
+                    .foregroundStyle(DS.Color.textPrimary)
                 Text("Passes don't lie.")
                     .scaledFont(size: 13)
-                    .foregroundStyle(Color(white: 0.55))
+                    .foregroundStyle(DS.Color.textSecondary)
             }
             .padding(.top, 24)
 
@@ -726,10 +726,10 @@ struct TruthOrDareView: View {
                             VStack(alignment: .leading, spacing: 2) {
                                 Text(entry.displayName)
                                     .scaledFont(size: 15, weight: .semibold)
-                                    .foregroundStyle(.white)
+                                    .foregroundStyle(DS.Color.textPrimary)
                                 Text("\(entry.completedTruths) truths · \(entry.completedDares) dares")
                                     .scaledFont(size: 11)
-                                    .foregroundStyle(Color(white: 0.55))
+                                    .foregroundStyle(DS.Color.textSecondary)
                             }
                             Spacer()
                             if entry.passes > 0 {

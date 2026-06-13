@@ -123,12 +123,12 @@ struct RecapView: View {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(meetup.destinationName)
                         .scaledFont(size: 24, weight: .bold)
-                        .foregroundStyle(.white)
+                        .foregroundStyle(DS.Color.textPrimary)
                         .lineLimit(2)
                     if let addr = meetup.destinationAddress, !addr.isEmpty {
                         Text(addr)
                             .scaledFont(size: 12)
-                            .foregroundStyle(Color(white: 0.66))
+                            .foregroundStyle(DS.Color.textSecondary)
                             .lineLimit(1)
                     }
                 }
@@ -171,7 +171,7 @@ struct RecapView: View {
                     .foregroundStyle(Color.coral)
                 Text("Add the first photo from this meetup")
                     .scaledFont(size: 13, weight: .semibold)
-                    .foregroundStyle(Color(white: 0.76))
+                    .foregroundStyle(DS.Color.textSecondary)
                 Spacer()
                 Button {
                     showPhotoPicker = true
@@ -197,7 +197,7 @@ struct RecapView: View {
                             image.resizable().scaledToFill()
                         default:
                             Color.white.opacity(0.08)
-                                .overlay(Image(systemName: "photo").foregroundStyle(Color(white: 0.45)))
+                                .overlay(Image(systemName: "photo").foregroundStyle(DS.Color.textSecondary))
                         }
                     }
                     .frame(height: 112)
@@ -214,15 +214,15 @@ struct RecapView: View {
         HStack(spacing: 8) {
             Image(systemName: icon)
                 .scaledFont(size: 12)
-                .foregroundStyle(Color(white: 0.62))
+                .foregroundStyle(DS.Color.textSecondary)
                 .frame(width: 16)
             Text(label)
                 .scaledFont(size: 12)
-                .foregroundStyle(Color(white: 0.62))
+                .foregroundStyle(DS.Color.textSecondary)
             Spacer()
             Text(value)
                 .scaledFont(size: 12, weight: .medium)
-                .foregroundStyle(.white)
+                .foregroundStyle(DS.Color.textPrimary)
                 .multilineTextAlignment(.trailing)
         }
     }
@@ -635,7 +635,7 @@ private struct RecapMetaPill: View {
     var body: some View {
         Label(title, systemImage: systemImage)
             .scaledFont(size: 11, weight: .semibold)
-            .foregroundStyle(Color(white: 0.78))
+            .foregroundStyle(DS.Color.textSecondary)
             .lineLimit(1)
             .minimumScaleFactor(0.82)
             .padding(.horizontal, 10)
@@ -657,12 +657,12 @@ private struct RecapStatTile: View {
                 .foregroundStyle(Color.coral)
             Text(value)
                 .scaledFont(size: 18, weight: .bold)
-                .foregroundStyle(.white)
+                .foregroundStyle(DS.Color.textPrimary)
                 .lineLimit(1)
                 .minimumScaleFactor(0.7)
             Text(label.uppercased())
                 .scaledFont(size: 10, weight: .bold)
-                .foregroundStyle(Color(white: 0.5))
+                .foregroundStyle(DS.Color.textSecondary)
                 .lineLimit(1)
         }
         .frame(maxWidth: .infinity, alignment: .leading)

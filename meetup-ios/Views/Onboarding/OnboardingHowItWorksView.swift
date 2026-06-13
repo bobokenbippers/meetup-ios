@@ -18,7 +18,7 @@ struct OnboardingHowItWorksView: View {
 
                 Text("How it works")
                     .scaledFont(size: 36, weight: .black, design: .rounded)
-                    .foregroundColor(.white)
+                    .foregroundStyle(DS.Color.textPrimary)
                     .padding(.bottom, 48)
 
                 VStack(spacing: 24) {
@@ -31,10 +31,10 @@ struct OnboardingHowItWorksView: View {
                             VStack(alignment: .leading, spacing: 5) {
                                 Text(step.title)
                                     .scaledFont(size: 18, weight: .bold)
-                                    .foregroundColor(.white)
+                                    .foregroundStyle(DS.Color.textPrimary)
                                 Text(step.subtitle)
                                     .scaledFont(size: 15)
-                                    .foregroundColor(Color(white: 0.6))
+                                    .foregroundStyle(DS.Color.textSecondary)
                             }
                             Spacer()
                         }
@@ -47,7 +47,7 @@ struct OnboardingHowItWorksView: View {
                 Button(action: onNext) {
                     Text("Sounds good →")
                         .scaledFont(size: 18, weight: .semibold)
-                        .foregroundColor(.white)
+                        .foregroundStyle(.white) // on coral background
                         .frame(maxWidth: .infinity)
                         .frame(height: 56)
                         .background(Color.coral)

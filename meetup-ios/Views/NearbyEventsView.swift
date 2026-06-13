@@ -99,7 +99,7 @@ struct NearbyEventsView: View {
                 .scaledFont(size: 12)
             Text("HAPPENING NEAR YOU")
                 .scaledFont(size: 10, weight: .bold)
-                .foregroundStyle(Color(white: 0.45))
+                .foregroundStyle(DS.Color.textSecondary)
         }
         .padding(.leading, 16)
     }
@@ -110,7 +110,7 @@ struct NearbyEventsView: View {
                 .tint(Color.coral)
             Text("Finding events near you…")
                 .scaledFont(size: 12)
-                .foregroundStyle(Color(white: 0.45))
+                .foregroundStyle(DS.Color.textSecondary)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, 16)
@@ -131,10 +131,10 @@ struct NearbyEventsView: View {
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Turn on location for local events")
                         .scaledFont(size: 13, weight: .semibold)
-                        .foregroundStyle(.white)
+                        .foregroundStyle(DS.Color.textPrimary)
                     Text("We'll show ideas near you.")
                         .scaledFont(size: 11)
-                        .foregroundStyle(Color(white: 0.58))
+                        .foregroundStyle(DS.Color.textSecondary)
                 }
 
                 Spacer(minLength: 8)
@@ -176,7 +176,7 @@ struct NearbyEventsView: View {
             header
             Text("No nearby events right now")
                 .scaledFont(size: 12, weight: .medium)
-                .foregroundStyle(Color(white: 0.58))
+                .foregroundStyle(DS.Color.textSecondary)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.horizontal, 16)
                 .padding(.vertical, 8)
@@ -198,10 +198,10 @@ struct NearbyEventsView: View {
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Events didn't load")
                         .scaledFont(size: 13, weight: .semibold)
-                        .foregroundStyle(.white)
+                        .foregroundStyle(DS.Color.textPrimary)
                     Text(message)
                         .scaledFont(size: 11)
-                        .foregroundStyle(Color(white: 0.58))
+                        .foregroundStyle(DS.Color.textSecondary)
                         .lineLimit(2)
                 }
 
@@ -361,7 +361,7 @@ private struct NearbyEventCard: View {
         VStack(alignment: .leading, spacing: 8) {
             Text(event.name)
                 .scaledFont(size: 14, weight: .bold)
-                .foregroundStyle(.white)
+                .foregroundStyle(DS.Color.textPrimary)
                 .lineLimit(2)
                 .multilineTextAlignment(.leading)
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -389,13 +389,13 @@ private struct NearbyEventCard: View {
                     Image(systemName: "mappin.and.ellipse")
                         .scaledFont(size: 10)
                 }
-                .foregroundStyle(Color(white: 0.6))
+                .foregroundStyle(DS.Color.textSecondary)
             }
 
             if let miles = distanceMiles {
                 Text(String(format: "%.1f mi away", miles))
                     .scaledFont(size: 10, weight: .medium)
-                    .foregroundStyle(Color(white: 0.45))
+                    .foregroundStyle(DS.Color.textSecondary)
             }
         }
         .padding(14)

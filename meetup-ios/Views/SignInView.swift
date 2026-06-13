@@ -57,12 +57,12 @@ struct SignInView: View {
                 // Title
                 Text("Squad Brunch")
                     .scaledFont(size: 42, weight: .black, design: .default)
-                    .foregroundStyle(.white)
+                    .foregroundStyle(DS.Color.textPrimary)
                     .tracking(-0.5)
 
                 Text("Know who's on their way.")
                     .scaledFont(size: 17, weight: .regular)
-                    .foregroundStyle(Color(white: 0.55))
+                    .foregroundStyle(DS.Color.textSecondary)
                     .padding(.top, 6)
                     .padding(.bottom, 56)
 
@@ -98,7 +98,7 @@ struct SignInView: View {
 
                     Text("By signing in you agree to our terms")
                         .scaledFont(size: 11)
-                        .foregroundStyle(Color(white: 0.35))
+                        .foregroundStyle(DS.Color.textSecondary)
                 }
                 .padding(.horizontal, 32)
                 .padding(.bottom, 52)

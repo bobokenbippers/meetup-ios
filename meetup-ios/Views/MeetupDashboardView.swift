@@ -228,14 +228,14 @@ struct MeetupDashboardView: View {
         VStack(alignment: .leading, spacing: 2) {
             Text("\(greeting), \(auth.profile?.displayName ?? "there") 👋")
                 .scaledFont(size: 12)
-                .foregroundStyle(Color(white: 0.55))
+                .foregroundStyle(DS.Color.textSecondary)
             Text(meetup.destinationName)
                 .scaledFont(size: 24, weight: .black)
-                .foregroundStyle(.white)
+                .foregroundStyle(DS.Color.textPrimary)
                 .lineLimit(1)
             Text("You're meeting \(meetingCount) \(meetingCount == 1 ? "person" : "people")")
                 .scaledFont(size: 12)
-                .foregroundStyle(Color(white: 0.55))
+                .foregroundStyle(DS.Color.textSecondary)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
@@ -365,7 +365,7 @@ struct MeetupDashboardView: View {
             HStack {
                 Text("Everyone")
                     .scaledFont(size: 13, weight: .bold)
-                    .foregroundStyle(.white)
+                    .foregroundStyle(DS.Color.textPrimary)
                 if myUserId == meetup.hostId {
                     Spacer()
                     Button {
@@ -721,7 +721,7 @@ struct DashboardParticipantPin: View {
                 VStack(alignment: .leading, spacing: 1) {
                     Text(participant.displayName ?? "?")
                         .scaledFont(size: 10, weight: .bold)
-                        .foregroundStyle(.white)
+                        .foregroundStyle(DS.Color.textPrimary)
                     Text(etaText)
                         .scaledFont(size: 9, weight: .semibold)
                         .foregroundStyle(etaColor)
@@ -807,7 +807,7 @@ private struct DashboardParticipantRow: View {
                         .fill(Color.black.opacity(0.35))
                     Image(systemName: "checkmark")
                         .scaledFont(size: 12, weight: .bold)
-                        .foregroundStyle(.white)
+                        .foregroundStyle(.white) // on black overlay
                 }
             }
 
@@ -815,11 +815,11 @@ private struct DashboardParticipantRow: View {
                 HStack(spacing: 4) {
                     Text(participant.displayName ?? "Unknown")
                         .scaledFont(size: 12, weight: .semibold)
-                        .foregroundStyle(.white)
+                        .foregroundStyle(DS.Color.textPrimary)
                     if isMe {
                         Text("(you)")
                             .scaledFont(size: 11)
-                            .foregroundStyle(Color(white: 0.5))
+                            .foregroundStyle(DS.Color.textSecondary)
                     }
                 }
                 Text(etaText)

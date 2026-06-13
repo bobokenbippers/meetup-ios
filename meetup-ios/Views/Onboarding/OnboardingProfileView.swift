@@ -31,18 +31,18 @@ struct OnboardingProfileView: View {
 
                 Text("What should we\ncall you?")
                     .scaledFont(size: 34, weight: .black, design: .rounded)
-                    .foregroundColor(.white)
+                    .foregroundStyle(DS.Color.textPrimary)
                     .multilineTextAlignment(.center)
                     .padding(.bottom, 10)
 
                 Text("This is how your friends will see you.")
                     .scaledFont(size: 16)
-                    .foregroundColor(Color(white: 0.6))
+                    .foregroundStyle(DS.Color.textSecondary)
                     .padding(.bottom, 40)
 
                 TextField("Your name", text: $displayName)
                     .scaledFont(size: 18)
-                    .foregroundColor(.white)
+                    .foregroundStyle(DS.Color.textPrimary)
                     .tint(Color.coral)
                     .padding(16)
                     .background(Color.appSurface)
@@ -75,7 +75,7 @@ struct OnboardingProfileView: View {
                         } else {
                             Text("Done →")
                                 .scaledFont(size: 18, weight: .semibold)
-                                .foregroundColor(.white)
+                                .foregroundStyle(.white) // on coral background
                         }
                     }
                     .frame(maxWidth: .infinity)

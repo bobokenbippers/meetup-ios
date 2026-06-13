@@ -83,10 +83,10 @@ struct GamesHomeView: View {
             VStack(spacing: 4) {
                 Text("Truth or Dare")
                     .scaledFont(size: 24, weight: .black)
-                    .foregroundStyle(.white)
+                    .foregroundStyle(DS.Color.textPrimary)
                 Text("The coin picks. Dares need photo proof.\nNo meetup required.")
                     .scaledFont(size: 12)
-                    .foregroundStyle(Color(white: 0.6))
+                    .foregroundStyle(DS.Color.textSecondary)
                     .multilineTextAlignment(.center)
             }
             Button {
@@ -117,7 +117,7 @@ struct GamesHomeView: View {
         VStack(alignment: .leading, spacing: 10) {
             Text("My Groups")
                 .scaledFont(size: 13, weight: .bold)
-                .foregroundStyle(Color(white: 0.6))
+                .foregroundStyle(DS.Color.textSecondary)
                 .padding(.horizontal, 4)
 
             if !myGroups.isEmpty {
@@ -168,11 +168,11 @@ struct GamesHomeView: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(group.name)
                     .scaledFont(size: 15, weight: .semibold)
-                    .foregroundStyle(.white)
+                    .foregroundStyle(DS.Color.textPrimary)
                 if let count = group.memberCount {
                     Text("\(count) member\(count == 1 ? "" : "s")")
                         .scaledFont(size: 11)
-                        .foregroundStyle(Color(white: 0.55))
+                        .foregroundStyle(DS.Color.textSecondary)
                 }
             }
 
@@ -180,7 +180,7 @@ struct GamesHomeView: View {
 
             Image(systemName: "chevron.right")
                 .scaledFont(size: 13, weight: .semibold)
-                .foregroundStyle(Color(white: 0.4))
+                .foregroundStyle(DS.Color.textSecondary)
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 12)
@@ -193,7 +193,7 @@ struct GamesHomeView: View {
         VStack(alignment: .leading, spacing: 10) {
             Text("Your games")
                 .scaledFont(size: 13, weight: .bold)
-                .foregroundStyle(Color(white: 0.6))
+                .foregroundStyle(DS.Color.textSecondary)
                 .padding(.horizontal, 4)
 
             VStack(spacing: 0) {
@@ -226,10 +226,10 @@ struct GamesHomeView: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(session.isSpicy ? "Spicy round" : "Normal round")
                     .scaledFont(size: 15, weight: .semibold)
-                    .foregroundStyle(.white)
+                    .foregroundStyle(DS.Color.textPrimary)
                 Text(session.createdAt, format: .dateTime.month(.abbreviated).day())
                     .scaledFont(size: 11)
-                    .foregroundStyle(Color(white: 0.55))
+                    .foregroundStyle(DS.Color.textSecondary)
             }
 
             Spacer()
