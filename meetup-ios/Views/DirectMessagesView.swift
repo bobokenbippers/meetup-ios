@@ -570,10 +570,10 @@ private struct MessageBubble: View {
             if isMine { Spacer(minLength: 46) }
             ZStack(alignment: isMine ? .topTrailing : .topLeading) {
                 bubbleContent
-                    .padding(.top, showsReactionPicker ? 40 : 0)
 
                 if showsReactionPicker {
                     reactionPickerRow
+                        .offset(y: -44)
                         .transition(
                             .opacity.combined(
                                 with: .scale(
@@ -585,6 +585,7 @@ private struct MessageBubble: View {
                         .zIndex(1)
                 }
             }
+            .zIndex(showsReactionPicker ? 2 : 0)
             if !isMine { Spacer(minLength: 46) }
         }
     }
@@ -604,18 +605,6 @@ private struct MessageBubble: View {
                 Text(message.createdAt, format: .dateTime.hour().minute())
                     .scaledFont(size: 9, weight: .medium)
                     .foregroundStyle(isMine ? .white.opacity(0.45) : DS.Color.textSecondary)
-                Button {
-                    withAnimation(.spring(response: 0.22, dampingFraction: 0.86)) {
-                        showsReactionPicker.toggle()
-                    }
-                } label: {
-                    Image(systemName: "face.smiling")
-                        .scaledFont(size: 10, weight: .semibold)
-                        .foregroundStyle(isMine ? .white.opacity(0.62) : DS.Color.textSecondary)
-                        .frame(width: 20, height: 20)
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("Show reactions")
             }
             if message.editedAt != nil {
                 Text("Edited")
@@ -630,6 +619,9 @@ private struct MessageBubble: View {
         .padding(.vertical, 9)
         .background(isMine ? Color.coral : Color.appSurface)
         .clipShape(RoundedRectangle(cornerRadius: 16))
+        .onLongPressGesture(minimumDuration: 0.22) {
+            showReactionPicker()
+        }
         .contextMenu {
             if isMine {
                 Button(action: onEdit) {
@@ -643,7 +635,7 @@ private struct MessageBubble: View {
     }
 
     private var reactionPickerRow: some View {
-        HStack(spacing: 5) {
+        HStack(spacing: 4) {
             ForEach(Self.availableReactions, id: \.self) { emoji in
                 Button {
                     withAnimation(.spring(response: 0.22, dampingFraction: 0.86)) {
@@ -653,16 +645,30 @@ private struct MessageBubble: View {
                 } label: {
                     Text(emoji)
                         .scaledFont(size: 13, weight: .semibold)
-                        .frame(width: 28, height: 26)
-                        .background(isMine ? Color.white.opacity(0.18) : Color.black.opacity(0.07))
+                        .frame(width: 27, height: 27)
+                        .background(Color.white.opacity(0.001))
                         .clipShape(Capsule())
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel("React with \(emoji)")
             }
+            Button {
+                withAnimation(.spring(response: 0.22, dampingFraction: 0.86)) {
+                    showsReactionPicker = false
+                }
+            } label: {
+                Image(systemName: "plus")
+                    .scaledFont(size: 11, weight: .bold)
+                    .foregroundStyle(DS.Color.textSecondary)
+                    .frame(width: 27, height: 27)
+                    .background(Color.white.opacity(0.55))
+                    .clipShape(Circle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("More reactions")
         }
-        .padding(.horizontal, 8)
-        .padding(.vertical, 6)
+        .padding(.horizontal, 7)
+        .padding(.vertical, 5)
         .background(.ultraThinMaterial)
         .clipShape(Capsule())
         .overlay(
@@ -670,6 +676,12 @@ private struct MessageBubble: View {
                 .strokeBorder(.white.opacity(0.12), lineWidth: 1)
         )
         .shadow(color: .black.opacity(0.18), radius: 10, x: 0, y: 4)
+    }
+
+    private func showReactionPicker() {
+        withAnimation(.spring(response: 0.22, dampingFraction: 0.86)) {
+            showsReactionPicker = true
+        }
     }
 
     private var reactionRow: some View {
