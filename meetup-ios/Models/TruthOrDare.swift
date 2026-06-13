@@ -66,6 +66,11 @@ struct GamePlayer: Codable, Identifiable, Equatable {
 ///
 /// Status lifecycle: `pending` (waiting for coin flip) → `prompted`
 /// (coin landed, prompt drawn) → `completed` or `passed`.
+///
+/// For dare turns, `dareLocked` gates the doer: false = assigning
+/// phase (another player picks/edits the dare text); true = dare is
+/// set and the doer can act. Truths skip the assigning phase and
+/// are always locked immediately after the coin flip.
 struct GameTurn: Codable, Identifiable, Equatable {
     let id: UUID
     let sessionId: UUID
@@ -76,6 +81,7 @@ struct GameTurn: Codable, Identifiable, Equatable {
     let promptKind: String?          // "truth" | "dare"
     let promptText: String?
     let proofPhotoUrl: String?
+    let dareLocked: Bool             // false = assigning phase; true = dare confirmed
     let createdAt: Date
     let completedAt: Date?
     let profiles: GamePlayer.PlayerProfile?
@@ -89,6 +95,7 @@ struct GameTurn: Codable, Identifiable, Equatable {
         case promptKind = "prompt_kind"
         case promptText = "prompt_text"
         case proofPhotoUrl = "proof_photo_url"
+        case dareLocked = "dare_locked"
         case createdAt = "created_at"
         case completedAt = "completed_at"
     }
@@ -103,7 +110,7 @@ struct GameTurn: Codable, Identifiable, Equatable {
 
     /// Local copy of this turn with the server's flip result applied,
     /// so the flipping player's animation starts before the Realtime
-    /// echo arrives.
+    /// echo arrives. Truths are immediately locked; dares start unlocked.
     func applyingFlip(_ result: CoinFlipResult) -> GameTurn {
         GameTurn(
             id: id,
@@ -115,6 +122,7 @@ struct GameTurn: Codable, Identifiable, Equatable {
             promptKind: result.promptKind,
             promptText: result.promptText,
             proofPhotoUrl: proofPhotoUrl,
+            dareLocked: result.promptKind == "truth",
             createdAt: createdAt,
             completedAt: completedAt,
             profiles: profiles
@@ -132,6 +140,7 @@ struct GameTurn: Codable, Identifiable, Equatable {
             promptKind: promptKind,
             promptText: promptText,
             proofPhotoUrl: url,
+            dareLocked: dareLocked,
             createdAt: createdAt,
             completedAt: completedAt,
             profiles: profiles

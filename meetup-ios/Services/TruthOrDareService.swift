@@ -195,6 +195,22 @@ final class TruthOrDareService {
             .execute()
     }
 
+    /// Assign (or override) the dare for the current turn.
+    /// Called by any game player who is NOT the doer. Passing the
+    /// existing `promptText` keeps the server suggestion; passing a
+    /// non-empty string replaces it. The first caller wins — a race
+    /// from a second player is silently ignored by the server.
+    func assignDare(turnId: UUID, promptText: String) async throws {
+        struct Params: Encodable {
+            let p_turn_id: UUID
+            let p_prompt_text: String
+        }
+        try await supabase
+            .rpc("assign_dare_prompt",
+                 params: Params(p_turn_id: turnId, p_prompt_text: promptText))
+            .execute()
+    }
+
     /// Chicken out of the current turn.
     func passTurn(turnId: UUID) async throws {
         struct Params: Encodable {
