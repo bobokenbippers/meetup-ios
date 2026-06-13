@@ -69,6 +69,7 @@ enum DS {
     }
 
     enum Font {
+        static let hero     = Typography.Font.display
         static let title    = Typography.Font.title
         static let headline = Typography.Font.headline
         static let body     = Typography.Font.body
