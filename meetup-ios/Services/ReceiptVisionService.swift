@@ -1,5 +1,6 @@
 import Foundation
 import UIKit
+import Supabase
 
 /// Vision-LLM receipt parsing.
 ///
