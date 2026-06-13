@@ -1,7 +1,7 @@
 import Foundation
 
 /// A Truth or Dare game session. Standalone sessions have no meetup
-/// (`meetupId == nil`) and are joined via their short invite code.
+/// (`meetupId == nil`).
 struct GameSession: Codable, Identifiable, Equatable {
     let id: UUID
     let meetupId: UUID?
@@ -11,7 +11,6 @@ struct GameSession: Codable, Identifiable, Equatable {
     let status: String               // "lobby" | "active" | "ended"
     let turnOrder: [UUID]
     let currentTurnIndex: Int
-    let inviteCode: String?
     let createdAt: Date
     let endedAt: Date?
 
@@ -22,7 +21,6 @@ struct GameSession: Codable, Identifiable, Equatable {
         case startedBy = "started_by"
         case turnOrder = "turn_order"
         case currentTurnIndex = "current_turn_index"
-        case inviteCode = "invite_code"
         case createdAt = "created_at"
         case endedAt = "ended_at"
     }
@@ -148,15 +146,12 @@ struct GameTurn: Codable, Identifiable, Equatable {
     }
 }
 
-/// Result of the start-session RPC: the new session and the short
-/// invite code friends use to join it.
+/// Result of the start-session RPC.
 struct StartGameResult: Codable, Equatable {
     let sessionId: UUID
-    let inviteCode: String
 
     enum CodingKeys: String, CodingKey {
         case sessionId = "session_id"
-        case inviteCode = "invite_code"
     }
 }
 

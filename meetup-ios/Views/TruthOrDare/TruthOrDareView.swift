@@ -8,9 +8,8 @@ import UIKit
 /// proof/answer/pass), and the end-of-game scoreboard. All game
 /// state is server-authoritative and synced over Supabase Realtime.
 ///
-/// Runs in two modes: standalone (the default — friends join with
-/// the session's invite code) or embedded in a meetup, where any
-/// meetup participant can play.
+/// Runs in two modes: standalone (the default) or embedded in a
+/// meetup, where any meetup participant can play.
 struct TruthOrDareView: View {
     let meetup: Meetup?
 
@@ -20,8 +19,7 @@ struct TruthOrDareView: View {
 
     /// Standalone mode: open an existing session directly, or start
     /// from the tier-pick setup screen when nil. Pass `groupId` when
-    /// starting on behalf of a game group — the session is stamped
-    /// with the group and members get a push with the invite code.
+    /// starting on behalf of a game group.
     init(sessionId: UUID? = nil, groupId: UUID? = nil) {
         self.meetup = nil
         self.groupId = groupId
@@ -65,7 +63,11 @@ struct TruthOrDareView: View {
 
     @State private var showPassConfirm = false
     @State private var showEndConfirm = false
-    @State private var copiedCode = false
+
+    // Custom dare assignment
+    @State private var customDareText: String = ""
+    @State private var showCustomDareInput = false
+    @State private var isAssigningDare = false
 
     // Custom dare assignment
     @State private var customDareText: String = ""
@@ -276,10 +278,6 @@ struct TruthOrDareView: View {
             }
             .padding(.top, 24)
 
-            if let code = session.inviteCode {
-                inviteCodeChip(code)
-            }
-
             ScrollView {
                 VStack(spacing: 0) {
                     ForEach(players) { player in
@@ -348,45 +346,6 @@ struct TruthOrDareView: View {
             .padding(.horizontal, 20)
             .padding(.bottom, 16)
         }
-    }
-
-    /// Copyable invite-code chip so the host can read the code out or
-    /// paste it into any chat.
-    private func inviteCodeChip(_ code: String) -> some View {
-        Button {
-            UIPasteboard.general.string = code
-            copiedCode = true
-            Task {
-                try? await Task.sleep(for: .seconds(2))
-                copiedCode = false
-            }
-        } label: {
-            HStack(spacing: 10) {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Share code")
-                        .scaledFont(size: 10, weight: .semibold)
-                        .foregroundStyle(Color(white: 0.55))
-                    Text(code)
-                        .scaledFont(size: 24, weight: .black)
-                        .foregroundStyle(Color.coral)
-                        .tracking(6)
-                }
-                Image(systemName: copiedCode ? "checkmark.circle.fill" : "doc.on.doc")
-                    .scaledFont(size: 16)
-                    .foregroundStyle(copiedCode ? Color.statusLive : Color(white: 0.6))
-            }
-            .padding(.horizontal, 18)
-            .padding(.vertical, 10)
-            .background(Color.appSurface)
-            .clipShape(RoundedRectangle(cornerRadius: 14))
-            .overlay(
-                RoundedRectangle(cornerRadius: 14)
-                    .strokeBorder(Color.coral.opacity(0.35), lineWidth: 1)
-            )
-        }
-        .buttonStyle(.plain)
-        .accessibilityIdentifier("chip_invite_code")
-        .accessibilityLabel("Share code \(code). Tap to copy.")
     }
 
     private var starterName: String {
