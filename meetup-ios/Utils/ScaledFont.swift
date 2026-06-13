@@ -5,9 +5,9 @@ import SwiftUI
 ///
 /// Replaces `.font(.system(size:weight:design:))`, which is locked at a fixed
 /// point size and ignores Dynamic Type. Backed by `@ScaledMetric` so the size
-/// grows/shrinks proportionally with the accessibility text-size slider, and the
-/// system Bold Text setting applies as usual through the system font.
+/// grows/shrinks proportionally with the accessibility text-size slider.
 private struct ScaledFontModifier: ViewModifier {
+    @Environment(\.legibilityWeight) private var legibilityWeight
     @ScaledMetric private var size: CGFloat
     private let weight: Font.Weight
     private let design: Font.Design
@@ -19,7 +19,28 @@ private struct ScaledFontModifier: ViewModifier {
     }
 
     func body(content: Content) -> some View {
-        content.font(.system(size: size, weight: weight, design: design))
+        content.font(
+            .system(
+                size: size,
+                weight: legibilityWeight == .bold ? weight.appBoldTextAdjusted : weight,
+                design: design
+            )
+        )
+    }
+}
+
+extension Font.Weight {
+    var appBoldTextAdjusted: Font.Weight {
+        if self == .ultraLight || self == .thin || self == .light || self == .regular {
+            return .semibold
+        }
+        if self == .medium || self == .semibold {
+            return .bold
+        }
+        if self == .bold {
+            return .heavy
+        }
+        return .black
     }
 }
 
