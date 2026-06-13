@@ -89,16 +89,32 @@ struct ReceiptParser {
         return UIImage(cgImage: cgOut, scale: image.scale, orientation: image.imageOrientation)
     }
 
+    /// One recognized text fragment plus the geometry needed to re-pair it
+    /// with neighbours on the same visual row. Vision returns each fragment as
+    /// its own observation; on skewed/thermal receipts the right-hand price
+    /// column is vertically offset from the item name, so pairing by raw line
+    /// index mis-matches prices to items. We re-pair by Y coordinate instead.
+    struct OCRObservation {
+        let text: String
+        let midY: CGFloat   // Vision normalized coords: origin bottom-left, y grows upward
+        let minX: CGFloat
+        let height: CGFloat
+    }
+
     private static func extractText(from image: UIImage) async -> [String] {
         let processed = preprocessed(image)
         guard let cgImage = processed.cgImage else { return [] }
         // Pass the image orientation so Vision auto-rotates upside-down receipts
         let orientation = CGImagePropertyOrientation(image.imageOrientation)
-        return await withCheckedContinuation { continuation in
+        let observations: [OCRObservation] = await withCheckedContinuation { continuation in
             let request = VNRecognizeTextRequest { req, _ in
-                let lines = (req.results as? [VNRecognizedTextObservation] ?? [])
-                    .compactMap { $0.topCandidates(1).first?.string }
-                continuation.resume(returning: lines)
+                let obs = (req.results as? [VNRecognizedTextObservation] ?? [])
+                    .compactMap { o -> OCRObservation? in
+                        guard let s = o.topCandidates(1).first?.string else { return nil }
+                        let bb = o.boundingBox
+                        return OCRObservation(text: s, midY: bb.midY, minX: bb.minX, height: bb.height)
+                    }
+                continuation.resume(returning: obs)
             }
             request.recognitionLevel = .accurate
             request.usesLanguageCorrection = false
@@ -107,6 +123,34 @@ struct ReceiptParser {
             } catch {
                 continuation.resume(returning: [])
             }
+        }
+        return reassembleRows(observations)
+    }
+
+    /// Group OCR fragments into visual rows by Y coordinate, then order each
+    /// row left-to-right by X. This re-pairs an offset price column with its
+    /// item name. Receipts where Vision already returns a full line as one
+    /// observation are unaffected (each row stays a single fragment).
+    static func reassembleRows(_ observations: [OCRObservation]) -> [String] {
+        guard !observations.isEmpty else { return [] }
+        // Top-to-bottom: larger midY is higher on the page.
+        let sorted = observations.sorted { $0.midY > $1.midY }
+        let heights = sorted.map(\.height).sorted()
+        let medianHeight = heights[heights.count / 2]
+        let tolerance = max(medianHeight * 0.5, 0.005)
+
+        var rows: [[OCRObservation]] = []
+        for obs in sorted {
+            if let anchor = rows.last?.first, abs(anchor.midY - obs.midY) <= tolerance {
+                rows[rows.count - 1].append(obs)
+            } else {
+                rows.append([obs])
+            }
+        }
+        return rows.map { row in
+            row.sorted { $0.minX < $1.minX }
+                .map(\.text)
+                .joined(separator: "  ")
         }
     }
 
@@ -200,8 +244,45 @@ struct ReceiptParser {
                 // Receipts often print promos, card metadata, and loyalty copy after total.
                 continue
             } else if !summaryKeywords.contains(where: { lower.contains($0) }) {
+                // Inline quantity annotation: "(N @ U.UU)" or "N @ U.UU".
+                // N = quantity, U = per-unit price. The annotation is NOT the
+                // line total: the real total is either a separate price column to
+                // its right, or (when that column is absent) N * U. Never treat
+                // the bare unit price U as the line price.
+                let annotationPattern = #"\(?\s*(\d+)\s*@\s*\$?(\d+(?:\.\d{1,2})?)\s*\)?"#
+                var annotationQty: Int? = nil
+                var annotationUnit: Double? = nil
+                var annotationColumnTotal: Double? = nil
+                if let annRegex = try? NSRegularExpression(pattern: annotationPattern),
+                   let annMatch = annRegex.firstMatch(in: line, range: NSRange(line.startIndex..., in: line)),
+                   let qRange = Range(annMatch.range(at: 1), in: line),
+                   let uRange = Range(annMatch.range(at: 2), in: line),
+                   let q = Int(String(line[qRange])), q >= 2, q <= 20,
+                   let u = Double(String(line[uRange])), u >= 0.01 {
+                    annotationQty = q
+                    annotationUnit = u
+                    // A price remaining to the right of the annotation is the
+                    // real line total (e.g. "(2 @21.00) 42.00").
+                    if let annFullRange = Range(annMatch.range, in: line) {
+                        var remainder = line
+                        remainder.removeSubrange(annFullRange)
+                        let remMatches = priceRegex.matches(in: remainder, range: NSRange(remainder.startIndex..., in: remainder))
+                        if let remLast = remMatches.last {
+                            let rStr = Range(remLast.range(at: 1), in: remainder).map { String(remainder[$0]) }
+                                    ?? Range(remLast.range(at: 2), in: remainder).map { String(remainder[$0]) }
+                            if let rStr, let rVal = Double(rStr), rVal >= 0.01 {
+                                annotationColumnTotal = rVal
+                            }
+                        }
+                    }
+                }
+
                 // Standalone price line — check if previous line was a summary label
                 var name = line
+                if annotationQty != nil {
+                    name = name.replacingOccurrences(of: annotationPattern, with: "", options: .regularExpression)
+                }
+                name = name
                     .replacingOccurrences(of: pricePattern, with: "", options: .regularExpression)
                     .trimmingCharacters(in: .whitespaces)
                     .trimmingCharacters(in: CharacterSet(charactersIn: "$"))
@@ -223,6 +304,7 @@ struct ReceiptParser {
                 // strippers run — "4x " is 1-5 consonants + space, so the noise
                 // stripper would otherwise eat it. A second capture afterwards
                 // handles quantities hidden behind noise (e.g. "I 2 Tacos").
+                // Skipped entirely when an inline "@" annotation already set qty.
                 var quantity = 1
                 let quantityPattern = #"^(\d+)\s*[xX]?\s+"#
                 func captureQuantity() {
@@ -233,13 +315,15 @@ struct ReceiptParser {
                         name = String(name[qRange.upperBound...])
                     }
                 }
-                captureQuantity()
+                if annotationQty == nil { captureQuantity() }
                 // Strip leading all-consonant OCR noise tokens (e.g. "nll "),
                 // then leading single-letter artifacts (e.g. "I " misread from "1 ")
                 name = name.replacingOccurrences(of: #"^([^aeiouAEIOU\s]{1,5}\s+)+"#, with: "", options: .regularExpression)
                 name = name.replacingOccurrences(of: #"^[A-Za-z]\s+"#, with: "", options: .regularExpression)
-                if quantity == 1 { captureQuantity() }
-                name = name.replacingOccurrences(of: quantityPattern, with: "", options: .regularExpression)
+                if annotationQty == nil {
+                    if quantity == 1 { captureQuantity() }
+                    name = name.replacingOccurrences(of: quantityPattern, with: "", options: .regularExpression)
+                }
                 name = name.trimmingCharacters(in: .whitespaces)
 
                 // Skip modifier lines like "**w.Salad"
@@ -278,11 +362,29 @@ struct ReceiptParser {
                     }
                 }
 
+                // Resolve final quantity + line total.
+                //  - Annotation with a separate column total: keep it as a single
+                //    line at that total (matches prior column-total behavior).
+                //  - Annotation without a column total: line total = N * U,
+                //    expanded into N units at U each.
+                //  - Otherwise: existing quantity-prefix expansion.
+                var lineQuantity = quantity
+                var linePrice = price
+                if let aq = annotationQty, let au = annotationUnit {
+                    if let colTotal = annotationColumnTotal {
+                        lineQuantity = 1
+                        linePrice = colTotal
+                    } else {
+                        lineQuantity = aq
+                        linePrice = (au * Double(aq) * 100).rounded() / 100
+                    }
+                }
+
                 if !name.isEmpty {
-                    let unitPrice = quantity > 1
-                        ? (price / Double(quantity) * 100).rounded() / 100
-                        : price
-                    for _ in 0..<quantity {
+                    let unitPrice = lineQuantity > 1
+                        ? (linePrice / Double(lineQuantity) * 100).rounded() / 100
+                        : linePrice
+                    for _ in 0..<lineQuantity {
                         items.append((name: name, price: unitPrice))
                     }
                 }

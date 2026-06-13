@@ -244,6 +244,51 @@ struct ReceiptParserTests {
         #expect(receipt.items.allSatisfy { $0.price == 19.00 })
     }
 
+    @Test("Daily Gather bar receipt: inline (N @ U) quantities and modifier sub-line")
+    func parsesDailyGatherReceipt() {
+        // Inline "(N @ U.UU" annotations have NO separate column total here, so
+        // the line total must be N * U (never the bare unit price). "(2) Woodford RX"
+        // is a priceless modifier of Old Fashioned and must not become an item.
+        let lines = [
+            "Half Dozen Raw Oysters EC  23.00",
+            "Brown Sugar Bourbon Tini (2 @16.00",
+            "Drink Special  10.00",
+            "Butcher Burger  19.00",
+            "Friends Having Dinner (2 @14.00",
+            "Old Fashioned (2 @18.00",
+            "(2) Woodford RX",
+            "Subtotal  148.00",
+            "Tax  12.22",
+            "Total  160.22",
+        ]
+        let receipt = ReceiptParser.parseText(lines)
+
+        // 1 + 2 + 1 + 1 + 2 + 2 = 9 expanded units
+        #expect(receipt.items.count == 9)
+
+        func total(_ name: String) -> Double {
+            receipt.items.filter { $0.name == name }.reduce(0) { $0 + $1.price }
+        }
+        #expect(total("Half Dozen Raw Oysters EC") == 23.00)
+        #expect(total("Brown Sugar Bourbon Tini") == 32.00)
+        #expect(total("Drink Special") == 10.00)
+        #expect(total("Butcher Burger") == 19.00)
+        #expect(total("Friends Having Dinner") == 28.00)
+        #expect(total("Old Fashioned") == 36.00)
+
+        // Friends Having Dinner is a real shareable item — present, not dropped
+        #expect(receipt.items.contains { $0.name == "Friends Having Dinner" })
+        #expect(receipt.items.filter { $0.name == "Friends Having Dinner" }.count == 2)
+        #expect(receipt.items.allSatisfy { $0.name == "Brown Sugar Bourbon Tini" ? $0.price == 16.00 : true })
+
+        // Modifier sub-line must not appear as an item
+        #expect(!receipt.items.contains { $0.name.contains("Woodford") })
+
+        #expect(receipt.subtotal == 148.00)
+        #expect(receipt.tax == 12.22)
+        #expect(receipt.total == 160.22)
+    }
+
     @Test("real receipt summary with non-cash total and payment tip")
     func parsesNonCashPaymentReceiptSummary() {
         let lines = [
