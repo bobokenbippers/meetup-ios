@@ -277,11 +277,11 @@ struct MeetupsListView: View {
                 Button(action: { presentedSheet = .create }) {
                     Image(systemName: "plus")
                         .scaledFont(size: 17, weight: .semibold)
-                        .foregroundStyle(Color.appAccentForeground)
+                        .foregroundStyle(Color.appSecondaryAccentForeground)
                         .frame(width: 34, height: 34)
-                        .background(Color.coral)
+                        .background(Color.appSecondaryAccent)
                         .clipShape(Circle())
-                        .shadow(color: Color.coral.opacity(0.4), radius: 6, y: 3)
+                        .shadow(color: Color.appSecondaryAccent.opacity(0.4), radius: 6, y: 3)
                 }
                 .accessibilityLabel("Create Meetup")
                 .accessibilityIdentifier("btn_create_meetup")
@@ -357,10 +357,10 @@ struct MeetupsListView: View {
                         sectionHeader("Invited")
                         Text("\(invited.count)")
                             .scaledFont(size: 10, weight: .bold)
-                            .foregroundStyle(Color.appAccentForeground)
+                            .foregroundStyle(Color.appSecondaryAccentForeground)
                             .padding(.horizontal, 6)
                             .padding(.vertical, 2)
-                            .background(Color.coral)
+                            .background(Color.appSecondaryAccent)
                             .clipShape(Capsule())
                     }
                 }
