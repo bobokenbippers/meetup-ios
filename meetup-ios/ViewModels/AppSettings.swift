@@ -66,8 +66,14 @@ enum AppColorTheme: String, CaseIterable, Identifiable {
 
     var secondaryAccentForegroundColor: Color {
         switch self {
-        case .standard, .knicks:
+        case .standard:
             return Color(light: .white, dark: .black)
+        case .knicks:
+            // Orange #F58426 is light in both schemes; white-on-orange fails
+            // contrast (~2:1). A near-black warm ink reads ~9:1 either way and
+            // keeps the orange accent legible without re-breaking the white-text
+            // bug we just fixed on the food cards.
+            return Color(hex: "1A1206")
         }
     }
 
