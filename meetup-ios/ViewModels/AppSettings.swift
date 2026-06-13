@@ -59,7 +59,8 @@ enum AppColorTheme: String, CaseIterable, Identifiable {
         case .standard:
             return Color(light: Color(hex: "6C57C5"), dark: Color(hex: "8A78E0"))
         case .knicks:
-            return Color(light: Color(hex: "C65312"), dark: Color(hex: "FFB36B"))
+            // Official Knicks Orange #F58426; lightened for dark-mode contrast.
+            return Color(light: Color(hex: "F58426"), dark: Color(hex: "FF9E4D"))
         }
     }
 
@@ -82,13 +83,15 @@ enum AppColorTheme: String, CaseIterable, Identifiable {
                 Color(red: 0.000, green: 0.780, blue: 0.941),
             ]
         case .knicks:
+            // Official Knicks palette: blue #006BB6, orange #F58426, silver #BEC0C2,
+            // plus supporting tints for avatar/pin variety.
             return [
                 Color(hex: "006BB6"),
-                Color(hex: "C65312"),
+                Color(hex: "F58426"),
                 Color(hex: "1D428A"),
-                Color(hex: "B9560F"),
+                Color(hex: "BEC0C2"),
                 Color(hex: "005EA8"),
-                Color(hex: "4B5563"),
+                Color(hex: "C65312"),
             ]
         }
     }
@@ -103,7 +106,7 @@ enum AppColorTheme: String, CaseIterable, Identifiable {
     var categoryGradientFoodEnd: Color {
         switch self {
         case .standard: return Color(red: 0.235, green: 0.180, blue: 0.478)
-        case .knicks: return Color(hex: "C65312")
+        case .knicks: return Color(hex: "F58426")
         }
     }
 }
