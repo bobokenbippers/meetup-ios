@@ -201,6 +201,7 @@ struct MessageThreadView: View {
                                     editingMessage = message
                                     editDraft = message.body ?? ""
                                 },
+                                onCopy: { copyToClipboard(message) },
                                 onDelete: { Task { await delete(message) } }
                             )
                             .id(message.id)
@@ -486,6 +487,12 @@ struct MessageThreadView: View {
         }
     }
 
+    private func copyToClipboard(_ message: Message) {
+        guard let body = message.body?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !body.isEmpty else { return }
+        UIPasteboard.general.string = body
+    }
+
     private func edit(_ message: Message, body: String) async {
         do {
             try await DirectMessageService.shared.editMessage(message, body: body)
@@ -560,10 +567,14 @@ private struct MessageBubble: View {
     let onOpenPhoto: (URL) -> Void
     let onToggleReaction: (String) -> Void
     let onEdit: () -> Void
+    let onCopy: () -> Void
     let onDelete: () -> Void
 
     private static let availableReactions = ["❤️", "😂", "😮", "😢", "🔥", "👍"]
     @State private var showsReactionPicker = false
+    private var hasCopyableText: Bool {
+        message.body?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false
+    }
 
     var body: some View {
         HStack {
@@ -623,6 +634,11 @@ private struct MessageBubble: View {
             showReactionPicker()
         }
         .contextMenu {
+            if hasCopyableText {
+                Button(action: onCopy) {
+                    Label("Copy", systemImage: "doc.on.doc")
+                }
+            }
             if isMine {
                 Button(action: onEdit) {
                     Label("Edit", systemImage: "pencil")
