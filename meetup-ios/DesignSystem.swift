@@ -61,11 +61,11 @@ extension Color {
 /// `DS.Font.*` over raw literals so swaps propagate from one place.
 enum DS {
     enum Color {
-        static let background    = SwiftUI.Color.appBackground
-        static let surface       = SwiftUI.Color.appSurface
+        static let background    = SwiftUI.Color.surface
+        static let surface       = SwiftUI.Color.surfaceCard
         static let textPrimary   = SwiftUI.Color.textPrimary
         static let textSecondary = SwiftUI.Color.textSecondary
-        static let accent        = SwiftUI.Color.coral
+        static let accent        = SwiftUI.Color.brand
     }
 
     enum Font {
