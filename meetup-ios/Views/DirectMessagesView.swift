@@ -568,60 +568,77 @@ private struct MessageBubble: View {
     var body: some View {
         HStack {
             if isMine { Spacer(minLength: 46) }
-            VStack(alignment: isMine ? .trailing : .leading, spacing: 6) {
-                if let path = message.imagePath {
-                    MessageImage(path: path, onOpen: onOpenPhoto)
-                }
-                if let body = message.body, !body.isEmpty {
-                    Text(body)
-                        .scaledFont(size: 14)
-                        .foregroundStyle(isMine ? .white : DS.Color.textPrimary)
-                        .multilineTextAlignment(isMine ? .trailing : .leading)
-                }
-                HStack(spacing: 6) {
-                    Text(message.createdAt, format: .dateTime.hour().minute())
-                        .scaledFont(size: 9, weight: .medium)
-                        .foregroundStyle(isMine ? .white.opacity(0.45) : DS.Color.textSecondary)
-                    Button {
-                        withAnimation(.spring(response: 0.22, dampingFraction: 0.86)) {
-                            showsReactionPicker.toggle()
-                        }
-                    } label: {
-                        Image(systemName: "face.smiling")
-                            .scaledFont(size: 10, weight: .semibold)
-                            .foregroundStyle(isMine ? .white.opacity(0.62) : DS.Color.textSecondary)
-                            .frame(width: 20, height: 20)
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel("Show reactions")
-                }
-                if message.editedAt != nil {
-                    Text("Edited")
-                        .scaledFont(size: 9, weight: .medium)
-                        .foregroundStyle(isMine ? .white.opacity(0.42) : DS.Color.textSecondary)
-                }
+            ZStack(alignment: isMine ? .topTrailing : .topLeading) {
+                bubbleContent
+                    .padding(.top, showsReactionPicker ? 40 : 0)
+
                 if showsReactionPicker {
                     reactionPickerRow
-                }
-                if !reactionSummaries.isEmpty {
-                    reactionRow
-                }
-            }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 9)
-            .background(isMine ? Color.coral : Color.appSurface)
-            .clipShape(RoundedRectangle(cornerRadius: 16))
-            .contextMenu {
-                if isMine {
-                    Button(action: onEdit) {
-                        Label("Edit", systemImage: "pencil")
-                    }
-                    Button(role: .destructive, action: onDelete) {
-                        Label("Delete", systemImage: "trash")
-                    }
+                        .transition(
+                            .opacity.combined(
+                                with: .scale(
+                                    scale: 0.96,
+                                    anchor: isMine ? .bottomTrailing : .bottomLeading
+                                )
+                            )
+                        )
+                        .zIndex(1)
                 }
             }
             if !isMine { Spacer(minLength: 46) }
+        }
+    }
+
+    private var bubbleContent: some View {
+        VStack(alignment: isMine ? .trailing : .leading, spacing: 6) {
+            if let path = message.imagePath {
+                MessageImage(path: path, onOpen: onOpenPhoto)
+            }
+            if let body = message.body, !body.isEmpty {
+                Text(body)
+                    .scaledFont(size: 14)
+                    .foregroundStyle(isMine ? .white : DS.Color.textPrimary)
+                    .multilineTextAlignment(isMine ? .trailing : .leading)
+            }
+            HStack(spacing: 6) {
+                Text(message.createdAt, format: .dateTime.hour().minute())
+                    .scaledFont(size: 9, weight: .medium)
+                    .foregroundStyle(isMine ? .white.opacity(0.45) : DS.Color.textSecondary)
+                Button {
+                    withAnimation(.spring(response: 0.22, dampingFraction: 0.86)) {
+                        showsReactionPicker.toggle()
+                    }
+                } label: {
+                    Image(systemName: "face.smiling")
+                        .scaledFont(size: 10, weight: .semibold)
+                        .foregroundStyle(isMine ? .white.opacity(0.62) : DS.Color.textSecondary)
+                        .frame(width: 20, height: 20)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Show reactions")
+            }
+            if message.editedAt != nil {
+                Text("Edited")
+                    .scaledFont(size: 9, weight: .medium)
+                    .foregroundStyle(isMine ? .white.opacity(0.42) : DS.Color.textSecondary)
+            }
+            if !reactionSummaries.isEmpty {
+                reactionRow
+            }
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 9)
+        .background(isMine ? Color.coral : Color.appSurface)
+        .clipShape(RoundedRectangle(cornerRadius: 16))
+        .contextMenu {
+            if isMine {
+                Button(action: onEdit) {
+                    Label("Edit", systemImage: "pencil")
+                }
+                Button(role: .destructive, action: onDelete) {
+                    Label("Delete", systemImage: "trash")
+                }
+            }
         }
     }
 
@@ -644,6 +661,15 @@ private struct MessageBubble: View {
                 .accessibilityLabel("React with \(emoji)")
             }
         }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 6)
+        .background(.ultraThinMaterial)
+        .clipShape(Capsule())
+        .overlay(
+            Capsule()
+                .strokeBorder(.white.opacity(0.12), lineWidth: 1)
+        )
+        .shadow(color: .black.opacity(0.18), radius: 10, x: 0, y: 4)
     }
 
     private var reactionRow: some View {
