@@ -32,6 +32,7 @@ struct GameScoreboardTests {
             promptKind: kind,
             promptText: kind == nil ? nil : "prompt",
             proofPhotoUrl: nil,
+            dareLocked: kind != "dare",
             createdAt: Date(),
             completedAt: status == "completed" || status == "passed" ? Date() : nil,
             profiles: nil
