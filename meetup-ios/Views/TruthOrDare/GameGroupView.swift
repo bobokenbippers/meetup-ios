@@ -73,7 +73,6 @@ struct GameGroupView: View {
         } message: {
             Text(error ?? "")
         }
-        .preferredColorScheme(.dark)
     }
 
     // MARK: - Header
@@ -85,11 +84,11 @@ struct GameGroupView: View {
                 .foregroundStyle(Color.coral)
             Text(group.name)
                 .scaledFont(size: 22, weight: .black)
-                .foregroundStyle(.white)
+                .foregroundStyle(DS.Color.textPrimary)
                 .multilineTextAlignment(.center)
             Text("\(members.count) member\(members.count == 1 ? "" : "s")")
                 .scaledFont(size: 12)
-                .foregroundStyle(Color(white: 0.6))
+                .foregroundStyle(DS.Color.textSecondary)
         }
         .frame(maxWidth: .infinity)
         .padding(20)
@@ -120,7 +119,7 @@ struct GameGroupView: View {
             HStack {
                 Text("Members")
                     .scaledFont(size: 13, weight: .bold)
-                    .foregroundStyle(Color(white: 0.6))
+                    .foregroundStyle(DS.Color.textSecondary)
                 Spacer()
                 if amOwner {
                     Button {
@@ -160,7 +159,7 @@ struct GameGroupView: View {
             HStack(spacing: 6) {
                 Text(member.userId == myUserId ? "You" : (member.displayName ?? "Player"))
                     .scaledFont(size: 15, weight: .semibold)
-                    .foregroundStyle(.white)
+                    .foregroundStyle(DS.Color.textPrimary)
                 if member.userId == group.ownerId {
                     Image(systemName: "crown.fill")
                         .scaledFont(size: 11)
@@ -177,7 +176,7 @@ struct GameGroupView: View {
                 } label: {
                     Image(systemName: "minus.circle.fill")
                         .scaledFont(size: 18)
-                        .foregroundStyle(Color(white: 0.45))
+                        .foregroundStyle(DS.Color.textSecondary)
                 }
                 .disabled(isActing)
                 .accessibilityLabel("Remove \(member.displayName ?? "member")")

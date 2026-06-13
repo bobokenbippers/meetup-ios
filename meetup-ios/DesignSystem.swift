@@ -56,6 +56,26 @@ extension Color {
     }
 }
 
+// MARK: - DS namespace (canonical token surface)
+/// Canonical design-token surface. Views should prefer `DS.Color.*` and
+/// `DS.Font.*` over raw literals so swaps propagate from one place.
+enum DS {
+    enum Color {
+        static let background    = SwiftUI.Color.appBackground
+        static let surface       = SwiftUI.Color.appSurface
+        static let textPrimary   = SwiftUI.Color.textPrimary
+        static let textSecondary = SwiftUI.Color.textSecondary
+        static let accent        = SwiftUI.Color.coral
+    }
+
+    enum Font {
+        static let title    = Typography.Font.title
+        static let headline = Typography.Font.headline
+        static let body     = Typography.Font.body
+        static let caption  = Typography.Font.caption
+    }
+}
+
 // MARK: - Card style
 struct CardStyle: ViewModifier {
     func body(content: Content) -> some View {
