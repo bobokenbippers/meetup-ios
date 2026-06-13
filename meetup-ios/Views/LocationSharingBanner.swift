@@ -17,7 +17,7 @@ struct LocationSharingBanner: View {
                     .scaledFont(size: 10, weight: .semibold)
                     .opacity(0.7)
             }
-            .foregroundStyle(.white)
+            .foregroundStyle(Color.appAccentForeground)
             .padding(.horizontal, 16)
             .padding(.vertical, 9)
             .background(Color.coral)

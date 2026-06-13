@@ -228,7 +228,7 @@ struct CreateMeetupView: View {
                             } label: {
                                 Text(createButtonTitle)
                                     .font(.headline)
-                                    .foregroundStyle(.white)
+                                    .foregroundStyle(Color.appAccentForeground)
                                     .frame(maxWidth: .infinity)
                                     .padding(.vertical, 16)
                                     .background(

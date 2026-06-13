@@ -135,7 +135,7 @@ private struct ConversationRow: View {
                     if summary.unreadCount > 0 {
                         Text("\(summary.unreadCount)")
                             .scaledFont(size: 10, weight: .bold)
-                            .foregroundStyle(.white)
+                            .foregroundStyle(Color.appAccentForeground)
                             .frame(minWidth: 20, minHeight: 20)
                             .background(Color.coral)
                             .clipShape(Capsule())
@@ -376,7 +376,7 @@ struct MessageThreadView: View {
                     } else {
                         Image(systemName: "arrow.up")
                             .scaledFont(size: 16, weight: .bold)
-                            .foregroundStyle(.white)
+                            .foregroundStyle(canSend ? Color.appAccentForeground : .white)
                             .frame(width: 36, height: 36)
                             .background(canSend ? Color.coral : Color.white.opacity(0.12))
                             .clipShape(Circle())

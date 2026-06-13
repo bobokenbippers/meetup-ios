@@ -288,7 +288,7 @@ struct MeetupDashboardView: View {
                 .overlay {
                     Image(systemName: "mappin.circle.fill")
                         .scaledFont(size: 18)
-                        .foregroundStyle(.white)
+                        .foregroundStyle(Color.appAccentForeground)
                 }
 
             VStack(alignment: .leading, spacing: 1) {

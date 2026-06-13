@@ -67,7 +67,7 @@ struct FriendProfileView: View {
                             } label: {
                                 Label("Message", systemImage: "bubble.left.and.bubble.right.fill")
                                     .scaledFont(size: 15, weight: .bold)
-                                    .foregroundStyle(.white) // on coral background
+                                    .foregroundStyle(Color.appAccentForeground)
                                     .frame(maxWidth: .infinity)
                                     .padding(.vertical, 13)
                                     .background(Color.coral)

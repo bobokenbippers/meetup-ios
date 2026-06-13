@@ -75,7 +75,7 @@ struct OnboardingProfileView: View {
                         } else {
                             Text("Done →")
                                 .scaledFont(size: 18, weight: .semibold)
-                                .foregroundStyle(.white) // on coral background
+                                .foregroundStyle(Color.appAccentForeground)
                         }
                     }
                     .frame(maxWidth: .infinity)

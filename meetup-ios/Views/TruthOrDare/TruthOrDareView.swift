@@ -290,10 +290,10 @@ struct TruthOrDareView: View {
                             if player.userId == session.startedBy {
                                 Text("HOST")
                                     .scaledFont(size: 9, weight: .black)
-                                    .foregroundStyle(Color.appSecondaryAccent)
+                                    .foregroundStyle(Color.coral)
                                     .padding(.horizontal, 6)
                                     .padding(.vertical, 3)
-                                    .background(Color.appSecondaryAccent.opacity(0.15))
+                                    .background(Color.coral.opacity(0.15))
                                     .clipShape(Capsule())
                             }
                             Spacer()
@@ -421,7 +421,7 @@ struct TruthOrDareView: View {
     }
 
     private func tierAccent(for tier: String) -> Color {
-        tier == "spicy" ? Color.coral : Color.appSecondaryAccent
+        tier == "spicy" ? Color.appSecondaryAccent : Color.coral
     }
 
     // MARK: - Prompt stage (coin has landed)
@@ -456,8 +456,8 @@ struct TruthOrDareView: View {
     /// The card showing the prompt kind label + text + subtitle.
     private func promptCard(_ turn: GameTurn) -> some View {
         let accentColor = turn.isDare
-            ? Color.coral
-            : Color.appSecondaryAccent
+            ? Color.appSecondaryAccent
+            : Color.coral
         return VStack(spacing: 14) {
             Label(
                 turn.isDare ? "TAILS — DARE" : "HEADS — TRUTH",
@@ -557,14 +557,14 @@ struct TruthOrDareView: View {
                         .lineLimit(3, reservesSpace: true)
                         .scaledFont(size: 15)
                         .foregroundStyle(DS.Color.textPrimary)
-                        .tint(Color.coral)
+                        .tint(Color.appSecondaryAccent)
                         .padding(.horizontal, 14)
                         .padding(.vertical, 10)
                         .background(Color.appSurface)
                         .clipShape(RoundedRectangle(cornerRadius: 12))
                         .overlay(
                             RoundedRectangle(cornerRadius: 12)
-                                .strokeBorder(Color.coral.opacity(0.4), lineWidth: 1)
+                                .strokeBorder(Color.appSecondaryAccent.opacity(0.4), lineWidth: 1)
                         )
                         .accessibilityIdentifier("field_custom_dare")
 
@@ -684,7 +684,7 @@ struct TruthOrDareView: View {
                 } else {
                     Image(systemName: turn.isDare ? "flame.fill" : "checkmark.circle.fill")
                         .scaledFont(size: 9)
-                        .foregroundStyle(turn.isDare ? Color.coral : Color.statusLive)
+                        .foregroundStyle(turn.isDare ? Color.appSecondaryAccent : Color.coral)
                 }
             }
             .frame(width: 110)

@@ -178,7 +178,7 @@ struct RecapView: View {
                 } label: {
                     Image(systemName: "plus")
                         .scaledFont(size: 13, weight: .bold)
-                        .foregroundStyle(.white)
+                        .foregroundStyle(Color.appAccentForeground)
                         .frame(width: 30, height: 30)
                         .background(Color.coral)
                         .clipShape(Circle())
@@ -312,7 +312,7 @@ struct RecapView: View {
                 }
                 HStack(spacing: 10) {
                     Circle()
-                        .fill(Color.participantPalette[index % Color.participantPalette.count].opacity(0.7))
+                        .fill(Color.participantPalette[index % Color.participantPalette.count])
                         .frame(width: 28, height: 28)
                         .overlay(
                             Text(String((person.displayName ?? "?").prefix(1)).uppercased())

@@ -13,8 +13,8 @@ struct ProfileAvatarView: View {
     }
 
     private var fallbackColor: Color {
-        guard let userId else { return Color.coral.opacity(0.75) }
-        return Color.participantPalette[abs(userId.hashValue) % Color.participantPalette.count].opacity(0.78)
+        guard let userId else { return Color.coral }
+        return Color.participantPalette[abs(userId.hashValue) % Color.participantPalette.count]
     }
 
     private var imageURL: URL? {

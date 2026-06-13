@@ -72,7 +72,7 @@ struct EditMeetupView: View {
                             } label: {
                                 Text("Save Changes")
                                     .font(.headline)
-                                    .foregroundStyle(.white)
+                                    .foregroundStyle(Color.appAccentForeground)
                                     .frame(maxWidth: .infinity)
                                     .padding(.vertical, 16)
                                     .background(
@@ -101,7 +101,7 @@ struct EditMeetupView: View {
                 .overlay {
                     Image(systemName: "mappin.circle.fill")
                         .font(.system(size: 18))
-                        .foregroundStyle(.white) // on coral background
+                        .foregroundStyle(Color.appAccentForeground)
                 }
             VStack(alignment: .leading, spacing: 2) {
                 Text(meetup.destinationName)
