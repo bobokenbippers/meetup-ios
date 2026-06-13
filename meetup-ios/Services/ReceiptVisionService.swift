@@ -5,7 +5,7 @@ import Supabase
 /// Vision-LLM receipt parsing.
 ///
 /// Sends a scanned receipt image to the `parse-receipt` Supabase Edge Function,
-/// which calls Claude (vision) and returns clean, structured line items. This
+/// which calls OpenAI (vision) and returns clean, structured line items. This
 /// is dramatically more accurate on messy bar/restaurant receipts than the
 /// local Apple Vision + regex parser.
 ///

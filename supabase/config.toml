@@ -2,6 +2,6 @@
 verify_jwt = false
 
 # Vision-LLM receipt parser. Called from the signed-in app, so keep JWT
-# verification on (default). Requires the ANTHROPIC_API_KEY secret.
+# verification on (default). Requires the OPENAI_API_KEY secret.
 [functions.parse-receipt]
 verify_jwt = true

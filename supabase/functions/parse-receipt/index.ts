@@ -3,23 +3,23 @@ import { serve } from "https://deno.land/std@0.224.0/http/server.ts"
 // parse-receipt
 // ----------------------------------------------------------------------------
 // Vision-LLM receipt parsing. Accepts a base64-encoded receipt image, sends it
-// to Claude (vision) with a strict JSON schema, and returns clean structured
+// to OpenAI (vision) with a strict JSON schema, and returns clean structured
 // line items plus printed subtotal/tax/total.
 //
 // The iOS client keeps the local Apple Vision + regex parser as a graceful
 // fallback, so this function only needs to succeed on the happy path — when it
 // errors, the client silently falls back.
 //
-// Secret: ANTHROPIC_API_KEY must be set as a Supabase secret. NEVER hardcode it.
-//   supabase secrets set ANTHROPIC_API_KEY=sk-ant-...
+// Secret: OPENAI_API_KEY must be set as a Supabase secret. NEVER hardcode it.
+//   supabase secrets set OPENAI_API_KEY=sk-...
 //
-// Model: claude-sonnet-4-6 — strong vision quality at low cost. Receipts are
-// small images and the output is a short JSON object, so a single call is cheap
-// (a few cents at most) and typically returns in 2-6s.
+// Model: gpt-4o-mini — strong vision quality at very low cost. Receipts are
+// small images and the output is a short JSON object, so a single call is
+// fractions of a cent (~$0.0007) and typically returns in 2-6s.
 // ----------------------------------------------------------------------------
 
-const ANTHROPIC_API_URL = "https://api.anthropic.com/v1/messages"
-const MODEL = "claude-sonnet-4-6"
+const OPENAI_API_URL = "https://api.openai.com/v1/chat/completions"
+const MODEL = "gpt-4o-mini"
 
 const CORS_HEADERS: Record<string, string> = {
   "access-control-allow-origin": "*",
@@ -35,8 +35,10 @@ function json(body: unknown, status = 200): Response {
   })
 }
 
-// Strict schema for the structured response. Claude is constrained to emit
-// exactly this shape via output_config.format.
+// Strict schema for the structured response. The model is constrained to emit
+// exactly this shape via response_format json_schema (strict mode). OpenAI
+// strict mode requires every property listed in `required` and
+// additionalProperties:false on every object — both hold here.
 const RECEIPT_SCHEMA = {
   type: "object",
   properties: {
@@ -92,48 +94,47 @@ const SYSTEM_PROMPT = [
   "- Prices are numbers without a currency symbol.",
 ].join("\n")
 
-interface AnthropicError {
+interface UpstreamError {
   status: number
   message: string
 }
 
-async function callClaude(
+async function callOpenAI(
   apiKey: string,
   base64Image: string,
   mediaType: string,
 ): Promise<unknown> {
-  const res = await fetch(ANTHROPIC_API_URL, {
+  const res = await fetch(OPENAI_API_URL, {
     method: "POST",
     headers: {
       "content-type": "application/json",
-      "x-api-key": apiKey,
-      "anthropic-version": "2023-06-01",
+      authorization: `Bearer ${apiKey}`,
     },
     body: JSON.stringify({
       model: MODEL,
       max_tokens: 4096,
-      system: SYSTEM_PROMPT,
-      output_config: {
-        format: {
-          type: "json_schema",
+      response_format: {
+        type: "json_schema",
+        json_schema: {
+          name: "receipt",
+          strict: true,
           schema: RECEIPT_SCHEMA,
         },
       },
       messages: [
+        { role: "system", content: SYSTEM_PROMPT },
         {
           role: "user",
           content: [
             {
-              type: "image",
-              source: {
-                type: "base64",
-                media_type: mediaType,
-                data: base64Image,
-              },
-            },
-            {
               type: "text",
               text: "Parse this receipt and return the structured JSON.",
+            },
+            {
+              type: "image_url",
+              image_url: {
+                url: `data:${mediaType};base64,${base64Image}`,
+              },
             },
           ],
         },
@@ -143,37 +144,46 @@ async function callClaude(
 
   if (!res.ok) {
     const text = await res.text()
-    const err: AnthropicError = { status: res.status, message: text }
+    const err: UpstreamError = { status: res.status, message: text }
     throw err
   }
 
   const payload = await res.json()
 
-  if (payload.stop_reason === "refusal") {
-    throw { status: 422, message: "Model refused to parse the image." } as AnthropicError
+  const choice = (payload.choices ?? [])[0]
+  if (!choice) {
+    throw { status: 502, message: "Empty response from model." } as UpstreamError
+  }
+  // Structured-output refusal surfaces as message.refusal.
+  if (choice.message?.refusal) {
+    throw {
+      status: 422,
+      message: `Model refused: ${choice.message.refusal}`,
+    } as UpstreamError
+  }
+  if (choice.finish_reason === "content_filter") {
+    throw { status: 422, message: "Model refused to parse the image." } as UpstreamError
   }
 
-  // output_config.format guarantees the first text block is valid JSON matching
-  // the schema.
-  const textBlock = (payload.content ?? []).find(
-    (b: { type: string }) => b.type === "text",
-  )
-  if (!textBlock?.text) {
-    throw { status: 502, message: "Empty response from model." } as AnthropicError
+  // response_format json_schema guarantees message.content is valid JSON
+  // matching the schema.
+  const content = choice.message?.content
+  if (typeof content !== "string" || !content) {
+    throw { status: 502, message: "Empty response from model." } as UpstreamError
   }
 
-  return JSON.parse(textBlock.text)
+  return JSON.parse(content)
 }
 
 // Validate and normalize the parsed structure into the exact shape the client
 // expects. Throws on anything malformed so the client can fall back.
 function validate(parsed: unknown) {
   if (typeof parsed !== "object" || parsed === null) {
-    throw { status: 502, message: "Parsed result is not an object." } as AnthropicError
+    throw { status: 502, message: "Parsed result is not an object." } as UpstreamError
   }
   const p = parsed as Record<string, unknown>
   if (!Array.isArray(p.items)) {
-    throw { status: 502, message: "Parsed result missing items array." } as AnthropicError
+    throw { status: 502, message: "Parsed result missing items array." } as UpstreamError
   }
 
   const num = (v: unknown): number =>
@@ -209,9 +219,9 @@ serve(async (req) => {
     return json({ error: "Method not allowed" }, 405)
   }
 
-  const apiKey = Deno.env.get("ANTHROPIC_API_KEY")
+  const apiKey = Deno.env.get("OPENAI_API_KEY")
   if (!apiKey) {
-    return json({ error: "ANTHROPIC_API_KEY is not configured." }, 500)
+    return json({ error: "OPENAI_API_KEY is not configured." }, 500)
   }
 
   let body: { image?: string; mediaType?: string }
@@ -225,7 +235,7 @@ serve(async (req) => {
   if (!base64Image) {
     return json({ error: "Missing 'image' (base64) in request body." }, 400)
   }
-  // Accept JPEG/PNG/HEIC/WebP; default to JPEG since the client encodes JPEG.
+  // Accept JPEG/PNG/WebP/GIF; default to JPEG since the client encodes JPEG.
   const allowed = ["image/jpeg", "image/png", "image/webp", "image/gif"]
   const mediaType =
     body.mediaType && allowed.includes(body.mediaType)
@@ -233,11 +243,11 @@ serve(async (req) => {
       : "image/jpeg"
 
   try {
-    const parsed = await callClaude(apiKey, base64Image, mediaType)
+    const parsed = await callOpenAI(apiKey, base64Image, mediaType)
     const result = validate(parsed)
     return json(result, 200)
   } catch (e) {
-    const err = e as AnthropicError
+    const err = e as UpstreamError
     const status = typeof err.status === "number" ? err.status : 500
     console.error("parse-receipt failed:", status, err.message)
     // Surface a clean error; the client falls back to its local parser.
