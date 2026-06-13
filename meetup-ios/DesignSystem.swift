@@ -71,8 +71,7 @@ enum DS {
     }
 
     enum Font {
-        /// Large hero headline — scales with Dynamic Type (largeTitle + black weight).
-        static let hero     = SwiftUI.Font.largeTitle.weight(.black)
+        static let hero     = Typography.Font.display
         static let title    = Typography.Font.title
         static let headline = Typography.Font.headline
         static let body     = Typography.Font.body

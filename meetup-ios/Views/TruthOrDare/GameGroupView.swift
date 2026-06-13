@@ -80,10 +80,10 @@ struct GameGroupView: View {
     private var header: some View {
         VStack(spacing: 10) {
             Image(systemName: "person.3.fill")
-                .scaledFont(size: 40)
+                .scaledFont(size: 32)
                 .foregroundStyle(Color.coral)
             Text(group.name)
-                .scaledFont(size: 22, weight: .black)
+                .scaledFont(size: 20, weight: .bold)
                 .foregroundStyle(DS.Color.textPrimary)
                 .multilineTextAlignment(.center)
             Text("\(members.count) member\(members.count == 1 ? "" : "s")")
