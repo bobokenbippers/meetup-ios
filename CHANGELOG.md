@@ -36,6 +36,9 @@ Please test:
 - Meetup share sheets now include readable invite text plus the web invite URL.
 
 ### Fixed
+- Truth or Dare: players are no longer trapped in a dead game. Any player in a session can now end it (not just the original starter), so a soft-locked game started by someone else can be cleared by anyone in it.
+- Truth or Dare: an active game with no playable turn now shows a "This game stalled" screen with an End Game / Close action instead of spinning forever.
+- Truth or Dare: abandoned sessions are auto-retired by a janitor cron — lobbies that sit over 6h without reaching 2 players, and active games with no turn activity for 12h — so they stop showing as "live" in everyone's games list.
 - Knicks theme: active food/brunch meetup cards now use a gradient of Knicks Blue into a darker shade of the same blue instead of ending in bright burnt orange, so the white card title reads clearly (9.6:1 contrast) and the card leans Knicks blue instead of being mostly orange. Stays on the official Knicks palette.
 - Meetup dashboard action buttons (Directions, Split Bill, Game) no longer wrap or hyphenate onto two lines now that the row holds three buttons.
 - Invitees can see the meetup host/sender in the participant roster after accepting an invite.
