@@ -632,8 +632,6 @@ private struct DestinationSection: View {
 private struct InviteSection: View {
     @Binding var invitees: [FoundUser]
 
-    @Environment(AppSettings.self) private var settings
-
     @State private var inviteePhone = ""
     @State private var foundUser: FoundUser?
     @State private var foundUserStatus: FriendshipStatus = .none
@@ -727,22 +725,21 @@ private struct InviteSection: View {
                 .foregroundStyle(DS.Color.textSecondary)
                 .textCase(nil)
         }
-        .task { await loadContactsIfEnabled() }
-        .onChange(of: settings.contactsEnabled) { _, _ in
-            Task { await loadContactsIfEnabled() }
-        }
+        .task { await loadContactsIfAuthorized() }
         .alert("Error", isPresented: Binding(get: { error != nil }, set: { if !$0 { error = nil } })) {
             Button("OK") { error = nil }
         } message: { Text(error ?? "") }
     }
 
-    private func loadContactsIfEnabled() async {
-        guard settings.contactsEnabled else {
+    private func loadContactsIfAuthorized() async {
+        // Don't prompt for access mid-meetup-creation; only use contacts if
+        // already authorized in iOS. The first-time prompt lives in the People tab.
+        await contactsManager.load(requestsAccess: false)
+        guard contactsManager.hasContactsAccess else {
             contactsManager.clear()
             contactSuggestions = []
             return
         }
-        await contactsManager.load(requestsAccess: false)
         refreshContactSuggestions(for: inviteePhone)
     }
 
@@ -785,7 +782,7 @@ private struct InviteSection: View {
     }
 
     private func refreshContactSuggestions(for value: String) {
-        guard settings.contactsEnabled else {
+        guard contactsManager.hasContactsAccess else {
             contactSuggestions = []
             return
         }
