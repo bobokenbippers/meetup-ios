@@ -2,6 +2,7 @@ import SwiftUI
 import UIKit
 import PhotosUI
 import UserNotifications
+import Contacts
 
 struct SettingsView: View {
     @Environment(AuthViewModel.self) private var auth
