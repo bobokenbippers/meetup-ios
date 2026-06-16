@@ -88,8 +88,11 @@ struct TruthOrDareView: View {
         session?.startedBy == myUserId
     }
 
+    // Any player can end a game (a soft-locked game shouldn't trap the
+    // people in it just because they didn't start it). Meetup hosts can
+    // end a meetup-embedded game even if they never joined.
     private var canEndGame: Bool {
-        amStarter || (meetup != nil && meetup?.hostId == myUserId)
+        amPlayer || (meetup != nil && meetup?.hostId == myUserId)
     }
 
     private var isMyTurn: Bool {
@@ -386,8 +389,9 @@ struct TruthOrDareView: View {
                         promptStage(turn)
                     }
                 } else {
-                    ProgressView()
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    // Active session with no playable turn = the game
+                    // stalled. Don't spin forever — give players a way out.
+                    stalledStage
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -409,6 +413,51 @@ struct TruthOrDareView: View {
                 gameFeed
             }
         }
+    }
+
+    /// Shown when an active game has no playable turn — it soft-locked.
+    /// Replaces the old infinite spinner so players aren't trapped.
+    private var stalledStage: some View {
+        VStack(spacing: 16) {
+            Spacer()
+            Image(systemName: "exclamationmark.triangle.fill")
+                .scaledFont(size: 44)
+                .foregroundStyle(Color.statusLate)
+            Text("This game stalled")
+                .scaledFont(size: 20, weight: .black)
+                .foregroundStyle(DS.Color.textPrimary)
+            Text(canEndGame
+                 ? "The round didn't advance. End the game to clear it for everyone."
+                 : "The round didn't advance. Ask a player to end it, or close this screen.")
+                .scaledFont(size: 13)
+                .foregroundStyle(DS.Color.textSecondary)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, 32)
+
+            VStack(spacing: 10) {
+                if canEndGame {
+                    Button {
+                        showEndConfirm = true
+                    } label: {
+                        Label("End Game", systemImage: "flag.checkered")
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.glassProminent)
+                    .disabled(isActing)
+                    .accessibilityIdentifier("btn_end_stalled_game")
+                }
+                Button {
+                    dismiss()
+                } label: {
+                    Label("Close", systemImage: "xmark")
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.glass)
+            }
+            .padding(.horizontal, 32)
+            Spacer()
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
     private func tierChip(_ session: GameSession) -> some View {
