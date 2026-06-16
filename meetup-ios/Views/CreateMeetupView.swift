@@ -515,16 +515,16 @@ private struct CategorySelectionTile: View {
                     .scaledFont(size: 13, weight: .bold)
             }
         }
-        .foregroundStyle(isSelected ? .white : Color(white: 0.88))
+        .foregroundStyle(isSelected ? .white : color)
         .frame(maxWidth: .infinity, minHeight: 52)
         .padding(.horizontal, 10)
         .background {
             RoundedRectangle(cornerRadius: 12)
-                .fill(isSelected ? color.opacity(0.30) : Color(white: 0.145))
+                .fill(isSelected ? color.opacity(0.35) : color.opacity(0.15))
         }
         .overlay {
             RoundedRectangle(cornerRadius: 12)
-                .strokeBorder(isSelected ? color : color.opacity(0.55), lineWidth: isSelected ? 2 : 1.25)
+                .strokeBorder(isSelected ? color : color.opacity(0.6), lineWidth: isSelected ? 2 : 1.25)
         }
         .contentShape(RoundedRectangle(cornerRadius: 12))
         .accessibilityAddTraits(isSelected ? .isSelected : [])
