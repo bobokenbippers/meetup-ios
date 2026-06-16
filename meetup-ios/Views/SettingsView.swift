@@ -18,8 +18,7 @@ struct SettingsView: View {
     @State private var showSignOutConfirm = false
     @State private var showDeleteConfirm = false
     @State private var contactsManager = ContactsManager()
-    @State private var isSyncingContacts = false
-    @State private var contactSyncMessage: String?
+    @State private var isRequestingContacts = false
     @State private var selectedProfilePhoto: PhotosPickerItem?
     @State private var isUploadingProfilePhoto = false
     @State private var profilePhotoMessage: String?
@@ -213,30 +212,34 @@ struct SettingsView: View {
                             if !newValue { LocationManager.shared.stopTracking() }
                             persist()
                         }
-                    Toggle(isOn: Binding(
-                        get: { settings.contactsEnabled },
-                        set: { setContactSyncEnabled($0) }
-                    )) {
-                        HStack(spacing: 10) {
-                            Text("Sync Contacts")
-                            if isSyncingContacts {
-                                ProgressView()
-                                    .controlSize(.small)
-                                    .tint(Color.coral)
-                            }
+                    HStack(spacing: 10) {
+                        Text("Contacts")
+                            .foregroundStyle(DS.Color.textPrimary)
+                        if isRequestingContacts {
+                            ProgressView()
+                                .controlSize(.small)
+                                .tint(Color.coral)
                         }
-                    }
-                        .tint(Color.coral)
-                        .foregroundStyle(DS.Color.textPrimary)
-                        .listRowBackground(Color.appSurface)
-
-                    if let contactSyncMessage {
-                        Text(contactSyncMessage)
-                            .font(.caption2)
+                        Spacer()
+                        Text(contactsAccessLabel)
                             .foregroundStyle(DS.Color.textSecondary)
-                            .listRowBackground(Color.appSurface)
                     }
-                    if contactSyncMessage?.contains("iOS Settings") == true {
+                    .listRowBackground(Color.appSurface)
+
+                    if contactsManager.authStatus == .notDetermined {
+                        Button {
+                            isRequestingContacts = true
+                            Task {
+                                await contactsManager.load(force: true)
+                                contactsManager.refreshAuthorizationStatus()
+                                isRequestingContacts = false
+                            }
+                        } label: {
+                            aboutRow("Allow Contacts Access", systemImage: "person.crop.circle.badge.plus")
+                        }
+                        .buttonStyle(.plain)
+                        .listRowBackground(Color.appSurface)
+                    } else if contactsManager.needsSettingsForAccess {
                         Button {
                             openSystemSettings()
                         } label: {
@@ -248,7 +251,7 @@ struct SettingsView: View {
                 } header: {
                     sectionHeader("PRIVACY")
                 } footer: {
-                    Text("When off, your live location and ETA are never shared during meetups. Contact sync only reads your device contacts locally to suggest people you may know.")
+                    Text("When off, your live location and ETA are never shared during meetups. Contact suggestions read your device contacts locally to suggest people you may know — they're on whenever you allow Contacts access, and you can turn them off any time in iOS Settings.")
                         .font(.caption2)
                         .foregroundStyle(DS.Color.textSecondary)
                 }
@@ -295,7 +298,7 @@ struct SettingsView: View {
         }
         .task {
             await loadPrefs()
-            refreshContactSyncState()
+            contactsManager.refreshAuthorizationStatus()
         }
         .onChange(of: selectedProfilePhoto) { _, item in
             guard let item else { return }
@@ -434,41 +437,10 @@ struct SettingsView: View {
         openURL(url)
     }
 
-    private func refreshContactSyncState() {
-        contactsManager.refreshAuthorizationStatus()
-        guard settings.contactsEnabled else {
-            contactSyncMessage = nil
-            return
-        }
-        if contactsManager.needsSettingsForAccess {
-            settings.contactsEnabled = false
-            contactSyncMessage = "Contacts permission is off. Enable it in iOS Settings to sync contacts."
-        }
-    }
-
-    private func setContactSyncEnabled(_ enabled: Bool) {
-        if enabled {
-            settings.contactsEnabled = true
-            contactSyncMessage = nil
-            isSyncingContacts = true
-            Task {
-                await contactsManager.load(force: true)
-                isSyncingContacts = false
-                if contactsManager.hasContactsAccess {
-                    let count = contactsManager.contacts.count
-                    contactSyncMessage = count == 0
-                        ? "Contacts synced, but no phone numbers were found."
-                        : "Synced \(count) contacts."
-                } else {
-                    settings.contactsEnabled = false
-                    contactSyncMessage = "Contacts permission is off. Enable it in iOS Settings to sync contacts."
-                }
-            }
-        } else {
-            settings.contactsEnabled = false
-            contactsManager.clear()
-            contactSyncMessage = "Contact sync is off."
-        }
+    private var contactsAccessLabel: String {
+        if contactsManager.hasContactsAccess { return "Allowed" }
+        if contactsManager.authStatus == .notDetermined { return "Not set" }
+        return "Off"
     }
 
     private func uploadProfilePhoto(_ item: PhotosPickerItem) async {

@@ -21,7 +21,7 @@ struct PeopleListView: View {
     @State private var selectedDirectMessage: DirectMessageRoute?
     @State private var selectedFriendProfile: FriendProfileRoute?
     @Environment(NavigationState.self) private var navState
-    @Environment(AppSettings.self) private var settings
+    @Environment(\.scenePhase) private var scenePhase
 
     private var isSearchEnabled: Bool {
         let raw = phoneSearch.hasPrefix("+1") ? String(phoneSearch.dropFirst(2)) : phoneSearch
@@ -179,15 +179,20 @@ struct PeopleListView: View {
 
             .task {
                 await load()
-                await loadContactsIfEnabled()
+                await loadContactsIfAuthorized()
                 enrichWithContactNames()
                 refreshSuggestions()
                 await loadSmartSuggestions()
                 await startFriendRequestRealtime()
             }
-            .onChange(of: settings.contactsEnabled) { _, _ in
+            .onChange(of: scenePhase) { _, newPhase in
+                // Contacts access can be changed in iOS Settings while we're backgrounded.
+                guard newPhase == .active else { return }
+                let wasAuthorized = contactsManager.hasContactsAccess
+                contactsManager.refreshAuthorizationStatus()
+                guard contactsManager.hasContactsAccess != wasAuthorized else { return }
                 Task {
-                    await loadContactsIfEnabled()
+                    await loadContactsIfAuthorized()
                     enrichWithContactNames()
                     refreshSuggestions()
                     await loadSmartSuggestions()
@@ -258,7 +263,7 @@ struct PeopleListView: View {
                 .autocorrectionDisabled()
                 .onChange(of: phoneSearch) { _, v in
                     if v.contains(where: { $0.isLetter }) {
-                        contactSuggestions = settings.contactsEnabled
+                        contactSuggestions = contactsManager.hasContactsAccess
                             ? Array(contactsManager.search(v).prefix(5))
                             : []
                     } else {
@@ -268,7 +273,7 @@ struct PeopleListView: View {
                         if phoneSearch != formatted {
                             phoneSearch = formatted
                         } else {
-                            contactSuggestions = settings.contactsEnabled
+                            contactSuggestions = contactsManager.hasContactsAccess
                                 ? Array(contactsManager.search(digitsOnly).prefix(5))
                                 : []
                         }
@@ -435,7 +440,7 @@ struct PeopleListView: View {
     }
 
     private func enrichWithContactNames() {
-        guard settings.contactsEnabled else {
+        guard contactsManager.hasContactsAccess else {
             contactNameOverrides = [:]
             return
         }
@@ -451,7 +456,7 @@ struct PeopleListView: View {
     }
 
     private func refreshSuggestions() {
-        guard settings.contactsEnabled else { contactSuggestions = []; return }
+        guard contactsManager.hasContactsAccess else { contactSuggestions = []; return }
         guard !phoneSearch.isEmpty else { contactSuggestions = []; return }
         if phoneSearch.contains(where: { $0.isLetter }) {
             contactSuggestions = Array(contactsManager.search(phoneSearch).prefix(5))
@@ -462,14 +467,16 @@ struct PeopleListView: View {
         }
     }
 
-    private func loadContactsIfEnabled() async {
-        guard settings.contactsEnabled else {
+    private func loadContactsIfAuthorized() async {
+        // load() refreshes the live iOS authorization status and, on first run
+        // (.notDetermined), prompts for access — the natural first-time request moment.
+        await contactsManager.load()
+        guard contactsManager.hasContactsAccess else {
             contactsManager.clear()
             contactSuggestions = []
             contactNameOverrides = [:]
             return
         }
-        await contactsManager.load()
     }
 
     private func load() async {
@@ -669,7 +676,7 @@ struct PeopleListView: View {
         let existingIds = Set(people.map { $0.id })
         do {
             let results: [ProfileSuggestion]
-            if settings.contactsEnabled {
+            if contactsManager.hasContactsAccess {
                 results = try await SuggestionsService.shared.fetchSuggestions(
                     contactsManager: contactsManager,
                     existingFriendIds: existingIds

@@ -169,9 +169,6 @@ final class AppSettings {
     var reduceMotion: Bool {
         didSet { UserDefaults.standard.set(reduceMotion, forKey: "reduceMotion") }
     }
-    var contactsEnabled: Bool {
-        didSet { UserDefaults.standard.set(contactsEnabled, forKey: "contactsEnabled") }
-    }
     var eventSuggestionsEnabled: Bool {
         didSet { UserDefaults.standard.set(eventSuggestionsEnabled, forKey: "eventSuggestionsEnabled") }
     }
@@ -203,7 +200,6 @@ final class AppSettings {
         boldText = d.bool(forKey: "boldText")
         largerText = d.bool(forKey: "largerText")
         reduceMotion = d.bool(forKey: "reduceMotion")
-        contactsEnabled = d.bool(forKey: "contactsEnabled")
         eventSuggestionsEnabled = d.object(forKey: "eventSuggestionsEnabled") == nil
             ? true
             : d.bool(forKey: "eventSuggestionsEnabled")
