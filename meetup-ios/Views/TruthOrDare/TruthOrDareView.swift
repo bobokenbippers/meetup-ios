@@ -50,6 +50,7 @@ struct TruthOrDareView: View {
     @State private var isActing = false
     @State private var error: String?
     @State private var selectedTier = "normal"
+    @State private var selectedMode = "turn_based"
 
     // Turn IDs whose coin animation has finished, so the prompt card
     // only appears after the coin settles.
@@ -202,6 +203,27 @@ struct TruthOrDareView: View {
                     .foregroundStyle(DS.Color.textSecondary)
                     .multilineTextAlignment(.center)
             }
+
+            VStack(spacing: 10) {
+                Text("Pick a mode")
+                    .scaledFont(size: 13, weight: .semibold)
+                    .foregroundStyle(DS.Color.textSecondary)
+                HStack(spacing: 10) {
+                    modeCard(
+                        mode: "turn_based",
+                        title: "Turn-Based",
+                        subtitle: "Take turns in order",
+                        symbol: "person.crop.circle.badge.clock"
+                    )
+                    modeCard(
+                        mode: "free_for_all",
+                        title: "Free-for-All",
+                        subtitle: "Anyone grabs a card",
+                        symbol: "bolt.fill"
+                    )
+                }
+            }
+            .padding(.horizontal, 20)
 
             VStack(spacing: 10) {
                 Text("Pick the vibe")
@@ -475,6 +497,35 @@ struct TruthOrDareView: View {
 
     private func tierAccent(for tier: String) -> Color {
         tier == "spicy" ? Color.appSecondaryAccent : Color.coral
+    }
+
+    private func modeCard(mode: String, title: String, subtitle: String, symbol: String) -> some View {
+        let isSelected = selectedMode == mode
+        let accent = Color.purple
+        return Button {
+            selectedMode = mode
+        } label: {
+            VStack(spacing: 6) {
+                Image(systemName: symbol)
+                    .scaledFont(size: 26)
+                    .foregroundStyle(isSelected ? accent : Color(white: 0.5))
+                Text(title)
+                    .scaledFont(size: 15, weight: .bold)
+                    .foregroundStyle(DS.Color.textPrimary)
+                Text(subtitle)
+                    .scaledFont(size: 11)
+                    .foregroundStyle(DS.Color.textSecondary)
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 18)
+            .background(Color.appSurface)
+            .clipShape(RoundedRectangle(cornerRadius: 16))
+            .overlay(
+                RoundedRectangle(cornerRadius: 16)
+                    .strokeBorder(isSelected ? accent : Color.white.opacity(0.08), lineWidth: isSelected ? 2 : 1)
+            )
+        }
+        .buttonStyle(.plain)
     }
 
     // MARK: - Verdict vote
@@ -1019,8 +1070,10 @@ struct TruthOrDareView: View {
         do {
             let result: StartGameResult
             if let meetup {
+                // TODO: pass selectedMode to start_truth_or_dare when backend supports it
                 result = try await TruthOrDareService.shared.startSession(meetupId: meetup.id, tier: selectedTier)
             } else {
+                // TODO: pass selectedMode to start_truth_or_dare when backend supports it
                 result = try await TruthOrDareService.shared.startSession(tier: selectedTier, groupId: groupId)
             }
             standaloneSessionId = result.sessionId
