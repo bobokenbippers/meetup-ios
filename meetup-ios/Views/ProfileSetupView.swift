@@ -1,13 +1,47 @@
 import SwiftUI
+import Contacts
+import ContactsUI
 import Supabase
+
+// MARK: - Contact picker bridge
+
+struct ContactPhonePicker: UIViewControllerRepresentable {
+    var onPick: (String) -> Void
+
+    func makeCoordinator() -> Coordinator { Coordinator(onPick: onPick) }
+
+    func makeUIViewController(context: Context) -> CNContactPickerViewController {
+        let picker = CNContactPickerViewController()
+        picker.displayedPropertyKeys = [CNContactPhoneNumbersKey]
+        picker.delegate = context.coordinator
+        return picker
+    }
+
+    func updateUIViewController(_ uiViewController: CNContactPickerViewController, context: Context) {}
+
+    final class Coordinator: NSObject, CNContactPickerDelegate {
+        let onPick: (String) -> Void
+        init(onPick: @escaping (String) -> Void) { self.onPick = onPick }
+
+        func contactPicker(_ picker: CNContactPickerViewController, didSelect contactProperty: CNContactProperty) {
+            guard let phone = contactProperty.value as? CNPhoneNumber else { return }
+            let digits = phone.stringValue.filter { $0.isNumber }
+            let e164: String
+            if digits.count == 10 { e164 = "+1" + digits }
+            else if digits.count == 11, digits.hasPrefix("1") { e164 = "+" + digits }
+            else { return }
+            onPick(e164)
+        }
+    }
+}
+
+// MARK: - Profile setup view
 
 struct ProfileSetupView: View {
     @Environment(AuthViewModel.self) private var auth
     @State private var phone = ""
     @State private var isSaving = false
-    @State private var isFetchingMeContact = false
-    @State private var showsAppleIDContactButton = false
-    @State private var contactsManager = ContactsManager()
+    @State private var showContactPicker = false
     @State private var error: String?
 
     var body: some View {
@@ -36,21 +70,13 @@ struct ProfileSetupView: View {
                     }
             }
             .padding(.horizontal)
-            if showsAppleIDContactButton {
-                Button {
-                    Task { await useAppleIDContactInfo() }
-                } label: {
-                    if isFetchingMeContact {
-                        ProgressView()
-                            .controlSize(.small)
-                    } else {
-                        Label("Use Apple ID", systemImage: "person.crop.circle.badge.checkmark")
-                    }
-                }
-                .buttonStyle(.bordered)
-                .controlSize(.small)
-                .disabled(isFetchingMeContact)
+            Button {
+                showContactPicker = true
+            } label: {
+                Label("Use from Contacts", systemImage: "person.crop.circle.badge.checkmark")
             }
+            .buttonStyle(.bordered)
+            .controlSize(.small)
             Button("Save") {
                 Task { await save() }
             }
@@ -62,42 +88,17 @@ struct ProfileSetupView: View {
             Spacer()
         }
         .padding()
-        .task {
-            await refreshAppleIDContactAvailability()
+        .sheet(isPresented: $showContactPicker) {
+            ContactPhonePicker { e164 in
+                let digits = e164.hasPrefix("+1") ? String(e164.dropFirst(2)) : e164
+                phone = PhoneFormatter.format(digits)
+                showContactPicker = false
+            }
+            .ignoresSafeArea()
         }
     }
 
     private var normalizedPhone: String? { PhoneFormatter.toE164(phone) }
-
-    private func refreshAppleIDContactAvailability() async {
-        contactsManager.refreshAuthorizationStatus()
-        if contactsManager.authStatus == .notDetermined {
-            showsAppleIDContactButton = true
-            return
-        }
-
-        guard contactsManager.hasContactsAccess else {
-            showsAppleIDContactButton = false
-            return
-        }
-
-        showsAppleIDContactButton = await contactsManager.fetchMeContact(requestsAccess: false) != nil
-    }
-
-    private func useAppleIDContactInfo() async {
-        isFetchingMeContact = true
-        defer { isFetchingMeContact = false }
-
-        guard let e164 = await contactsManager.fetchMeContact() else {
-            showsAppleIDContactButton = false
-            return
-        }
-
-        let digits = e164.hasPrefix("+1") ? String(e164.dropFirst(2)) : e164
-        phone = PhoneFormatter.format(digits)
-        showsAppleIDContactButton = true
-        error = nil
-    }
 
     private func save() async {
         guard let phone = normalizedPhone, let userId = auth.session?.user.id else { return }
