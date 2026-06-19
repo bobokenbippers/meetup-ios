@@ -67,6 +67,34 @@ final class ContactsManager {
         contacts = loaded
     }
 
+    func fetchMeContact(requestsAccess: Bool = true) async -> String? {
+        authStatus = CNContactStore.authorizationStatus(for: .contacts)
+        if authStatus == .notDetermined {
+            guard requestsAccess else { return nil }
+            do {
+                _ = try await CNContactStore().requestAccess(for: .contacts)
+            } catch {
+                authStatus = CNContactStore.authorizationStatus(for: .contacts)
+                return nil
+            }
+            authStatus = CNContactStore.authorizationStatus(for: .contacts)
+        }
+        guard hasContactsAccess else { return nil }
+
+        return await Task.detached(priority: .userInitiated) {
+            let store = CNContactStore()
+            let keys = [CNContactPhoneNumbersKey] as [CNKeyDescriptor]
+            do {
+                let me = try store.unifiedMeContact(keysToFetch: keys)
+                return me.phoneNumbers.compactMap {
+                    ContactsManager.toE164($0.value.stringValue)
+                }.first
+            } catch {
+                return nil
+            }
+        }.value
+    }
+
     nonisolated static func toE164(_ raw: String) -> String? {
         let digits = raw.filter { $0.isNumber }
         if digits.count == 10 { return "+1" + digits }
