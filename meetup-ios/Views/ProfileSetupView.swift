@@ -1,61 +1,33 @@
 import SwiftUI
-import Contacts
-import ContactsUI
 import Supabase
-
-// MARK: - Contact picker bridge
-
-struct ContactPhonePicker: UIViewControllerRepresentable {
-    var onPick: (String) -> Void
-
-    func makeCoordinator() -> Coordinator { Coordinator(onPick: onPick) }
-
-    func makeUIViewController(context: Context) -> CNContactPickerViewController {
-        let picker = CNContactPickerViewController()
-        picker.displayedPropertyKeys = [CNContactPhoneNumbersKey]
-        picker.delegate = context.coordinator
-        return picker
-    }
-
-    func updateUIViewController(_ uiViewController: CNContactPickerViewController, context: Context) {}
-
-    final class Coordinator: NSObject, CNContactPickerDelegate {
-        let onPick: (String) -> Void
-        init(onPick: @escaping (String) -> Void) { self.onPick = onPick }
-
-        func contactPicker(_ picker: CNContactPickerViewController, didSelect contactProperty: CNContactProperty) {
-            guard let phone = contactProperty.value as? CNPhoneNumber else { return }
-            let digits = phone.stringValue.filter { $0.isNumber }
-            let e164: String
-            if digits.count == 10 { e164 = "+1" + digits }
-            else if digits.count == 11, digits.hasPrefix("1") { e164 = "+" + digits }
-            else { return }
-            onPick(e164)
-        }
-    }
-}
+import UIKit
 
 // MARK: - Profile setup view
 
 struct ProfileSetupView: View {
     @Environment(AuthViewModel.self) private var auth
+    @State private var contactsManager = ContactsManager()
+    @State private var displayName = ""
     @State private var phone = ""
+    @State private var profileImage: UIImage?
     @State private var isSaving = false
-    @State private var showContactPicker = false
+    @State private var isImportingAppleID = false
     @State private var error: String?
 
     var body: some View {
         VStack(spacing: 24) {
             Spacer()
-            Image(systemName: "phone.circle.fill")
-                .scaledFont(size: 60)
-                .foregroundStyle(.tint)
+            profilePhotoPreview
             Text("One more thing")
                 .font(.largeTitle.bold())
-            Text("Add your phone number so friends can invite you to meetups.")
+            Text("Add your name and phone number so friends can invite you to meetups.")
                 .font(.body)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
+            TextField("Display name", text: $displayName)
+                .textFieldStyle(.roundedBorder)
+                .textContentType(.name)
+                .padding(.horizontal)
             HStack(spacing: 0) {
                 Text("🇺🇸 +1")
                     .padding(.horizontal, 12)
@@ -71,12 +43,16 @@ struct ProfileSetupView: View {
             }
             .padding(.horizontal)
             Button {
-                showContactPicker = true
+                Task { await importAppleIDContactInfo() }
             } label: {
-                Label("Use from Contacts", systemImage: "person.crop.circle.badge.checkmark")
+                Label(
+                    isImportingAppleID ? "Importing..." : "Use Apple ID",
+                    systemImage: "person.crop.circle.badge.checkmark"
+                )
             }
             .buttonStyle(.bordered)
             .controlSize(.small)
+            .disabled(isImportingAppleID || isSaving)
             Button("Save") {
                 Task { await save() }
             }
@@ -88,28 +64,93 @@ struct ProfileSetupView: View {
             Spacer()
         }
         .padding()
-        .sheet(isPresented: $showContactPicker) {
-            ContactPhonePicker { e164 in
-                let digits = e164.hasPrefix("+1") ? String(e164.dropFirst(2)) : e164
-                phone = PhoneFormatter.format(digits)
-                showContactPicker = false
+        .task {
+            if displayName.isEmpty, let existingName = auth.profile?.displayName {
+                displayName = existingName
             }
-            .ignoresSafeArea()
+        }
+    }
+
+    @ViewBuilder
+    private var profilePhotoPreview: some View {
+        if let profileImage {
+            Image(uiImage: profileImage)
+                .resizable()
+                .scaledToFill()
+                .frame(width: 88, height: 88)
+                .clipShape(Circle())
+        } else {
+            ZStack {
+                Circle()
+                    .fill(.tint.opacity(0.14))
+                Image(systemName: "person.crop.circle.fill")
+                    .scaledFont(size: 54)
+                    .foregroundStyle(.tint)
+            }
+            .frame(width: 88, height: 88)
         }
     }
 
     private var normalizedPhone: String? { PhoneFormatter.toE164(phone) }
 
+    private var normalizedDisplayName: String? {
+        let trimmed = displayName.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? nil : trimmed
+    }
+
+    private func importAppleIDContactInfo() async {
+        isImportingAppleID = true
+        error = nil
+        defer { isImportingAppleID = false }
+
+        guard let meContact = await contactsManager.fetchMeContact() else {
+            if contactsManager.needsSettingsForAccess {
+                error = "Allow Contacts access in Settings to import Apple ID info."
+            }
+            return
+        }
+
+        if let importedDisplayName = meContact.displayName {
+            displayName = importedDisplayName
+        }
+        if let importedPhone = meContact.phone {
+            let digits = importedPhone.hasPrefix("+1") ? String(importedPhone.dropFirst(2)) : importedPhone
+            phone = PhoneFormatter.format(digits)
+        }
+        if let imageData = meContact.imageData,
+           let image = UIImage(data: imageData) {
+            profileImage = image
+        }
+    }
+
     private func save() async {
         guard let phone = normalizedPhone, let userId = auth.session?.user.id else { return }
         isSaving = true
+        error = nil
         defer { isSaving = false }
         do {
+            struct ProfileSetupUpdate: Encodable {
+                let phoneE164: String
+                let displayName: String?
+
+                enum CodingKeys: String, CodingKey {
+                    case phoneE164 = "phone_e164"
+                    case displayName = "display_name"
+                }
+            }
+
             try await SupabaseManager.shared.client
                 .from("profiles")
-                .update(["phone_e164": phone])
+                .update(ProfileSetupUpdate(phoneE164: phone, displayName: normalizedDisplayName))
                 .eq("id", value: userId)
                 .execute()
+            if let profileImage {
+                let didUpdatePhoto = await auth.updateProfilePhoto(profileImage)
+                if !didUpdatePhoto {
+                    self.error = auth.error ?? "Couldn't upload that photo."
+                    return
+                }
+            }
             await auth.loadProfile(userId: userId)
         } catch {
             self.error = error.localizedDescription

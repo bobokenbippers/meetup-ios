@@ -1,4 +1,5 @@
 import Contacts
+import Foundation
 import Observation
 
 struct DeviceContact: Identifiable, Sendable {
@@ -6,6 +7,12 @@ struct DeviceContact: Identifiable, Sendable {
     let displayName: String
     let phones: [String]
     let emails: [String]
+}
+
+struct MeContact: Sendable {
+    let phone: String?
+    let displayName: String?
+    let imageData: Data?
 }
 
 @Observable
@@ -67,6 +74,51 @@ final class ContactsManager {
         contacts = loaded
     }
 
+    func fetchMeContact(requestsAccess: Bool = true) async -> MeContact? {
+        authStatus = CNContactStore.authorizationStatus(for: .contacts)
+        if authStatus == .notDetermined {
+            guard requestsAccess else { return nil }
+            _ = try? await CNContactStore().requestAccess(for: .contacts)
+            authStatus = CNContactStore.authorizationStatus(for: .contacts)
+        }
+        guard hasContactsAccess else { return nil }
+
+        return await Task.detached(priority: .userInitiated) {
+            let store = CNContactStore()
+            let keys = [
+                CNContactPhoneNumbersKey,
+                CNContactGivenNameKey,
+                CNContactFamilyNameKey,
+                CNContactImageDataKey,
+                CNContactImageDataAvailableKey
+            ] as [CNKeyDescriptor]
+
+            let containerIdentifier = store.defaultContainerIdentifier()
+            let predicate = CNContact.predicateForContactsInContainer(withIdentifier: containerIdentifier)
+            guard let contacts = try? store.unifiedContacts(matching: predicate, keysToFetch: keys),
+                  let contact = contacts.max(by: { scoreMeContact($0) < scoreMeContact($1) }) else {
+                return nil
+            }
+
+            let displayName = [contact.givenName, contact.familyName]
+                .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+                .filter { !$0.isEmpty }
+                .joined(separator: " ")
+            let phone = contact.phoneNumbers
+                .compactMap { ContactsManager.toE164($0.value.stringValue) }
+                .first
+            let imageData = contact.isKeyAvailable(CNContactImageDataAvailableKey) &&
+                contact.imageDataAvailable ? contact.imageData : nil
+
+            guard phone != nil || !displayName.isEmpty || imageData != nil else { return nil }
+            return MeContact(
+                phone: phone,
+                displayName: displayName.isEmpty ? nil : displayName,
+                imageData: imageData
+            )
+        }.value
+    }
+
     nonisolated static func toE164(_ raw: String) -> String? {
         let digits = raw.filter { $0.isNumber }
         if digits.count == 10 { return "+1" + digits }
@@ -87,4 +139,13 @@ final class ContactsManager {
             $0.phones.contains { $0.contains(q) }
         }
     }
+}
+
+private func scoreMeContact(_ contact: CNContact) -> Int {
+    var score = 0
+    if contact.isKeyAvailable(CNContactImageDataAvailableKey), contact.imageDataAvailable { score += 4 }
+    if !contact.givenName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { score += 2 }
+    if !contact.familyName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { score += 2 }
+    if contact.phoneNumbers.contains(where: { ContactsManager.toE164($0.value.stringValue) != nil }) { score += 1 }
+    return score
 }
