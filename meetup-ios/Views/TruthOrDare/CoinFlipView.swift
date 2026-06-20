@@ -17,7 +17,6 @@ struct CoinFlipView: View {
     let onLanded: () -> Void
 
     @State private var angle: Double = 0
-    @State private var showingBack = false
     @State private var isAnimating = false
     @State private var hasLanded = false
     @State private var idlePulse = false
@@ -91,54 +90,8 @@ struct CoinFlipView: View {
     // MARK: - Coin
 
     private var coin: some View {
-        ZStack {
-            // Glow behind the coin
-            Circle()
-                .fill(faceShown.glowColor.opacity(0.35))
-                .blur(radius: 36)
-                .scaleEffect(1.1)
-
-            ZStack {
-                Circle()
-                    .fill(
-                        LinearGradient(
-                            colors: faceShown.bodyColors,
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                    )
-                Circle()
-                    .strokeBorder(.white.opacity(0.25), lineWidth: 5)
-                    .padding(6)
-
-                faceContent
-                    // The back of an x-axis flip renders mirrored; un-mirror
-                    // the content so the labels stay readable mid-spin.
-                    .scaleEffect(y: showingBack ? -1 : 1)
-            }
-            .modifier(CoinFlipEffect(showingBack: $showingBack, angle: angle))
+        AnimatedCoinDisc(angle: angle, landedFace: result == nil ? nil : landedFace)
             .shadow(color: .black.opacity(0.45), radius: 18, y: 10)
-        }
-    }
-
-    /// Which face design is visible at the current spin angle. The
-    /// "front" (even half-turns) is the landed face once a result
-    /// exists; the back alternates in during the spin for flicker.
-    private var faceShown: CoinFace {
-        guard result != nil else { return .unknown }
-        return showingBack ? landedFace.opposite : landedFace
-    }
-
-    private var faceContent: some View {
-        VStack(spacing: 8) {
-            Image(systemName: faceShown.symbol)
-                .scaledFont(size: 56, weight: .bold)
-                .foregroundStyle(.white)
-            Text(faceShown.label)
-                .scaledFont(size: 18, weight: .black)
-                .foregroundStyle(.white.opacity(0.95))
-                .tracking(4)
-        }
     }
 
     // MARK: - Animation
@@ -168,6 +121,63 @@ struct CoinFlipView: View {
             try? await Task.sleep(for: .milliseconds(900))
             UINotificationFeedbackGenerator().notificationOccurred(landedFace == .dare ? .warning : .success)
             onLanded()
+        }
+    }
+}
+
+private struct AnimatedCoinDisc: View, Animatable {
+    var angle: Double
+    let landedFace: CoinFace?
+
+    var animatableData: Double {
+        get { angle }
+        set { angle = newValue }
+    }
+
+    private var showingBack: Bool {
+        let normalized = (angle.truncatingRemainder(dividingBy: 360) + 360).truncatingRemainder(dividingBy: 360)
+        return normalized > 90 && normalized < 270
+    }
+
+    private var faceShown: CoinFace {
+        guard let landedFace else { return .unknown }
+        return showingBack ? landedFace.opposite : landedFace
+    }
+
+    var body: some View {
+        ZStack {
+            Circle()
+                .fill(faceShown.glowColor.opacity(0.35))
+                .blur(radius: 36)
+                .scaleEffect(1.1)
+
+            ZStack {
+                Circle()
+                    .fill(
+                        LinearGradient(
+                            colors: faceShown.bodyColors,
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                Circle()
+                    .strokeBorder(.white.opacity(0.25), lineWidth: 5)
+                    .padding(6)
+
+                VStack(spacing: 8) {
+                    Image(systemName: faceShown.symbol)
+                        .scaledFont(size: 56, weight: .bold)
+                        .foregroundStyle(.white)
+                    Text(faceShown.label)
+                        .scaledFont(size: 18, weight: .black)
+                        .foregroundStyle(.white.opacity(0.95))
+                        .tracking(4)
+                }
+                // The back of an x-axis flip renders mirrored; un-mirror the
+                // content without mutating SwiftUI state from the frame effect.
+                .scaleEffect(y: showingBack ? -1 : 1)
+            }
+            .modifier(CoinFlipEffect(angle: angle))
         }
     }
 }
@@ -227,10 +237,8 @@ private enum CoinFace {
     }
 }
 
-/// 3D coin rotation around the x-axis. Tracks which side faces the
-/// viewer via `showingBack` so the face artwork can swap mid-spin.
+/// 3D coin rotation around the x-axis.
 private struct CoinFlipEffect: GeometryEffect {
-    @Binding var showingBack: Bool
     var angle: Double
 
     var animatableData: Double {
@@ -239,12 +247,6 @@ private struct CoinFlipEffect: GeometryEffect {
     }
 
     func effectValue(size: CGSize) -> ProjectionTransform {
-        let normalized = (angle.truncatingRemainder(dividingBy: 360) + 360).truncatingRemainder(dividingBy: 360)
-        let back = normalized > 90 && normalized < 270
-        if back != showingBack {
-            DispatchQueue.main.async { showingBack = back }
-        }
-
         var transform = CATransform3DIdentity
         transform.m34 = -1 / max(size.width, size.height)
         transform = CATransform3DRotate(transform, CGFloat(Angle(degrees: angle).radians), 1, 0, 0)
