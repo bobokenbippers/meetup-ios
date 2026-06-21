@@ -60,7 +60,7 @@ struct AddGroupMemberView: View {
         )
     }
 
-    private var friendList: some View {
+    @ViewBuilder private var friendList: some View {
         let visibleFriends = filteredFriends
 
         ScrollView {
