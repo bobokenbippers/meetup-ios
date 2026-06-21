@@ -1,10 +1,47 @@
 import SwiftUI
+import Contacts
+import ContactsUI
 import Supabase
+
+// MARK: - Contact picker bridge
+
+struct ContactPhonePicker: UIViewControllerRepresentable {
+    var onPick: (String) -> Void
+
+    func makeCoordinator() -> Coordinator { Coordinator(onPick: onPick) }
+
+    func makeUIViewController(context: Context) -> CNContactPickerViewController {
+        let picker = CNContactPickerViewController()
+        picker.displayedPropertyKeys = [CNContactPhoneNumbersKey]
+        picker.delegate = context.coordinator
+        return picker
+    }
+
+    func updateUIViewController(_ uiViewController: CNContactPickerViewController, context: Context) {}
+
+    final class Coordinator: NSObject, CNContactPickerDelegate {
+        let onPick: (String) -> Void
+        init(onPick: @escaping (String) -> Void) { self.onPick = onPick }
+
+        func contactPicker(_ picker: CNContactPickerViewController, didSelect contactProperty: CNContactProperty) {
+            guard let phone = contactProperty.value as? CNPhoneNumber else { return }
+            let digits = phone.stringValue.filter { $0.isNumber }
+            let e164: String
+            if digits.count == 10 { e164 = "+1" + digits }
+            else if digits.count == 11, digits.hasPrefix("1") { e164 = "+" + digits }
+            else { return }
+            onPick(e164)
+        }
+    }
+}
+
+// MARK: - Profile setup view
 
 struct ProfileSetupView: View {
     @Environment(AuthViewModel.self) private var auth
     @State private var phone = ""
     @State private var isSaving = false
+    @State private var showContactPicker = false
     @State private var error: String?
 
     var body: some View {
@@ -33,6 +70,13 @@ struct ProfileSetupView: View {
                     }
             }
             .padding(.horizontal)
+            Button {
+                showContactPicker = true
+            } label: {
+                Label("Use from Contacts", systemImage: "person.crop.circle.badge.checkmark")
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.small)
             Button("Save") {
                 Task { await save() }
             }
@@ -44,6 +88,14 @@ struct ProfileSetupView: View {
             Spacer()
         }
         .padding()
+        .sheet(isPresented: $showContactPicker) {
+            ContactPhonePicker { e164 in
+                let digits = e164.hasPrefix("+1") ? String(e164.dropFirst(2)) : e164
+                phone = PhoneFormatter.format(digits)
+                showContactPicker = false
+            }
+            .ignoresSafeArea()
+        }
     }
 
     private var normalizedPhone: String? { PhoneFormatter.toE164(phone) }
