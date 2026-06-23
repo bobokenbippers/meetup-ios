@@ -27,6 +27,8 @@ struct MeetupDashboardView: View {
     @State private var isGeneratingShareLink = false
     @State private var showRecap = false
     @State private var showAddParticipants = false
+    @State private var showStopSharingConfirm = false
+    @State private var isStoppingSharing = false
 
     // Photo state
     @State private var recentPhotos: [MeetupPhoto] = []
@@ -225,6 +227,18 @@ struct MeetupDashboardView: View {
                     }
                 }
                 Button("Keep Meetup", role: .cancel) {}
+            }
+            .confirmationDialog(
+                "Stop sharing your location?",
+                isPresented: $showStopSharingConfirm,
+                titleVisibility: .visible
+            ) {
+                Button("Stop Sharing", role: .destructive) {
+                    Task { await stopSharing() }
+                }
+                Button("Keep Sharing", role: .cancel) {}
+            } message: {
+                Text("Your pin will disappear from everyone's map. You can't restart sharing once stopped.")
             }
             .task {
                 await load()
@@ -525,7 +539,46 @@ struct MeetupDashboardView: View {
                 .buttonStyle(.glass)
             }
             .padding(.horizontal, 16)
-            .padding(.vertical, 12)
+            .padding(.top, 12)
+            .padding(.bottom, 4)
+
+            // Stop Sharing button — only shown while actively broadcasting location
+            if LocationManager.shared.isTracking && LocationManager.shared.trackingMeetup?.id == meetup.id {
+                Button {
+                    showStopSharingConfirm = true
+                } label: {
+                    HStack(spacing: 6) {
+                        if isStoppingSharing {
+                            ProgressView()
+                                .scaleEffect(0.75)
+                        } else {
+                            Image(systemName: "location.slash.fill")
+                        }
+                        Text(isStoppingSharing ? "Stopping…" : "Stop Sharing Location")
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.8)
+                    }
+                    .scaledFont(size: 13, weight: .semibold)
+                    .foregroundStyle(Color.statusRunningLate)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 11)
+                    .background(Color.statusRunningLate.opacity(0.12))
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12)
+                            .strokeBorder(Color.statusRunningLate.opacity(0.35), lineWidth: 1)
+                    )
+                }
+                .buttonStyle(.plain)
+                .disabled(isStoppingSharing)
+                .padding(.horizontal, 16)
+                .padding(.bottom, 8)
+                .transition(.scale(scale: 0.95, anchor: .top).combined(with: .opacity))
+                .accessibilityLabel("Stop sharing your location")
+                .accessibilityIdentifier("btn_stop_sharing")
+            } else {
+                Color.clear.frame(height: 8)
+            }
         }
         .background(Color.appSurface)
         .clipShape(UnevenRoundedRectangle(cornerRadii: .init(topLeading: 22, topTrailing: 22)))
@@ -538,6 +591,21 @@ struct MeetupDashboardView: View {
     }
 
     // MARK: - Logic
+
+    private func stopSharing() async {
+        guard !isStoppingSharing else { return }
+        isStoppingSharing = true
+        defer { isStoppingSharing = false }
+        // Stop uploads first so no new location reaches Supabase after the clear.
+        LocationManager.shared.stopTracking()
+        do {
+            try await MeetupService.shared.clearMyLocation(meetupId: meetup.id)
+        } catch is CancellationError {
+            return
+        } catch {
+            self.error = error.localizedDescription
+        }
+    }
 
     private func openDirections() {
         let lat = meetup.destinationLat
