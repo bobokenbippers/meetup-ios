@@ -418,6 +418,38 @@ final class MeetupService {
             .execute()
     }
 
+    /// Nulls out the caller's location columns so their pin disappears from other
+    /// participants' maps immediately after the user stops sharing.
+    func clearMyLocation(meetupId: UUID) async throws {
+        guard let userId = supabase.auth.currentUser?.id else { return }
+
+        struct LocationClear: Encodable {
+            let lat: Double?
+            let lng: Double?
+            let bearing: Double?
+            let etaSeconds: Int?
+            let locationUpdatedAt: String?
+            enum CodingKeys: String, CodingKey {
+                case lat, lng, bearing
+                case etaSeconds = "eta_seconds"
+                case locationUpdatedAt = "location_updated_at"
+            }
+        }
+
+        try await supabase
+            .from("meetup_participants")
+            .update(LocationClear(
+                lat: nil,
+                lng: nil,
+                bearing: nil,
+                etaSeconds: nil,
+                locationUpdatedAt: nil
+            ))
+            .eq("meetup_id", value: meetupId)
+            .eq("user_id", value: userId)
+            .execute()
+    }
+
     func getFriends() async throws -> [Profile] {
         guard let myId = supabase.auth.currentUser?.id else { return [] }
         struct FriendshipRow: Codable {

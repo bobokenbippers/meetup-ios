@@ -24,7 +24,7 @@ enum LocationTier: Equatable {
         switch self {
         case .stationary:       return kCLLocationAccuracyHundredMeters
         case .walking:          return kCLLocationAccuracyNearestTenMeters
-        case .driving:          return kCLLocationAccuracyNearestTenMeters  // same as walking — 10m is sufficient for route tracking
+        case .driving:          return kCLLocationAccuracyNearestTenMeters
         case .nearDestination:  return kCLLocationAccuracyBest
         }
     }
@@ -35,6 +35,17 @@ enum LocationTier: Equatable {
         case .walking:          return 15
         case .driving:          return 20
         case .nearDestination:  return 5
+        }
+    }
+
+    /// The CLActivityType hint that best describes this tier's movement pattern.
+    /// Helps iOS tune satellite/cell handoffs for power efficiency.
+    var clActivityType: CLActivityType {
+        switch self {
+        case .stationary:       return .other
+        case .walking:          return .fitness
+        case .driving:          return .automotiveNavigation
+        case .nearDestination:  return .automotiveNavigation
         }
     }
 
@@ -67,8 +78,18 @@ final class LocationManager: NSObject {
     private var expiryTimer: Timer?
     private(set) var location: CLLocation?
     private(set) var authorizationStatus: CLAuthorizationStatus = .notDetermined
-    private var motionMode: MotionMode = .unknown
+    private var motionMode: MotionMode = .unknown {
+        didSet {
+            guard motionMode != oldValue else { return }
+            handleMotionModeChange()
+        }
+    }
     private(set) var currentTier: LocationTier = .stationary
+
+    // Continuation used to interrupt the upload-loop sleep when the tier changes.
+    // When non-nil, resuming it causes the current sleep to return immediately so
+    // the loop can restart with the new interval.
+    private var tierChangeContinuation: CheckedContinuation<Void, Never>?
 
     var isTracking: Bool { trackingMeetup != nil }
 
@@ -161,6 +182,13 @@ final class LocationManager: NSObject {
         }
     }
 
+    // Called on the main actor whenever motionMode changes so the CLManager
+    // hints and tier are updated immediately without waiting for the loop sleep.
+    private func handleMotionModeChange() {
+        guard isTracking else { return }
+        recalculateTier()
+    }
+
     private func startUploadLoop() {
         uploadTask?.cancel()
         uploadTask = Task {
@@ -168,10 +196,23 @@ final class LocationManager: NSObject {
                 await uploadLocationAndETA()
                 await checkArrived()
                 recalculateTier()
-                do {
-                    try await Task.sleep(for: .seconds(currentTier.uploadInterval))
-                } catch {
-                    return
+
+                // Sleep for the current tier's interval, but allow early wake-up if
+                // the tier changes (e.g. from 60 s stationary to 10 s nearDestination).
+                await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+                    tierChangeContinuation = continuation
+                    Task {
+                        do {
+                            try await Task.sleep(for: .seconds(currentTier.uploadInterval))
+                        } catch {
+                            // Task was cancelled — fall through so the outer loop exits.
+                        }
+                        // Resume the continuation if it hasn't already been resumed by a
+                        // tier change.  Using a swap so double-resume is impossible.
+                        let cont = tierChangeContinuation
+                        tierChangeContinuation = nil
+                        cont?.resume()
+                    }
                 }
             }
         }
@@ -184,12 +225,22 @@ final class LocationManager: NSObject {
         if newTier != currentTier {
             currentTier = newTier
             applyTier(newTier)
+            // Wake the sleeping upload loop so it picks up the new interval immediately.
+            wakeUploadLoop()
         }
+    }
+
+    /// Interrupt the current sleep cycle so the upload loop restarts with the new tier's interval.
+    private func wakeUploadLoop() {
+        let cont = tierChangeContinuation
+        tierChangeContinuation = nil
+        cont?.resume()
     }
 
     private func applyTier(_ tier: LocationTier) {
         clManager.desiredAccuracy = tier.desiredAccuracy
         clManager.distanceFilter = tier.distanceFilter
+        clManager.activityType = tier.clActivityType
     }
 
     private func uploadLocationAndETA() async {
@@ -216,9 +267,9 @@ final class LocationManager: NSObject {
 
     private func calculateETA(from origin: CLLocationCoordinate2D, to destination: CLLocationCoordinate2D) async -> Int? {
         let request = MKDirections.Request()
-        request.source = MKMapItem(location: CLLocation(latitude: origin.latitude, longitude: origin.longitude), address: nil)
-        request.destination = MKMapItem(location: CLLocation(latitude: destination.latitude, longitude: destination.longitude), address: nil)
-        request.transportType = .automobile
+        request.source = MKMapItem(placemark: MKPlacemark(coordinate: origin))
+        request.destination = MKMapItem(placemark: MKPlacemark(coordinate: destination))
+        request.transportType = motionMode == .walking || motionMode == .cycling ? .walking : .automobile
         return try? await MKDirections(request: request).calculate().routes.first.map { Int($0.expectedTravelTime) }
     }
 
