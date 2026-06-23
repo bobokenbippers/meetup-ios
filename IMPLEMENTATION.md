@@ -2749,6 +2749,53 @@ iOS:
 - `AddGroupMemberView` (new): searchable list of the owner's accepted friends;
   already-members are grayed out; tapping adds immediately via `addMember`.
 
+## Push Notifications — Complete Implementation (June 2026)
+
+All six push notification flows are wired end-to-end:
+
+| Event | Sender | Recipient | Edge Function | DB Trigger |
+|---|---|---|---|---|
+| Invite received | host | invitee | `push-meetup-invite` | `trg_notify_meetup_invite` on `meetup_participants INSERT` |
+| Accepted | invitee | host | `push-meetup-status` | `trg_notify_meetup_status` on `meetup_participants UPDATE` |
+| Declined | invitee | host | `push-meetup-status` | `trg_notify_meetup_status` on `meetup_participants UPDATE` |
+| Arrived | participant | host + all accepted | `push-meetup-status` | `trg_notify_meetup_status` on `meetup_participants UPDATE` |
+| Friend request received | requester | recipient | `push-friend-request` | `trg_notify_friend_request` on `friendships INSERT` |
+| Friend request accepted | acceptor | original requester | `push-friend-request` | `trg_notify_friend_accepted` on `friendships UPDATE` |
+| Leave now | cron | accepted participants | `push-leave-now` | pg_cron every 5 min |
+
+### Token Storage
+
+- `profiles.apns_token`: primary field; read by all push functions; cleared on APNs 410.
+- `device_tokens`: secondary per-device registry; populated by `NotificationService.registerDeviceToken`.
+- `apns.ts` shared module: on APNs 410 (stale token), clears both `profiles.apns_token` AND `device_tokens`.
+- `public.clear_stale_apns_token(token)`: SECURITY DEFINER helper for ops-level manual cleanup (migration `20260623000000_push_notifications_consistency.sql`).
+
+### iOS Registration
+
+`AppDelegate.didRegisterForRemoteNotificationsWithDeviceToken`:
+1. Saves hex token to `profiles.apns_token` (read by all push edge functions).
+2. Calls `NotificationService.shared.registerDeviceToken` to upsert into `device_tokens`.
+
+### Leave-Now Logic
+
+`push-leave-now` (pg_cron, every 5 min) skips participants with recent location activity
+(`last_seen_at` < 10 min ago). For participants with a stored `current_eta_seconds`, it fires
+when `depart_in_minutes = minutes_to_target - eta_min - parking_buffer_min` is in [0, 5].
+For participants without an ETA (haven't opened the dashboard yet), it falls back to a flat
+30-min window from `target_arrival_at`.
+
+### Deep-Link Routing (iOS)
+
+`AppDelegate.userNotificationCenter(_:didReceive:)` reads `event` and `meetupId` from
+`userInfo`, then calls `NavigationState.shared.handle(event:meetupId:)`:
+
+| `event` | Navigation |
+|---|---|
+| `meetup_invite`, `meetup_arrived`, `meetup_accepted`, `meetup_declined`, `meetup_cancelled`, `leave_now` | Switch to Meetups tab; set `pendingMeetupId` |
+| `friend_request`, `friend_accepted` | Switch to People tab; show friend requests |
+| `new_message` | Switch to Messages tab |
+| `game_group_start` | Switch to Games tab |
+
 ## Appendix C — Testing Strategy
 
 - **Unit tests (backend):** `pytest`. Focus on `services/punctuality.py`, `services/routing.py` ETA caching logic.
