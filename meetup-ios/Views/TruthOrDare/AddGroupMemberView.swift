@@ -60,12 +60,14 @@ struct AddGroupMemberView: View {
         )
     }
 
-    private var friendList: some View {
+    @ViewBuilder private var friendList: some View {
+        let visibleFriends = filteredFriends
+
         ScrollView {
-            VStack(spacing: 0) {
-                ForEach(Array(filteredFriends.enumerated()), id: \.element.id) { idx, friend in
+            LazyVStack(spacing: 0) {
+                ForEach(Array(visibleFriends.enumerated()), id: \.element.id) { idx, friend in
                     friendRow(friend)
-                    if idx < filteredFriends.count - 1 {
+                    if idx < visibleFriends.count - 1 {
                         Divider().padding(.leading, 60)
                     }
                 }
