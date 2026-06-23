@@ -100,15 +100,21 @@ export async function sendPush(token: string, payload: PushPayload): Promise<voi
   }
 
   if (res.status === 410) {
-    // Token stale — clear it so we don't keep retrying
+    // Token stale — clear it from both profiles and device_tokens so we don't keep retrying
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
     )
-    await supabase
-      .from("profiles")
-      .update({ apns_token: null })
-      .eq("apns_token", token)
+    await Promise.all([
+      supabase
+        .from("profiles")
+        .update({ apns_token: null })
+        .eq("apns_token", token),
+      supabase
+        .from("device_tokens")
+        .delete()
+        .eq("token", token),
+    ])
     return
   }
 

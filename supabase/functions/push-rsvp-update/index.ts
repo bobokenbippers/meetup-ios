@@ -34,15 +34,14 @@ serve(async (req) => {
       .eq("id", userId)
       .single()
 
-    // Get the host's device token
-    const { data: tokenRows } = await supabase
-      .from("device_tokens")
-      .select("token")
-      .eq("user_id", meetup.host_id)
-      .eq("platform", "ios")
-      .limit(1)
+    // Get the host's APNs token from profiles (primary source for all push functions)
+    const { data: hostProfile } = await supabase
+      .from("profiles")
+      .select("apns_token")
+      .eq("id", meetup.host_id)
+      .single()
 
-    if (!tokenRows?.length) return new Response("no host token", { status: 200 })
+    if (!hostProfile?.apns_token) return new Response("no host token", { status: 200 })
 
     const displayName = respondent?.display_name ?? "Someone"
     const meetupName = meetup.destination_name ?? "your meetup"
@@ -53,7 +52,7 @@ serve(async (req) => {
       : newStatus === "maybe" ? "Maybe"
       : newStatus
 
-    await sendPush(tokenRows[0].token, {
+    await sendPush(hostProfile.apns_token, {
       title: "RSVP Update",
       body: `${displayName} said ${statusLabel} to ${meetupName}`,
       event: "rsvp_update",
