@@ -97,10 +97,11 @@ struct BillView: View {
     // MARK: - Receipt List
 
     private var receiptListView: some View {
+        let snapshot = billSnapshot
         ZStack(alignment: .bottom) {
             List {
                 ForEach(receipts) { receipt in
-                    receiptSection(receipt: receipt)
+                    receiptSection(receipt: receipt, snapshot: snapshot)
                 }
                 Section {
                     Button {
@@ -113,12 +114,12 @@ struct BillView: View {
             .listStyle(.insetGrouped)
             .contentMargins(.bottom, 80, for: .scrollContent)
 
-            bottomBar
+            bottomBar(snapshot: snapshot)
         }
     }
 
-    private func receiptSection(receipt: Receipt) -> some View {
-        let payerName = participants.first(where: { $0.userId == receipt.payerUserId })?.displayName ?? "Unknown"
+    private func receiptSection(receipt: Receipt, snapshot: BillSnapshot) -> some View {
+        let payerName = snapshot.participantNames[receipt.payerUserId] ?? "Unknown"
         let isExpanded = expandedReceiptId == receipt.id
         let items = receiptItems[receipt.id] ?? []
 
@@ -158,10 +159,10 @@ struct BillView: View {
                         .foregroundStyle(.secondary)
                 } else {
                     ForEach(disambiguatedItems(items), id: \.item.id) { entry in
-                        itemRow(item: entry.item, displayName: entry.label)
+                        itemRow(item: entry.item, displayName: entry.label, snapshot: snapshot)
                     }
                 }
-                let myOwed = myOwedForReceipt(receipt)
+                let myOwed = myOwedForReceipt(receipt, snapshot: snapshot)
                 if myOwed > 0 {
                     HStack {
                         Text("You owe at \(receipt.placeName)")
@@ -195,12 +196,10 @@ struct BillView: View {
         }
     }
 
-    private func itemRow(item: BillItem, displayName: String) -> some View {
-        let itemClaims = claims.filter { $0.billItemId == item.id }
+    private func itemRow(item: BillItem, displayName: String, snapshot: BillSnapshot) -> some View {
+        let itemClaims = snapshot.claimsByItem[item.id] ?? []
         let isMine = itemClaims.contains { $0.userId == myUserId }
-        let claimNames = itemClaims.compactMap { c in
-            participants.first(where: { $0.userId == c.userId })?.displayName
-        }
+        let claimNames = itemClaims.compactMap { snapshot.participantNames[$0.userId] }
         return HStack {
             VStack(alignment: .leading, spacing: 2) {
                 Text(displayName)
@@ -224,7 +223,7 @@ struct BillView: View {
         }
     }
 
-    private var bottomBar: some View {
+    private func bottomBar(snapshot: BillSnapshot) -> some View {
         VStack(spacing: 0) {
             Divider()
             HStack {
@@ -232,7 +231,7 @@ struct BillView: View {
                     Text("Total you owe")
                         .font(.caption)
                         .foregroundStyle(.secondary)
-                    Text(crossReceiptMyTotal, format: .currency(code: "USD"))
+                    Text(crossReceiptMyTotal(snapshot: snapshot), format: .currency(code: "USD"))
                         .font(.headline)
                 }
                 Spacer()
@@ -247,16 +246,12 @@ struct BillView: View {
     // MARK: - Summary Sheet
 
     private var summarySheet: some View {
+        let snapshot = billSnapshot
         NavigationStack {
             List {
                 ForEach(receipts) { receipt in
-                    let payerName = participants.first(where: { $0.userId == receipt.payerUserId })?.displayName ?? "Unknown"
-                    let receiptTotals = BillService.computeReceiptTotals(
-                        receipts: [receipt],
-                        items: receiptItems,
-                        claims: claims,
-                        participants: participants
-                    )[receipt.id] ?? []
+                    let payerName = snapshot.participantNames[receipt.payerUserId] ?? "Unknown"
+                    let receiptTotals = snapshot.receiptTotalsById[receipt.id] ?? []
 
                     Section("At \(receipt.placeName) · paid by \(payerName)") {
                         ForEach(receiptTotals.filter { $0.total > 0.005 }, id: \.userId) { t in
@@ -278,7 +273,7 @@ struct BillView: View {
                 }
 
                 Section {
-                    let allTotals = crossReceiptTotals
+                    let allTotals = snapshot.crossReceiptTotals
                     ForEach(allTotals.filter { $0.total > 0.005 }, id: \.userId) { t in
                         HStack {
                             Text(t.displayName)
@@ -304,12 +299,24 @@ struct BillView: View {
 
     // MARK: - Computed Totals
 
-    private var crossReceiptTotals: [BillService.PersonTotal] {
-        var combined: [UUID: BillService.PersonTotal] = [:]
-        let allReceiptTotals = BillService.computeReceiptTotals(
+    private struct BillSnapshot {
+        let participantNames: [UUID: String]
+        let claimsByItem: [UUID: [BillItemClaim]]
+        let receiptTotalsById: [UUID: [BillService.PersonTotal]]
+        let crossReceiptTotals: [BillService.PersonTotal]
+    }
+
+    private var billSnapshot: BillSnapshot {
+        let participantNames = participants.reduce(into: [UUID: String]()) { names, participant in
+            names[participant.userId] = participant.displayName ?? "Unknown"
+        }
+        let claimsByItem = Dictionary(grouping: claims, by: \.billItemId)
+        let receiptTotalsById = BillService.computeReceiptTotals(
             receipts: receipts, items: receiptItems, claims: claims, participants: participants
         )
-        for (_, totals) in allReceiptTotals {
+        var combined: [UUID: BillService.PersonTotal] = [:]
+
+        for (_, totals) in receiptTotalsById {
             for t in totals {
                 if combined[t.userId] == nil {
                     combined[t.userId] = t
@@ -319,20 +326,23 @@ struct BillView: View {
                 }
             }
         }
-        return combined.values.sorted { $0.total > $1.total }
-    }
 
-    private var crossReceiptMyTotal: Double {
-        guard let me = myUserId else { return 0 }
-        return crossReceiptTotals.first(where: { $0.userId == me })?.total ?? 0
-    }
-
-    private func myOwedForReceipt(_ receipt: Receipt) -> Double {
-        guard let me = myUserId else { return 0 }
-        let totals = BillService.computeReceiptTotals(
-            receipts: [receipt], items: receiptItems, claims: claims, participants: participants
+        return BillSnapshot(
+            participantNames: participantNames,
+            claimsByItem: claimsByItem,
+            receiptTotalsById: receiptTotalsById,
+            crossReceiptTotals: combined.values.sorted { $0.total > $1.total }
         )
-        return totals[receipt.id]?.first(where: { $0.userId == me })?.total ?? 0
+    }
+
+    private func crossReceiptMyTotal(snapshot: BillSnapshot) -> Double {
+        guard let me = myUserId else { return 0 }
+        return snapshot.crossReceiptTotals.first(where: { $0.userId == me })?.total ?? 0
+    }
+
+    private func myOwedForReceipt(_ receipt: Receipt, snapshot: BillSnapshot) -> Double {
+        guard let me = myUserId else { return 0 }
+        return snapshot.receiptTotalsById[receipt.id]?.first(where: { $0.userId == me })?.total ?? 0
     }
 
     // MARK: - Data

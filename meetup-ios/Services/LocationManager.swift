@@ -77,6 +77,7 @@ final class LocationManager: NSObject {
     private var uploadTask: Task<Void, Never>?
     private var expiryTimer: Timer?
     private(set) var location: CLLocation?
+    @ObservationIgnored private var lastPublishedLocationAt: Date?
     private(set) var authorizationStatus: CLAuthorizationStatus = .notDetermined
     private var motionMode: MotionMode = .unknown {
         didSet {
@@ -282,7 +283,11 @@ final class LocationManager: NSObject {
 
 extension LocationManager: CLLocationManagerDelegate {
     func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
-        location = locations.last
+        guard let newLocation = locations.last,
+              shouldPublishLocation(newLocation)
+        else { return }
+        location = newLocation
+        lastPublishedLocationAt = newLocation.timestamp
     }
 
     func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
@@ -296,4 +301,15 @@ extension LocationManager: CLLocationManagerDelegate {
     // requestLocation() reports failures here; swallow them — callers degrade gracefully
     // when `location` stays nil (e.g. nearby-event suggestions just hide their section).
     func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {}
+
+    private func shouldPublishLocation(_ newLocation: CLLocation) -> Bool {
+        guard LocationManager.isLocationValid(newLocation) else { return false }
+        guard let current = location, let lastPublishedLocationAt else { return true }
+
+        let elapsed = newLocation.timestamp.timeIntervalSince(lastPublishedLocationAt)
+        let moved = newLocation.distance(from: current)
+        let minimumMove = max(10, currentTier.distanceFilter * 0.5)
+
+        return elapsed >= 5 || moved >= minimumMove
+    }
 }
