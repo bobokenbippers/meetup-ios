@@ -727,6 +727,7 @@ private struct MessageImage: View {
 
     @State private var url: URL?
     @State private var failedToLoad = false
+    @State private var loadedPath: String?
 
     var body: some View {
         Group {
@@ -785,7 +786,8 @@ private struct MessageImage: View {
     }
 
     private func loadSignedURL() async {
-        if url != nil, !failedToLoad { return }
+        if loadedPath == path, url != nil, !failedToLoad { return }
+        loadedPath = path
         failedToLoad = false
         url = nil
         do {
