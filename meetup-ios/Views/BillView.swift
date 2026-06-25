@@ -96,7 +96,7 @@ struct BillView: View {
 
     // MARK: - Receipt List
 
-    private var receiptListView: some View {
+    @ViewBuilder private var receiptListView: some View {
         let snapshot = billSnapshot
         ZStack(alignment: .bottom) {
             List {
@@ -245,7 +245,7 @@ struct BillView: View {
 
     // MARK: - Summary Sheet
 
-    private var summarySheet: some View {
+    @ViewBuilder private var summarySheet: some View {
         let snapshot = billSnapshot
         NavigationStack {
             List {
