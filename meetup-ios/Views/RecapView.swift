@@ -26,13 +26,11 @@ struct RecapView: View {
     private var myUserId: UUID? { auth.session?.user.id }
     private var isHost: Bool { myUserId == meetup.hostId }
 
-    private var arrived: [MeetupParticipant] {
-        participants.filter { $0.status == "arrived" }
+    private var showedUp: [MeetupParticipant] {
+        participants.filter(\.countsAsRecapAttendance)
     }
-    private var noShow: [MeetupParticipant] {
-        participants.filter { $0.status == "yes" || $0.status == "accepted" }
-    }
-    private var declined: [MeetupParticipant] {
+
+    private var declinedOrMaybe: [MeetupParticipant] {
         participants.filter { $0.status == "declined" || $0.status == "maybe" || $0.status == "invited" }
     }
 
@@ -43,7 +41,7 @@ struct RecapView: View {
     private var peopleCountText: String {
         let total = participants.count
         guard total > 0 else { return "Loading the crew" }
-        return arrived.isEmpty ? "\(total) invited" : "\(arrived.count) of \(total) made it"
+        return showedUp.isEmpty ? "\(total) invited" : "\(showedUp.count) of \(total) counted"
     }
 
     private var receiptTotal: Double {
@@ -229,7 +227,7 @@ struct RecapView: View {
 
     private var socialStatsRow: some View {
         HStack(spacing: 10) {
-            RecapStatTile(value: "\(arrived.count)", label: "showed up", systemImage: "checkmark.circle.fill")
+            RecapStatTile(value: "\(showedUp.count)", label: "counted", systemImage: "checkmark.circle.fill")
             RecapStatTile(value: "\(meetupPhotos.count)", label: "photos", systemImage: "photo.stack")
             RecapStatTile(
                 value: receiptTotal > 0 ? receiptTotal.formatted(.currency(code: "USD")) : "$0",
@@ -243,14 +241,14 @@ struct RecapView: View {
 
     private var hostSummaryCard: some View {
         let total = participants.count
-        let came = arrived.count
+        let came = showedUp.count
         return HStack(spacing: 0) {
             Spacer()
             VStack(spacing: 4) {
                 Text("\(came) of \(total)")
                     .scaledFont(size: 28, weight: .black)
                     .foregroundStyle(Color(.label))
-                Text("people showed up")
+                Text("people counted")
                     .scaledFont(size: 13)
                     .foregroundStyle(.secondary)
             }
@@ -269,14 +267,11 @@ struct RecapView: View {
 
     private var attendeeSection: some View {
         VStack(spacing: 12) {
-            if !arrived.isEmpty {
-                attendeeGroup(title: "Came", icon: "checkmark.circle.fill", iconColor: .statusLive, people: arrived)
+            if !showedUp.isEmpty {
+                attendeeGroup(title: "Counted", icon: "checkmark.circle.fill", iconColor: .statusLive, people: showedUp)
             }
-            if !noShow.isEmpty {
-                attendeeGroup(title: "Said yes, didn't show", icon: "xmark.circle", iconColor: .statusLate, people: noShow)
-            }
-            if !declined.isEmpty {
-                attendeeGroup(title: "Said no / maybe", icon: "minus.circle", iconColor: Color(.secondaryLabel), people: declined)
+            if !declinedOrMaybe.isEmpty {
+                attendeeGroup(title: "Said no / maybe", icon: "minus.circle", iconColor: Color(.secondaryLabel), people: declinedOrMaybe)
             }
             if !hasLoaded {
                 RoundedRectangle(cornerRadius: 16)

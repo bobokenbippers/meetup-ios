@@ -102,13 +102,17 @@ extension MeetupParticipant {
         status == "yes" || status == "accepted"
     }
 
+    var countsAsRecapAttendance: Bool {
+        status == "arrived" || isCommitted
+    }
+
     var isEnRoute: Bool {
         isCommitted && hasLiveETA
     }
 
-    func punctualityState(target: Date) -> PunctualityState? {
+    func punctualityState(target: Date, now: Date = Date()) -> PunctualityState? {
         guard isEnRoute, let seconds = etaSeconds else { return nil }
-        let delta = Date().addingTimeInterval(TimeInterval(seconds)).timeIntervalSince(target)
+        let delta = now.addingTimeInterval(TimeInterval(seconds)).timeIntervalSince(target)
         switch delta {
         case ..<(-300):  return .early
         case -300..<300: return .onTime
@@ -126,12 +130,11 @@ extension MeetupParticipant {
         return "\(minutes / 60)h \(minutes % 60)m away"
     }
 
-    func lateLabel(target: Date?) -> String? {
+    func lateLabel(target: Date?, now: Date = Date()) -> String? {
         guard let target, let seconds = etaSeconds, isEnRoute else { return nil }
-        let arrivalETA = Date().addingTimeInterval(TimeInterval(seconds))
+        let arrivalETA = now.addingTimeInterval(TimeInterval(seconds))
         guard arrivalETA > target else { return nil }
-        let lateBy = Int(arrivalETA.timeIntervalSince(target)) / 60
-        return "\(lateBy) min late"
+        return etaLabel() ?? "Running late"
     }
 }
 

@@ -6,6 +6,25 @@ import Testing
 struct PunctualityStatusTests {
     private let now = Date(timeIntervalSince1970: 1_800)
 
+    private func makeParticipant(
+        status: String = "accepted",
+        etaSeconds: Int? = nil,
+        lat: Double? = nil,
+        lng: Double? = nil
+    ) -> MeetupParticipant {
+        MeetupParticipant(
+            meetupId: UUID(),
+            userId: UUID(),
+            status: status,
+            lat: lat,
+            lng: lng,
+            bearing: nil,
+            etaSeconds: etaSeconds,
+            locationUpdatedAt: nil,
+            profiles: .init(displayName: "Jayko", phoneE164: nil)
+        )
+    }
+
     @Test("accepted RSVP without live ETA resolves to going")
     func acceptedWithoutLiveETAIsGoing() {
         let target = now.addingTimeInterval(300)
@@ -81,5 +100,51 @@ struct PunctualityStatusTests {
         }
 
         #expect(lateStatuses == ["yes", "accepted"])
+    }
+
+    @Test("late ETA label shows route time without adding elapsed start time")
+    func lateETALabelKeepsTransitTimeVisible() {
+        let participant = makeParticipant(
+            etaSeconds: 1_800,
+            lat: 40.7128,
+            lng: -74.0060
+        )
+        let target = now.addingTimeInterval(-1_800)
+
+        #expect(participant.lateLabel(target: target, now: now) == "30 min away")
+    }
+
+    @Test("late ETA label does not turn one minute away into sixty-one minutes late")
+    func lateETALabelKeepsTransitTimeVisibleBeyondAnHour() {
+        let participant = makeParticipant(
+            etaSeconds: 60,
+            lat: 40.7128,
+            lng: -74.0060
+        )
+        let target = now.addingTimeInterval(-3_600)
+
+        #expect(participant.lateLabel(target: target, now: now) == "1 min away")
+    }
+
+    @Test("late ETA label is hidden when arrival is on time")
+    func lateETALabelHiddenWhenArrivalIsOnTime() {
+        let participant = makeParticipant(
+            etaSeconds: 1_800,
+            lat: 40.7128,
+            lng: -74.0060
+        )
+        let target = now.addingTimeInterval(1_800)
+
+        #expect(participant.lateLabel(target: target, now: now) == nil)
+    }
+
+    @Test("recap attendance includes arrived and committed participants")
+    func recapAttendanceIncludesArrivedAndCommittedParticipants() {
+        let statuses = ["arrived", "yes", "accepted", "invited", "maybe", "declined", "no"]
+        let counted = statuses.filter {
+            makeParticipant(status: $0).countsAsRecapAttendance
+        }
+
+        #expect(counted == ["arrived", "yes", "accepted"])
     }
 }
