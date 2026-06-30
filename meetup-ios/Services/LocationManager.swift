@@ -8,6 +8,52 @@ enum MotionMode {
     case stationary, walking, cycling, driving, unknown
 }
 
+enum GoogleRouteTravelMode: String {
+    case drive = "DRIVE"
+    case walk = "WALK"
+    case bicycle = "BICYCLE"
+    case transit = "TRANSIT"
+
+    var googleMapsURLValue: String {
+        switch self {
+        case .drive:   return "driving"
+        case .walk:    return "walking"
+        case .bicycle: return "bicycling"
+        case .transit: return "transit"
+        }
+    }
+
+    static func forMotionMode(_ motionMode: MotionMode) -> GoogleRouteTravelMode {
+        switch motionMode {
+        case .driving:
+            return .drive
+        case .walking:
+            return .walk
+        case .cycling:
+            return .bicycle
+        case .stationary, .unknown:
+            return .transit
+        }
+    }
+}
+
+enum OpenRouteServiceProfile: String {
+    case drivingCar = "driving-car"
+    case cyclingRegular = "cycling-regular"
+    case footWalking = "foot-walking"
+
+    static func forMotionMode(_ motionMode: MotionMode) -> OpenRouteServiceProfile {
+        switch motionMode {
+        case .walking:
+            return .footWalking
+        case .cycling:
+            return .cyclingRegular
+        case .stationary, .driving, .unknown:
+            return .drivingCar
+        }
+    }
+}
+
 enum LocationTier: Equatable {
     case stationary, walking, driving, nearDestination
 
@@ -93,6 +139,9 @@ final class LocationManager: NSObject {
     private var tierChangeContinuation: CheckedContinuation<Void, Never>?
 
     var isTracking: Bool { trackingMeetup != nil }
+    var googleMapsDirectionsMode: String {
+        GoogleRouteTravelMode.forMotionMode(motionMode).googleMapsURLValue
+    }
 
     override private init() {
         super.init()
@@ -267,6 +316,22 @@ final class LocationManager: NSObject {
     }
 
     private func calculateETA(from origin: CLLocationCoordinate2D, to destination: CLLocationCoordinate2D) async -> Int? {
+        if let openRouteETA = await OpenRouteService.shared.calculateETA(
+            from: origin,
+            to: destination,
+            motionMode: motionMode
+        ) {
+            return openRouteETA
+        }
+
+        if let googleETA = await GoogleRoutesService.shared.calculateETA(
+            from: origin,
+            to: destination,
+            motionMode: motionMode
+        ) {
+            return googleETA
+        }
+
         let request = MKDirections.Request()
         request.source = MKMapItem(placemark: MKPlacemark(coordinate: origin))
         request.destination = MKMapItem(placemark: MKPlacemark(coordinate: destination))
@@ -278,6 +343,150 @@ final class LocationManager: NSObject {
         location.horizontalAccuracy > 0 &&
         location.horizontalAccuracy <= 200 &&
         location.timestamp.timeIntervalSinceNow >= -90
+    }
+}
+
+private struct OpenRouteService {
+    static let shared = OpenRouteService()
+
+    private var apiKey: String? {
+        AppEnvironment.current.value(for: "OPENROUTESERVICE_API_KEY")
+    }
+
+    func calculateETA(
+        from origin: CLLocationCoordinate2D,
+        to destination: CLLocationCoordinate2D,
+        motionMode: MotionMode
+    ) async -> Int? {
+        guard let apiKey else { return nil }
+
+        let profile = OpenRouteServiceProfile.forMotionMode(motionMode).rawValue
+        guard let url = URL(string: "https://api.openrouteservice.org/v2/matrix/\(profile)") else { return nil }
+
+        let body = OpenRouteServiceMatrixRequest(
+            locations: [
+                [origin.longitude, origin.latitude],
+                [destination.longitude, destination.latitude]
+            ],
+            sources: ["0"],
+            destinations: ["1"],
+            metrics: ["duration"]
+        )
+
+        guard let httpBody = try? JSONEncoder().encode(body) else { return nil }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.timeoutInterval = 8
+        request.setValue(apiKey, forHTTPHeaderField: "Authorization")
+        request.setValue("application/json; charset=utf-8", forHTTPHeaderField: "Content-Type")
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        request.httpBody = httpBody
+
+        guard let (data, response) = try? await URLSession.shared.data(for: request),
+              let httpResponse = response as? HTTPURLResponse,
+              200..<300 ~= httpResponse.statusCode,
+              let matrixResponse = try? JSONDecoder().decode(OpenRouteServiceMatrixResponse.self, from: data),
+              let duration = matrixResponse.durations.first?.compactMap({ $0 }).first
+        else {
+            return nil
+        }
+
+        return Int(duration.rounded())
+    }
+}
+
+private struct OpenRouteServiceMatrixRequest: Encodable {
+    let locations: [[Double]]
+    let sources: [String]
+    let destinations: [String]
+    let metrics: [String]
+}
+
+private struct OpenRouteServiceMatrixResponse: Decodable {
+    let durations: [[Double?]]
+}
+
+private struct GoogleRoutesService {
+    static let shared = GoogleRoutesService()
+
+    private var apiKey: String? {
+        guard let key = Bundle.main.object(forInfoDictionaryKey: "GoogleMapsAPIKey") as? String else {
+            return nil
+        }
+        let trimmed = key.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? nil : trimmed
+    }
+
+    func calculateETA(
+        from origin: CLLocationCoordinate2D,
+        to destination: CLLocationCoordinate2D,
+        motionMode: MotionMode
+    ) async -> Int? {
+        guard let apiKey else { return nil }
+        guard let url = URL(string: "https://routes.googleapis.com/directions/v2:computeRoutes") else { return nil }
+
+        var body: [String: Any] = [
+            "origin": [
+                "location": [
+                    "latLng": [
+                        "latitude": origin.latitude,
+                        "longitude": origin.longitude
+                    ]
+                ]
+            ],
+            "destination": [
+                "location": [
+                    "latLng": [
+                        "latitude": destination.latitude,
+                        "longitude": destination.longitude
+                    ]
+                ]
+            ],
+            "travelMode": GoogleRouteTravelMode.forMotionMode(motionMode).rawValue
+        ]
+
+        if GoogleRouteTravelMode.forMotionMode(motionMode) == .drive {
+            body["routingPreference"] = "TRAFFIC_AWARE"
+        }
+
+        guard let httpBody = try? JSONSerialization.data(withJSONObject: body) else { return nil }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.timeoutInterval = 8
+        request.setValue(apiKey, forHTTPHeaderField: "X-Goog-Api-Key")
+        request.setValue("routes.duration", forHTTPHeaderField: "X-Goog-FieldMask")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = httpBody
+
+        guard let (data, response) = try? await URLSession.shared.data(for: request),
+              let httpResponse = response as? HTTPURLResponse,
+              200..<300 ~= httpResponse.statusCode,
+              let routesResponse = try? JSONDecoder().decode(GoogleRoutesResponse.self, from: data),
+              let duration = routesResponse.routes.compactMap(\.duration).first
+        else {
+            return nil
+        }
+
+        return Self.seconds(fromGoogleDuration: duration)
+    }
+
+    private static func seconds(fromGoogleDuration duration: String) -> Int? {
+        guard duration.hasSuffix("s"),
+              let seconds = Double(duration.dropLast())
+        else {
+            return nil
+        }
+        return Int(seconds.rounded())
+    }
+}
+
+private struct GoogleRoutesResponse: Decodable {
+    let routes: [Route]
+
+    struct Route: Decodable {
+        let duration: String?
     }
 }
 
