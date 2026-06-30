@@ -42,8 +42,12 @@ jobs:
         run: |
           cat > Secrets.xcconfig <<EOF
           TICKETMASTER_API_KEY = ${{ secrets.TICKETMASTER_API_KEY }}
+          GOOGLE_MAPS_API_KEY = ${{ secrets.GOOGLE_MAPS_API_KEY }}
+          APP_ENV = OPENROUTESERVICE_API_KEY=${{ secrets.OPENROUTE_APP_KEY }}
           EOF
           test -n "${{ secrets.TICKETMASTER_API_KEY }}" || (echo "TICKETMASTER_API_KEY is required for TestFlight builds" && exit 1)
+          test -n "${{ secrets.GOOGLE_MAPS_API_KEY }}" || (echo "GOOGLE_MAPS_API_KEY is required for TestFlight builds" && exit 1)
+          test -n "${{ secrets.OPENROUTE_APP_KEY }}" || (echo "OPENROUTE_APP_KEY is required for TestFlight builds" && exit 1)
 
       - name: Regenerate profiles (enable Push + match --force)
         env:

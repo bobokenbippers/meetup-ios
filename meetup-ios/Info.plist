@@ -41,6 +41,10 @@
 	<string>Used to adapt location updates to save battery during active meetups.</string>
 	<key>TicketmasterAPIKey</key>
 	<string>$(TICKETMASTER_API_KEY)</string>
+	<key>AppEnvironment</key>
+	<string>$(APP_ENV)</string>
+	<key>GoogleMapsAPIKey</key>
+	<string>$(GOOGLE_MAPS_API_KEY)</string>
 	<key>LSApplicationQueriesSchemes</key>
 	<array>
 		<string>comgooglemaps</string>
@@ -58,8 +62,8 @@
 			</array>
 		</dict>
 	</array>
-	<!-- TicketmasterAPIKey is injected at build time from
-	     Secrets.xcconfig (gitignored) via build setting substitution, so the real
-	     keys never live in the repo. See Secrets.example.xcconfig. -->
+	<!-- API keys and app environment are injected at build time from
+	     Secrets.xcconfig (gitignored) via build setting substitution, so real
+	     secrets never live in the repo. See Secrets.example.xcconfig. -->
 </dict>
 </plist>
