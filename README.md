@@ -23,7 +23,7 @@ A live location sharing and meetup coordination app for iOS.
 | Workflow | Trigger | What it does |
 |---|---|---|
 | CI | Every PR + push to `main` | Builds + runs unit tests (no signing) |
-| TestFlight | Push to `main` | Signs, archives, uploads to TestFlight |
+| TestFlight | Manual workflow dispatch | Signs, archives, uploads to TestFlight after `confirm_upload=YES` |
 
 ## Local development
 
