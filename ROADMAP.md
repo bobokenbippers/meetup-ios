@@ -9,107 +9,81 @@ Tracks what's in progress, what's next, and future ideas. Items in "Up Next" are
 | Milestone | Status | Notes |
 |---|---|---|
 | M1 — Auth | ✅ Done | Sign in with Apple, profile creation, display name capture |
-| M2 — Friends | ⚠️ Partial | Add/remove friend works; push notifications for requests not wired |
-| M3 — Meetups + Dashboard | ✅ Mostly done | Create, invite, accept/decline, realtime, map, ETA labels |
-| M4 — Live Location | ⚠️ Partial | 30s upload loop works; tiered battery strategy not implemented |
-| M5 — Punctuality + Notifications | ⚠️ Partial | ETA labels + late coloring work; push delivery not wired |
-| M6 — Polish / Live Activities | ❌ Not started | No Dynamic Island, no audit log, no one-tap stop sharing UI |
-| M7 — TestFlight | ❌ Not started | |
-| M8 — Mapbox Turn-by-Turn | 🔜 Deferred | "Open in Apple Maps" is good enough for v1 |
+| M2 — Friends | ✅ Mostly done | Add/remove friend, contacts, DMs, realtime inbox, and DM pushes work; friend-request pushes remain a follow-up |
+| M3 — Meetups + Dashboard | ✅ Mostly done | Create, invite, accept/decline, share links, realtime, map, ETA labels, photos, games, and recap basics are in |
+| M4 — Live Location | ✅ Mostly done | Battery-aware tiering, motion-aware ETA, OpenRouteService routing, and Stop Sharing are in; real-world drain still needs measurement |
+| M5 — Punctuality + Notifications | ✅ Mostly done | ETA labels, late coloring, RSVP/event pushes, and late-punishment flow are in; "leave now" timing still needs field validation |
+| M6 — Polish / Live Activities | ⚠️ Partial | Stop Sharing, routing polish, bill realtime, and camera capture are in; Live Activities and privacy audit log remain |
+| M7 — TestFlight | ⚠️ In progress | Manual TestFlight workflow exists; current docs/notes being refreshed for the next beta |
+| M8 — Mapbox Turn-by-Turn | 🔜 Deferred | Google/Apple Maps handoff is good enough for v1 |
 
 ---
 
 ## Up Next
 
-Things that need to be built before the app is ready for real-world use.
+Things that should happen before the next broader TestFlight push.
 
-### Battery-aware location tiering (M4)
+### TestFlight release readiness (M7)
 
-`LocationManager` currently uploads every 30s at `kCLLocationAccuracyHundredMeters` with no awareness of motion state. The tiered strategy described in `IMPLEMENTATION.md` §M4 is not yet implemented.
+The manual TestFlight workflow is in place. Before inviting more testers, keep the release story tight and make sure the merged build is green.
 
-- Switch to `CLActivityType.automotiveNavigation` when moving
-- Stationary: 60s interval, `kCLLocationAccuracyHundredMeters`
-- Walking/moving: 15–20s interval, `kCLLocationAccuracyNearestTenMeters`
-- Within ~500m of destination: 10s interval, highest accuracy
-- Tighten `distanceFilter` as proximity decreases
+- Confirm CI and CodeQL are green on the latest `main`
+- Update `CHANGELOG.md` with tester-facing notes
+- Trigger the manual `TestFlight` workflow from GitHub Actions with `confirm_upload=YES`
+- Smoke test on a real device with at least two accounts
 
-*Needs: updates to `LocationManager.startTracking` and the upload loop.*
-
----
-
-### Push notifications for meetup events (M5)
-
-APNS token is saved to `profiles.apns_token` on every launch, but nothing sends pushes. Key events that need delivery:
-
-- **Invite received** → push to invitee
-- **Accept/decline** → push to host
-- **"Leave now"** → push when ETA math says the user needs to depart to arrive on time
-- **Arrived** → push to host when a participant marks arrived
-
-*Needs: Supabase Edge Function or database trigger + APNS delivery via the saved token.*
+*Needs: GitHub Actions green + manual TestFlight workflow run.*
 
 ---
 
-### Friend request push notifications (M2)
+### Venmo / PayPal settle-up links
 
-Same gap as meetup notifications — token exists, delivery doesn't.
+Bill totals per person are computed across receipts. The next useful bill-flow improvement is a one-tap payment handoff from each settle-up row.
 
-- Incoming friend request → push to recipient
-- Request accepted → push to requester
+- Add optional Venmo/PayPal handle fields to profiles or bill participants
+- Generate payment links with amount, recipient, and meetup note
+- Fall back cleanly when no handle is available
+- Add tests for URL encoding and amount formatting
 
-*Needs: same Edge Function pattern as meetup push.*
-
----
-
-### Live Activities — Dynamic Island + Lock Screen (M6)
-
-During an active meetup, the Dynamic Island and Lock Screen should show a live summary: ETAs and arrival status for each participant. Users shouldn't need to open the app to see who's on their way.
-
-*Needs: `ActivityKit` framework, a Widget Extension target, and a `MeetupLiveActivityAttributes` type pushed from `MeetupDashboardView`.*
+*Needs: profile/payment-handle data model decision before implementation.*
 
 ---
 
-### Privacy controls + one-tap stop sharing (M6)
+### Privacy controls + audit log (M6)
 
-- **Stop Sharing button** — stops `LocationManager` uploads and clears the participant's location columns in Supabase. Currently the app only stops uploads on `onDisappear`; there's no in-meetup "I'm done sharing" affordance.
-- **Audit log** — `IMPLEMENTATION.md` §M6 describes an `audit_log` table. Needs schema + RLS + a read surface (Settings or profile).
+Stop Sharing now gives users an in-meetup location cutoff. The remaining trust feature is an audit trail that shows when sensitive sharing starts, stops, and clears.
 
----
+- Add an `audit_log` table and RLS policies
+- Log location sharing start, stop, clear, and meetup completion events
+- Surface recent privacy events in Settings or profile
 
-### Shareable invite links (M3 gap)
-
-GUIDE.md calls this out for M3 but it was never built. SMS invites let someone join a meetup without already having the app installed.
-
-- Universal Links config in Apple Developer portal + `apple-app-site-association`
-- Deep link handler in `meetup_iosApp.swift` (`.onOpenURL`)
-- Join-meetup flow: open link → install app if needed → land on dashboard
+*Needs: schema + RLS + small Settings surface.*
 
 ---
 
 ## Meetup Recap
 
-**Post-event summary page**
+**Recap polish**
 
-After a meetup ends (`meetup.status == "completed"`), show a recap screen:
-- Who came (accepted → arrived participants)
-- Individual arrival times vs. target time
-- Total spent (sum of all bills attached to this meetup)
-- Shared photos from the event
-- Notes / memories (free-text, editable after the fact)
+The recap surface exists and can summarize arrivals, bills, photos, and late-punishment moments. The remaining work is making it feel like a shareable memory instead of a plain summary.
 
-*Needs: `meetup_photos` table; `notes` column on `meetups`; recap view gated on completed status. `meetup_participants.arrived_at` may already exist — confirm schema before adding.*
+- Add editable notes/memories after completion
+- Add a share card/export for the group recap
+- Tighten empty states when a meetup had no photos, bills, or late arrivals
+
+*Needs: UX polish and manual testing across completed meetup states.*
 
 ---
 
 ## Billing — Multiple Receipts
 
-**More than one bill per meetup**
+**Shipped; next polish**
 
-Allow attaching multiple receipts to a single meetup (e.g., dinner + drinks at different venues). Each receipt splits independently; totals roll up to the meetup recap.
+Multiple receipts, receipt thumbnails, camera/photo capture, realtime bill sync, and roll-up totals are now in the app. The next billing step is settlement.
 
-- `bills` table already exists — add a `meetup_id` foreign key
-- `BillView` currently handles one bill per session; needs a bill list + "Add another receipt" button
-- Roll up totals per person across all bills for the recap
+- Add Venmo/PayPal handoff links from settle-up rows
+- Add better guidance when people have unclaimed shared items
+- Smoke test bill realtime with two devices during an active meetup
 
 ---
 
@@ -125,17 +99,6 @@ Track punctuality across meetups using `meetup_participants.arrived_at` vs. `mee
 - **Profile stats** — visible to friends on the People tab
 
 *Needs: `arrival_records` table or computed view from `meetup_participants`; profile stats columns; animation layer.*
-
----
-
-## Payment Integration
-
-**Venmo / PayPal deep links from bill summary**
-
-Bill totals per person are already computed. The natural next step: generate a Venmo or PayPal deep link from the "you owe X" row so settling up is one tap.
-
-- `venmo://paycharge?txn=pay&recipients=<username>&amount=<total>&note=<meetup_name>`
-- Low priority — works well as a post-launch addition once the bill flow is stable.
 
 ---
 

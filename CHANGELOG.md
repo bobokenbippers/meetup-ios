@@ -1,25 +1,26 @@
 # Changelog
 
-## [Unreleased] - 2026-06-09
+## [Unreleased] - 2026-07-04
 ### TestFlight Notes
-Friend DMs are here: open Messages to chat with accepted friends, send text/photo messages, and delete your own messages. Meetup invites now share as normal web links, RSVP buttons are ordered Yes/Maybe/No, chat threads have a clearer back button, Settings includes a prefilled beta feedback email, event suggestions stay visible while asking for location, and the app no longer flashes the meetup screen before auth finishes.
+This beta is about real-world meetup reliability: location sharing is more battery-aware, Stop Sharing clears your live location, invite/RSVP pushes are wired, directions use your current travel mode, and bills now stay in sync while multiple people claim receipt items.
 
 Please test:
-- Create a meetup, invite a friend, and confirm the invite says who sent it.
-- Use the dashboard share button and confirm the web invite link opens the join flow.
-- Open the meetup after accepting and confirm the host appears in the participant list.
-- Send text and photo DMs both ways.
-- Delete one of your own messages.
-- Background the app and confirm DM push notifications open the right place.
+- Create a meetup, invite a friend, and confirm invite/RSVP push notifications arrive.
+- Join an active meetup, start sharing location, then tap Stop Sharing and confirm your location disappears from the dashboard.
+- Start directions while walking, driving, and cycling if possible; confirm Google Maps opens in the expected mode.
+- Open Split Bill on two devices, add multiple receipts, claim/unclaim items, and confirm both screens update without leaving the view.
+- Capture one receipt with Document Scanner and one with the Camera option; confirm thumbnails and parsed items appear.
+- Open a completed meetup recap and confirm arrivals, photos, and bill totals look right.
+- Send text/photo DMs and confirm unread counts and push routing still work.
 - Open Settings and use Send Feedback to report anything weird.
-- Confirm event suggestions show either events, a location prompt, an empty state, or a retryable error instead of disappearing.
-- Try sending a DM photo and tap retry if an image bubble fails to load.
-- Toggle Settings → Sync Contacts and confirm iOS asks for contact access, then People/Create Meetup contact suggestions follow that setting.
-- Add a friend from People when the searched user appears and confirm the request sends without an RLS error.
-- Type a destination in New Meetup/Edit Meetup and confirm location suggestions appear.
-- Upload a profile photo from Settings and confirm it appears in People, DMs, and meetup participant rows.
 
 ### Added
+- Battery-aware location tiering that adapts update interval, accuracy, and activity type based on motion and destination proximity.
+- Push notifications for core meetup events, including invites and RSVP changes.
+- OpenRouteService ETA support with Google Routes and MapKit fallback.
+- Stop Sharing control on the meetup dashboard that stops location updates and clears the user's live location from Supabase.
+- Multi-receipt bill flow with receipt thumbnails, explicit Camera capture, and realtime sync for receipts, items, and claims.
+- Routing-mode tests for Google Maps handoff values.
 - Truth or Dare squad game inside meetups: start a session from the dashboard Game button, pick Normal or Spicy prompts, and play in a realtime lobby. A server-decided full-screen coin flip (heads = truth, tails = dare) with a slow-motion settle and haptics picks each player's fate; dares require an in-app camera photo proof that shows in the shared game feed, truths are answered out loud, and passes land on the end-of-game chicken scoreboard. Backed by `game_sessions`/`game_players`/`game_turns`/`game_prompts` tables, SECURITY DEFINER RPCs, and Supabase Realtime.
 - Friend direct messages with a Messages tab, inbox, chat threads, realtime updates, unread counts, and push routing.
 - Text and photo messages between accepted friends, backed by the new `message-photos` storage bucket.
@@ -30,12 +31,16 @@ Please test:
 - Profile photo upload from Settings, backed by the new `profile-photos` storage bucket and `profiles.avatar_url`.
 
 ### Changed
+- Google Maps directions now use the user's current motion mode instead of always launching the same travel mode.
+- Bill views refresh in place when another participant edits receipts, item claims, or bill data.
 - Received meetup invites now show the sender with a `From <name>` line.
 - Meetup dashboard invite responses are ordered `Yes`, `Maybe`, `No`.
 - Message threads now include an explicit `Messages` back button.
 - Meetup share sheets now include readable invite text plus the web invite URL.
 
 ### Fixed
+- Location sharing can now be explicitly stopped during a meetup instead of only ending when the view disappears.
+- Bill item claims no longer require leaving and reopening Split Bill to see another tester's changes.
 - Truth or Dare: players are no longer trapped in a dead game. Any player in a session can now end it (not just the original starter), so a soft-locked game started by someone else can be cleared by anyone in it.
 - Truth or Dare: an active game with no playable turn now shows a "This game stalled" screen with an End Game / Close action instead of spinning forever.
 - Truth or Dare: abandoned sessions are auto-retired by a janitor cron — lobbies that sit over 6h without reaching 2 players, and active games with no turn activity for 12h — so they stop showing as "live" in everyone's games list.
