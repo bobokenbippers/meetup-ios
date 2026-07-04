@@ -288,18 +288,6 @@ struct ReceiptParser {
                     .trimmingCharacters(in: CharacterSet(charactersIn: "$"))
                     .trimmingCharacters(in: .whitespaces)
 
-                if name.isEmpty {
-                    // Price-on-own-line: check if prev was a summary label first
-                    switch prevLineCategory() {
-                    case "subtotal":  subtotal = price;                         continue
-                    case "tax":       tax = price;                               continue
-                    case "tip":       tip = price;                               continue
-                    case "surcharge": surcharge = price;                         continue
-                    case "total":     if price > total { total = price };        continue
-                    default: break
-                    }
-                }
-
                 // Capture quantity prefixes ("2 ", "4x ") BEFORE the OCR noise
                 // strippers run — "4x " is 1-5 consonants + space, so the noise
                 // stripper would otherwise eat it. A second capture afterwards
@@ -315,6 +303,29 @@ struct ReceiptParser {
                         name = String(name[qRange.upperBound...])
                     }
                 }
+
+                if name.isEmpty {
+                    // Price-on-own-line: check if prev was a summary label first
+                    switch prevLineCategory() {
+                    case "subtotal":  subtotal = price;                         continue
+                    case "tax":       tax = price;                               continue
+                    case "tip":       tip = price;                               continue
+                    case "surcharge": surcharge = price;                         continue
+                    case "total":     if price > total { total = price };        continue
+                    default: break
+                    }
+
+                    if idx > 0 {
+                        let prev = normalizedLines[idx - 1]
+                        let prevLower = prev.lowercased()
+                        let prevHasPrice = priceRegex.firstMatch(in: prev, range: NSRange(prev.startIndex..., in: prev)) != nil
+                        let prevIsSummary = summaryKeywords.contains(where: { prevLower.contains($0) })
+                        if !prevHasPrice && !prevIsSummary && !prev.hasPrefix("*") {
+                            name = prev.trimmingCharacters(in: .whitespaces)
+                        }
+                    }
+                }
+
                 if annotationQty == nil { captureQuantity() }
                 // Strip leading all-consonant OCR noise tokens (e.g. "nll "),
                 // then leading single-letter artifacts (e.g. "I " misread from "1 ")
@@ -342,23 +353,6 @@ struct ReceiptParser {
                     case "surcharge": surcharge = price;                         continue
                     case "total":     if price > total { total = price };        continue
                     default: continue  // discard noise item
-                    }
-                }
-
-                // If name is still empty after cleaning, use previous non-summary, non-price line
-                if name.isEmpty, idx > 0 {
-                    let prev = normalizedLines[idx - 1]
-                    let prevLower = prev.lowercased()
-                    let prevHasPrice = priceRegex.firstMatch(in: prev, range: NSRange(prev.startIndex..., in: prev)) != nil
-                    let prevIsSummary = summaryKeywords.contains(where: { prevLower.contains($0) })
-                    if !prevHasPrice && !prevIsSummary && !prev.hasPrefix("*") {
-                        var prevName = prev.trimmingCharacters(in: .whitespaces)
-                        prevName = prevName
-                            .replacingOccurrences(of: #"^([^aeiouAEIOU\s]{1,5}\s+)+"#, with: "", options: .regularExpression)
-                            .replacingOccurrences(of: #"^[A-Za-z]\s+"#, with: "", options: .regularExpression)
-                            .replacingOccurrences(of: #"^\d+\s+"#, with: "", options: .regularExpression)
-                            .trimmingCharacters(in: .whitespaces)
-                        name = prevName
                     }
                 }
 
