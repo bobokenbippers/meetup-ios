@@ -50,6 +50,29 @@ struct LocationTierTests {
         #expect(LocationTier.forContext(distanceToDestination: 500, motionMode: .stationary) == .stationary)
     }
 
+    // MARK: - Google route mode
+
+    @Test("Google routing uses transit before motion is known")
+    func googleRoutingDefaultsToTransitBeforeMotionIsKnown() {
+        #expect(GoogleRouteTravelMode.forMotionMode(.stationary) == .transit)
+        #expect(GoogleRouteTravelMode.forMotionMode(.unknown) == .transit)
+    }
+
+    @Test("Google routing follows active motion mode")
+    func googleRoutingFollowsActiveMotionMode() {
+        #expect(GoogleRouteTravelMode.forMotionMode(.driving) == .drive)
+        #expect(GoogleRouteTravelMode.forMotionMode(.walking) == .walk)
+        #expect(GoogleRouteTravelMode.forMotionMode(.cycling) == .bicycle)
+    }
+
+    @Test("Google Maps URL values match routing modes")
+    func googleMapsURLValuesMatchRoutingModes() {
+        #expect(GoogleRouteTravelMode.drive.googleMapsURLValue == "driving")
+        #expect(GoogleRouteTravelMode.walk.googleMapsURLValue == "walking")
+        #expect(GoogleRouteTravelMode.bicycle.googleMapsURLValue == "bicycling")
+        #expect(GoogleRouteTravelMode.transit.googleMapsURLValue == "transit")
+    }
+
     // MARK: - isLocationValid guards
 
     @Test("valid location passes both guards")

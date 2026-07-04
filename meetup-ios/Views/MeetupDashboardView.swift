@@ -610,11 +610,12 @@ struct MeetupDashboardView: View {
     private func openDirections() {
         let lat = meetup.destinationLat
         let lng = meetup.destinationLng
-        let gmNative = URL(string: "comgooglemaps://?daddr=\(lat),\(lng)&directionsmode=driving")!
+        let mode = LocationManager.shared.googleMapsDirectionsMode
+        let gmNative = URL(string: "comgooglemaps://?daddr=\(lat),\(lng)&directionsmode=\(mode)")!
         if UIApplication.shared.canOpenURL(gmNative) {
             UIApplication.shared.open(gmNative)
         } else {
-            let gmWeb = URL(string: "https://www.google.com/maps/dir/?api=1&destination=\(lat),\(lng)&travelmode=driving")!
+            let gmWeb = URL(string: "https://www.google.com/maps/dir/?api=1&destination=\(lat),\(lng)&travelmode=\(mode)")!
             UIApplication.shared.open(gmWeb)
         }
     }
