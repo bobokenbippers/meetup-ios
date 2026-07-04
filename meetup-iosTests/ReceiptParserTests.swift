@@ -124,6 +124,42 @@ struct ReceiptParserTests {
         #expect(receipt.items[0].price == 3.50)
     }
 
+    @Test("item name line followed by price line is paired")
+    func pairsItemNameWithStandalonePriceLine() {
+        let lines = [
+            "French Toast",
+            "$14.00",
+            "Subtotal",
+            "$14.00",
+            "Tax",
+            "$1.24",
+            "Total",
+            "$15.24",
+        ]
+        let receipt = ReceiptParser.parseText(lines)
+        #expect(receipt.items.count == 1)
+        #expect(receipt.items[0].name == "French Toast")
+        #expect(receipt.items[0].price == 14.00)
+        #expect(receipt.subtotal == 14.00)
+        #expect(receipt.tax == 1.24)
+        #expect(receipt.total == 15.24)
+    }
+
+    @Test("split OCR item quantity followed by line total is expanded")
+    func expandsSplitQuantityItemWithStandaloneTotalLine() {
+        let lines = [
+            "2 Breakfast Tacos",
+            "$18.00",
+            "Subtotal $18.00",
+            "Total $18.00",
+        ]
+        let receipt = ReceiptParser.parseText(lines)
+        #expect(receipt.items.count == 2)
+        #expect(receipt.items.allSatisfy { $0.name == "Breakfast Tacos" })
+        #expect(receipt.items.allSatisfy { $0.price == 9.00 })
+        #expect(receipt.subtotal == 18.00)
+    }
+
     @Test("HST and GST are treated as tax variants")
     func hstGstRecognised() {
         let lines = [
