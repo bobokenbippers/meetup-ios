@@ -20,7 +20,9 @@ struct BillView: View {
     @State private var showAddReceipt = false
     @State private var showSummary = false
     @State private var expandedReceiptId: UUID?
-    @State private var realtimeTask: Task<Void, Never>?
+    @State private var receiptsRealtimeTask: Task<Void, Never>?
+    @State private var itemsRealtimeTask: Task<Void, Never>?
+    @State private var claimsRealtimeTask: Task<Void, Never>?
 
     private var myUserId: UUID? { auth.session?.user.id }
 
@@ -52,7 +54,11 @@ struct BillView: View {
             } message: { Text(error ?? "") }
             .sheet(isPresented: $showAddReceipt) {
                 AddReceiptView(meetup: meetup, participants: participants) { receipt, items in
-                    receipts.append(receipt)
+                    if let index = receipts.firstIndex(where: { $0.id == receipt.id }) {
+                        receipts[index] = receipt
+                    } else {
+                        receipts.append(receipt)
+                    }
                     receiptItems[receipt.id] = items
                     expandedReceiptId = receipt.id
                     startRealtime()
@@ -63,7 +69,7 @@ struct BillView: View {
             }
         }
         .task { await load() }
-        .onDisappear { realtimeTask?.cancel() }
+        .onDisappear { stopRealtime() }
     }
 
     // MARK: - Empty View
@@ -130,6 +136,7 @@ struct BillView: View {
                 }
             } label: {
                 HStack {
+                    receiptThumbnail(receipt)
                     VStack(alignment: .leading, spacing: 4) {
                         Text(receipt.placeName)
                             .font(.headline)
@@ -176,6 +183,38 @@ struct BillView: View {
                     .padding(.top, 4)
                 }
             }
+        }
+    }
+
+    @ViewBuilder
+    private func receiptThumbnail(_ receipt: Receipt) -> some View {
+        if let photoUrl = receipt.photoUrl, let url = URL(string: photoUrl) {
+            AsyncImage(url: url) { phase in
+                switch phase {
+                case .success(let image):
+                    image
+                        .resizable()
+                        .scaledToFill()
+                case .failure:
+                    Image(systemName: "photo")
+                        .foregroundStyle(.secondary)
+                case .empty:
+                    ProgressView()
+                        .scaleEffect(0.7)
+                @unknown default:
+                    Color.clear
+                }
+            }
+            .frame(width: 44, height: 56)
+            .background(Color(.secondarySystemBackground))
+            .clipShape(RoundedRectangle(cornerRadius: 8))
+        } else {
+            Image(systemName: "receipt")
+                .font(.system(size: 18, weight: .semibold))
+                .foregroundStyle(.secondary)
+                .frame(width: 44, height: 56)
+                .background(Color(.secondarySystemBackground))
+                .clipShape(RoundedRectangle(cornerRadius: 8))
         }
     }
 
@@ -349,13 +388,9 @@ struct BillView: View {
 
     private func load() async {
         do {
-            receipts = try await BillService.shared.fetchReceipts(meetupId: meetup.id)
-            for receipt in receipts {
-                receiptItems[receipt.id] = try await BillService.shared.fetchReceiptItems(receiptId: receipt.id)
-            }
-            claims = try await BillService.shared.fetchAllReceiptClaims(receiptIds: receipts.map { $0.id })
+            try await reloadBillData(preserveExpandedReceipt: false)
             if let first = receipts.first { expandedReceiptId = first.id }
-            if !receipts.isEmpty { startRealtime() }
+            startRealtime()
         } catch is CancellationError {
             return
         } catch {
@@ -364,9 +399,43 @@ struct BillView: View {
         hasLoaded = true
     }
 
+    private func reloadBillData(preserveExpandedReceipt: Bool = true) async throws {
+        let previousExpandedReceiptId = expandedReceiptId
+        let freshReceipts = try await BillService.shared.fetchReceipts(meetupId: meetup.id)
+        var freshItems: [UUID: [BillItem]] = [:]
+        for receipt in freshReceipts {
+            freshItems[receipt.id] = try await BillService.shared.fetchReceiptItems(receiptId: receipt.id)
+        }
+        let freshClaims = try await BillService.shared.fetchAllReceiptClaims(receiptIds: freshReceipts.map { $0.id })
+
+        receipts = freshReceipts
+        receiptItems = freshItems
+        claims = freshClaims
+
+        guard preserveExpandedReceipt else { return }
+        if let previousExpandedReceiptId,
+           freshReceipts.contains(where: { $0.id == previousExpandedReceiptId }) {
+            expandedReceiptId = previousExpandedReceiptId
+        } else {
+            expandedReceiptId = freshReceipts.first?.id
+        }
+    }
+
+    private func reloadBillDataForRealtime() async {
+        do {
+            try await reloadBillData()
+        } catch is CancellationError {
+            return
+        } catch {
+            self.error = error.localizedDescription
+        }
+    }
+
     private func reloadClaims() async {
         do {
             claims = try await BillService.shared.fetchAllReceiptClaims(receiptIds: receipts.map { $0.id })
+        } catch is CancellationError {
+            return
         } catch {
             self.error = error.localizedDescription
         }
@@ -386,21 +455,64 @@ struct BillView: View {
     }
 
     private func startRealtime() {
-        guard realtimeTask == nil else { return }
-        realtimeTask = Task {
+        guard receiptsRealtimeTask == nil,
+              itemsRealtimeTask == nil,
+              claimsRealtimeTask == nil
+        else { return }
+
+        receiptsRealtimeTask = Task {
             let channel = SupabaseManager.shared.client.realtimeV2.channel("receipts-\(meetup.id)")
-            let changes = channel.postgresChange(AnyAction.self, schema: "public", table: "bill_item_claims")
+            let receiptChanges = channel.postgresChange(AnyAction.self, schema: "public", table: "receipts")
             do {
                 try await channel.subscribeWithError()
             } catch {
                 return
             }
-            for await _ in changes {
+            for await _ in receiptChanges {
+                guard !Task.isCancelled else { break }
+                await reloadBillDataForRealtime()
+            }
+            await SupabaseManager.shared.client.realtimeV2.removeChannel(channel)
+        }
+
+        itemsRealtimeTask = Task {
+            let channel = SupabaseManager.shared.client.realtimeV2.channel("receipt-items-\(meetup.id)")
+            let itemChanges = channel.postgresChange(AnyAction.self, schema: "public", table: "bill_items")
+            do {
+                try await channel.subscribeWithError()
+            } catch {
+                return
+            }
+            for await _ in itemChanges {
+                guard !Task.isCancelled else { break }
+                await reloadBillDataForRealtime()
+            }
+            await SupabaseManager.shared.client.realtimeV2.removeChannel(channel)
+        }
+
+        claimsRealtimeTask = Task {
+            let channel = SupabaseManager.shared.client.realtimeV2.channel("receipt-claims-\(meetup.id)")
+            let claimChanges = channel.postgresChange(AnyAction.self, schema: "public", table: "bill_item_claims")
+            do {
+                try await channel.subscribeWithError()
+            } catch {
+                return
+            }
+            for await _ in claimChanges {
                 guard !Task.isCancelled else { break }
                 await reloadClaims()
             }
             await SupabaseManager.shared.client.realtimeV2.removeChannel(channel)
         }
+    }
+
+    private func stopRealtime() {
+        receiptsRealtimeTask?.cancel()
+        receiptsRealtimeTask = nil
+        itemsRealtimeTask?.cancel()
+        itemsRealtimeTask = nil
+        claimsRealtimeTask?.cancel()
+        claimsRealtimeTask = nil
     }
 }
 
@@ -495,9 +607,15 @@ struct AddReceiptView: View {
                             .frame(maxHeight: 160)
                             .clipShape(RoundedRectangle(cornerRadius: 8))
                     }
-                    HStack(spacing: 12) {
+                    HStack(spacing: 8) {
                         Button { startCapture() } label: {
                             Label("Scan", systemImage: "doc.viewfinder")
+                                .frame(maxWidth: .infinity)
+                        }
+                        .buttonStyle(.glass)
+
+                        Button { startCameraCapture() } label: {
+                            Label("Camera", systemImage: "camera")
                                 .frame(maxWidth: .infinity)
                         }
                         .buttonStyle(.glass)
@@ -642,6 +760,14 @@ struct AddReceiptView: View {
         } else {
             error = "Camera isn't available on this device. Use Photos instead."
         }
+    }
+
+    private func startCameraCapture() {
+        guard UIImagePickerController.isSourceTypeAvailable(.camera) else {
+            error = "Camera isn't available on this device. Use Photos instead."
+            return
+        }
+        showCamera = true
     }
 
     private func parseImage(_ image: UIImage) async {
