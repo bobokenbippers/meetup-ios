@@ -255,7 +255,7 @@ struct MeetupsListView: View {
                         .tint(Color.coral)
                 } else if invited.isEmpty && active.isEmpty && past.isEmpty && deleted.isEmpty {
                     ScrollView {
-                        VStack(spacing: 0) {
+                        LazyVStack(spacing: 0) {
                             NearbyEventsView(
                                 refreshID: nearbyEventsRefreshID,
                                 onSelect: openCreate(prefill:)

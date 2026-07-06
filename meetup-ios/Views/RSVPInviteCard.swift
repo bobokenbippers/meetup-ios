@@ -221,9 +221,10 @@ struct ConfettiBurstCanvas: View {
     }()
 
     @State private var startTime: Date = .now
+    @State private var isFinished = false
 
     var body: some View {
-        TimelineView(.animation(minimumInterval: 1.0 / 60.0, paused: false)) { ctx in
+        TimelineView(.animation(minimumInterval: 1.0 / 60.0, paused: isFinished)) { ctx in
             Canvas { drawCtx, size in
                 let center = CGPoint(x: size.width / 2, y: size.height * 0.62)
                 let gravity = 200.0
@@ -247,6 +248,11 @@ struct ConfettiBurstCanvas: View {
                 }
             }
         }
-        .onAppear { startTime = .now }
+        .task {
+            startTime = .now
+            isFinished = false
+            do { try await Task.sleep(for: .seconds(1.7)) } catch { return }
+            isFinished = true
+        }
     }
 }

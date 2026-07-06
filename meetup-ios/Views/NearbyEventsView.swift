@@ -73,7 +73,7 @@ struct NearbyEventsView: View {
         VStack(alignment: .leading, spacing: 10) {
             header
             ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 12) {
+                LazyHStack(spacing: 12) {
                     ForEach(events) { event in
                         Button {
                             if let prefill = prefill(for: event) { onSelect(prefill) }
