@@ -14,7 +14,8 @@ final class MeetupPhotoService {
 
     /// Compress `image` to JPEG, upload to storage, return the storage path.
     func uploadPhoto(image: UIImage, meetupId: UUID) async throws -> String {
-        guard let jpeg = image.jpegData(compressionQuality: 0.8) else {
+        let prepared = image.resizedForMeetupUpload(maxDimension: 1600)
+        guard let jpeg = prepared.jpegData(compressionQuality: 0.78) else {
             throw PhotoServiceError.compressionFailed
         }
         let path = "\(meetupId.uuidString)/\(UUID().uuidString).jpg"
@@ -157,6 +158,33 @@ final class MeetupPhotoService {
             }
         }
         return urls
+    }
+}
+
+private extension UIImage {
+    func resizedForMeetupUpload(maxDimension: CGFloat) -> UIImage {
+        let longestSide = max(size.width, size.height)
+        guard longestSide > maxDimension else { return normalizedForMeetupUpload() }
+
+        let scale = maxDimension / longestSide
+        let targetSize = CGSize(width: size.width * scale, height: size.height * scale)
+        let format = UIGraphicsImageRendererFormat.default()
+        format.scale = 1
+        format.opaque = true
+
+        return UIGraphicsImageRenderer(size: targetSize, format: format).image { _ in
+            normalizedForMeetupUpload().draw(in: CGRect(origin: .zero, size: targetSize))
+        }
+    }
+
+    func normalizedForMeetupUpload() -> UIImage {
+        guard imageOrientation != .up else { return self }
+        let format = UIGraphicsImageRendererFormat.default()
+        format.scale = scale
+        format.opaque = true
+        return UIGraphicsImageRenderer(size: size, format: format).image { _ in
+            draw(in: CGRect(origin: .zero, size: size))
+        }
     }
 }
 
