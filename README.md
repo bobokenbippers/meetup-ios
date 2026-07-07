@@ -31,7 +31,7 @@ A live location sharing and meetup coordination app for iOS.
 2. Open `meetup-ios.xcodeproj` in Xcode
 3. Set your own bundle ID and development team in project settings
 4. Add `Config.xcconfig` with your Supabase URL and anon key (see `IMPLEMENTATION.md` for schema)
-5. Add `Secrets.xcconfig` from `Secrets.example.xcconfig`; set `APP_ENV` to include `OPENROUTESERVICE_API_KEY`. For GitHub Actions, add the same key as the repository secret `OPENROUTE_APP_KEY`.
+5. Add `Secrets.xcconfig` from `Secrets.example.xcconfig`; set `APP_ENV` to include `OPENROUTESERVICE_API_KEY`. For GitHub Actions/TestFlight builds, add repository secrets named `TICKETMASTER_API_KEY` and `OPENROUTE_APP_KEY`.
 6. Run on simulator or device
 
 ## Project structure
