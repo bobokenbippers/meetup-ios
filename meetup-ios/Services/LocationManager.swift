@@ -324,14 +324,6 @@ final class LocationManager: NSObject {
             return openRouteETA
         }
 
-        if let googleETA = await GoogleRoutesService.shared.calculateETA(
-            from: origin,
-            to: destination,
-            motionMode: motionMode
-        ) {
-            return googleETA
-        }
-
         let request = MKDirections.Request()
         request.source = MKMapItem(placemark: MKPlacemark(coordinate: origin))
         request.destination = MKMapItem(placemark: MKPlacemark(coordinate: destination))
@@ -405,89 +397,6 @@ private struct OpenRouteServiceMatrixRequest: Encodable {
 
 private struct OpenRouteServiceMatrixResponse: Decodable {
     let durations: [[Double?]]
-}
-
-private struct GoogleRoutesService {
-    static let shared = GoogleRoutesService()
-
-    private var apiKey: String? {
-        guard let key = Bundle.main.object(forInfoDictionaryKey: "GoogleMapsAPIKey") as? String else {
-            return nil
-        }
-        let trimmed = key.trimmingCharacters(in: .whitespacesAndNewlines)
-        return trimmed.isEmpty ? nil : trimmed
-    }
-
-    func calculateETA(
-        from origin: CLLocationCoordinate2D,
-        to destination: CLLocationCoordinate2D,
-        motionMode: MotionMode
-    ) async -> Int? {
-        guard let apiKey else { return nil }
-        guard let url = URL(string: "https://routes.googleapis.com/directions/v2:computeRoutes") else { return nil }
-
-        var body: [String: Any] = [
-            "origin": [
-                "location": [
-                    "latLng": [
-                        "latitude": origin.latitude,
-                        "longitude": origin.longitude
-                    ]
-                ]
-            ],
-            "destination": [
-                "location": [
-                    "latLng": [
-                        "latitude": destination.latitude,
-                        "longitude": destination.longitude
-                    ]
-                ]
-            ],
-            "travelMode": GoogleRouteTravelMode.forMotionMode(motionMode).rawValue
-        ]
-
-        if GoogleRouteTravelMode.forMotionMode(motionMode) == .drive {
-            body["routingPreference"] = "TRAFFIC_AWARE"
-        }
-
-        guard let httpBody = try? JSONSerialization.data(withJSONObject: body) else { return nil }
-
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.timeoutInterval = 8
-        request.setValue(apiKey, forHTTPHeaderField: "X-Goog-Api-Key")
-        request.setValue("routes.duration", forHTTPHeaderField: "X-Goog-FieldMask")
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.httpBody = httpBody
-
-        guard let (data, response) = try? await URLSession.shared.data(for: request),
-              let httpResponse = response as? HTTPURLResponse,
-              200..<300 ~= httpResponse.statusCode,
-              let routesResponse = try? JSONDecoder().decode(GoogleRoutesResponse.self, from: data),
-              let duration = routesResponse.routes.compactMap(\.duration).first
-        else {
-            return nil
-        }
-
-        return Self.seconds(fromGoogleDuration: duration)
-    }
-
-    private static func seconds(fromGoogleDuration duration: String) -> Int? {
-        guard duration.hasSuffix("s"),
-              let seconds = Double(duration.dropLast())
-        else {
-            return nil
-        }
-        return Int(seconds.rounded())
-    }
-}
-
-private struct GoogleRoutesResponse: Decodable {
-    let routes: [Route]
-
-    struct Route: Decodable {
-        let duration: String?
-    }
 }
 
 extension LocationManager: CLLocationManagerDelegate {
