@@ -6,8 +6,8 @@
       "kind" : "remoteSourceControl",
       "location" : "git@github.com:supabase/supabase-swift.git",
       "state" : {
-        "revision" : "36528618a2ce8eac61c8cff878358b32ead6771e",
-        "version" : "2.49.0"
+        "revision" : "27f31bfb7be836a33c89f6636ef69a2cfff9a3fd",
+        "version" : "2.51.0"
       }
     },
     {
@@ -60,8 +60,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/pointfreeco/xctest-dynamic-overlay",
       "state" : {
-        "revision" : "401bf70d95bfe8db2a1dc619f9e175a85c089321",
-        "version" : "1.10.1"
+        "revision" : "8f6abcf4c8950e2679d5b2fee4ca284fd7c34886",
+        "version" : "1.11.0"
       }
     }
   ],
