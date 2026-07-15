@@ -420,7 +420,7 @@ final class MeetupService {
 
     /// Nulls out the caller's location columns so their pin disappears from other
     /// participants' maps immediately after the user stops sharing.
-    func clearMyLocation(meetupId: UUID) async throws {
+    func clearMyLocation(meetup: Meetup) async throws {
         guard let userId = supabase.auth.currentUser?.id else { return }
 
         struct LocationClear: Encodable {
@@ -445,9 +445,10 @@ final class MeetupService {
                 etaSeconds: nil,
                 locationUpdatedAt: nil
             ))
-            .eq("meetup_id", value: meetupId)
+            .eq("meetup_id", value: meetup.id)
             .eq("user_id", value: userId)
             .execute()
+        try await PrivacyAuditLogService.shared.log(.locationCleared, meetup: meetup)
     }
 
     func getFriends() async throws -> [Profile] {
