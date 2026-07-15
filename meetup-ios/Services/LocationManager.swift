@@ -183,6 +183,7 @@ final class LocationManager: NSObject {
         startMotionUpdates()
         startUploadLoop()
         scheduleExpiryTimer()
+        Task { try? await PrivacyAuditLogService.shared.log(.locationSharingStarted, meetup: meetup) }
     }
 
     /// Refresh the cached destination for an in-flight tracking session after the host
@@ -193,6 +194,7 @@ final class LocationManager: NSObject {
     }
 
     func stopTracking() {
+        let stoppedMeetup = trackingMeetup
         expiryTimer?.invalidate()
         expiryTimer = nil
         trackingMeetup = nil
@@ -201,6 +203,9 @@ final class LocationManager: NSObject {
         motionManager.stopActivityUpdates()
         uploadTask?.cancel()
         uploadTask = nil
+        if let stoppedMeetup {
+            Task { try? await PrivacyAuditLogService.shared.log(.locationSharingStopped, meetup: stoppedMeetup) }
+        }
     }
 
     private func isExpired(meetup: Meetup) -> Bool {

@@ -2006,26 +2006,46 @@ participants.sorted { (priority[$0.punctualityState ?? "unknown"] ?? 6) < (prior
 ### M6.1 Privacy Controls
 
 - [ ] Persistent banner during active meetup: "Sharing location with {meetup name}. Tap to stop." Tappable to end participation.
-- [ ] Settings → Activity log: list of every meetup, when joined, when sharing ended, who saw your location.
+- [x] Settings → Privacy Log: recent sensitive sharing events for the signed-in user.
 - [ ] Block user flow: from a friend's profile, tap Block → confirmation → friendship status → 'blocked', participant rows in shared meetups force-ended.
-- [ ] Audit log table:
+- [x] Privacy audit log table:
 
 ```sql
-create table public.audit_log (
-  id              bigserial primary key,
-  user_id         uuid not null references public.profiles(id) on delete cascade,
-  event           text not null,
-  meetup_id       uuid references public.meetups(id) on delete set null,
-  metadata        jsonb,
-  created_at      timestamptz not null default now()
+create table public.privacy_audit_logs (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references public.profiles(id) on delete cascade,
+  actor_id uuid references public.profiles(id) on delete set null,
+  meetup_id uuid references public.meetups(id) on delete set null,
+  event_type text not null check (
+    event_type in (
+      'location_sharing_started',
+      'location_sharing_stopped',
+      'location_cleared',
+      'meetup_completed'
+    )
+  ),
+  metadata jsonb not null default '{}'::jsonb,
+  created_at timestamptz not null default now()
 );
 
-alter table public.audit_log enable row level security;
-create policy "users see their own audit log"
-  on public.audit_log for select using (auth.uid() = user_id);
+alter table public.privacy_audit_logs enable row level security;
+create policy "users read own privacy audit logs"
+  on public.privacy_audit_logs for select
+  using (auth.uid() = user_id);
+
+create policy "users insert own privacy audit logs"
+  on public.privacy_audit_logs for insert
+  with check (
+    auth.uid() = user_id
+    and (actor_id is null or actor_id = auth.uid())
+  );
 ```
 
-Backend writes to this on key events: meetup joined, location sharing started/ended, participant viewed your location (optional), blocked.
+The iOS client writes `location_sharing_started`, `location_sharing_stopped`, and
+`location_cleared` through `PrivacyAuditLogService`. A database trigger writes
+`meetup_completed` rows for each participant when a meetup status transitions to
+`completed`, so completion cleanup is still logged if it happens outside the
+current screen.
 
 ### M6.2 Live Activities
 

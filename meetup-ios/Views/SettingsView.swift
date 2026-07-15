@@ -249,6 +249,13 @@ struct SettingsView: View {
                         .buttonStyle(.plain)
                         .listRowBackground(Color.appSurface)
                     }
+
+                    NavigationLink {
+                        PrivacyAuditLogView()
+                    } label: {
+                        aboutRow("Privacy Log", systemImage: "lock.shield")
+                    }
+                    .listRowBackground(Color.appSurface)
                 } header: {
                     sectionHeader("PRIVACY")
                 } footer: {

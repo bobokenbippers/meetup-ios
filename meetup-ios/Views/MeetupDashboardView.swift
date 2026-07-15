@@ -599,7 +599,7 @@ struct MeetupDashboardView: View {
         // Stop uploads first so no new location reaches Supabase after the clear.
         LocationManager.shared.stopTracking()
         do {
-            try await MeetupService.shared.clearMyLocation(meetupId: meetup.id)
+            try await MeetupService.shared.clearMyLocation(meetup: meetup)
         } catch is CancellationError {
             return
         } catch {
