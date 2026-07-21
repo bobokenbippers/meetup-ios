@@ -168,6 +168,20 @@ final class BillService {
             .execute()
     }
 
+    func deleteReceipt(_ receipt: Receipt) async throws {
+        if receipt.photoUrl != nil {
+            try? await supabase.storage
+                .from("receipts")
+                .remove(paths: ["\(receipt.id.uuidString)/photo.jpg"])
+        }
+
+        try await supabase
+            .from("receipts")
+            .delete()
+            .eq("id", value: receipt.id)
+            .execute()
+    }
+
     func fetchReceiptItems(receiptId: UUID) async throws -> [BillItem] {
         try await supabase
             .from("bill_items")
@@ -316,17 +330,17 @@ final class BillService {
                 let share = item.price / Double(claimants.count)
                 for uid in claimants { subtotals[uid, default: 0] += share }
             }
-            let totalSubtotal = subtotals.values.reduce(0, +)
+            let receiptSubtotal = receiptItems.reduce(0.0) { $0 + $1.price }
             let fees = receipt.tax + receipt.tip + receipt.surcharge
             let totals = participants.map { p in
                 let sub = subtotals[p.userId] ?? 0
-                let feeShare = totalSubtotal > 0 ? (sub / totalSubtotal) * fees : 0
+                let feeShare = receiptSubtotal > 0 ? (sub / receiptSubtotal) * fees : 0
                 return PersonTotal(
                     userId: p.userId,
                     displayName: p.displayName ?? "Unknown",
                     subtotal: sub,
-                    taxShare: totalSubtotal > 0 ? (sub / totalSubtotal) * receipt.tax : 0,
-                    tipShare: totalSubtotal > 0 ? (sub / totalSubtotal) * (receipt.tip + receipt.surcharge) : 0,
+                    taxShare: receiptSubtotal > 0 ? (sub / receiptSubtotal) * receipt.tax : 0,
+                    tipShare: receiptSubtotal > 0 ? (sub / receiptSubtotal) * (receipt.tip + receipt.surcharge) : 0,
                     total: sub + feeShare
                 )
             }.sorted { $0.total > $1.total }
