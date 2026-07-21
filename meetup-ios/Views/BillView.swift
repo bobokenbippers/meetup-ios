@@ -20,6 +20,7 @@ struct BillView: View {
     @State private var showAddReceipt = false
     @State private var showSummary = false
     @State private var expandedReceiptId: UUID?
+    @State private var receiptPendingDeletion: Receipt?
     @State private var receiptsRealtimeTask: Task<Void, Never>?
     @State private var itemsRealtimeTask: Task<Void, Never>?
     @State private var claimsRealtimeTask: Task<Void, Never>?
@@ -66,6 +67,24 @@ struct BillView: View {
             }
             .sheet(isPresented: $showSummary) {
                 summarySheet
+            }
+            .confirmationDialog(
+                "Delete receipt?",
+                isPresented: Binding(
+                    get: { receiptPendingDeletion != nil },
+                    set: { if !$0 { receiptPendingDeletion = nil } }
+                ),
+                titleVisibility: .visible
+            ) {
+                Button("Delete Receipt", role: .destructive) {
+                    guard let receipt = receiptPendingDeletion else { return }
+                    Task { await deleteReceipt(receipt) }
+                }
+                Button("Cancel", role: .cancel) {
+                    receiptPendingDeletion = nil
+                }
+            } message: {
+                Text("This removes the receipt, its items, and everyone’s claims so you can add it again.")
             }
         }
         .task { await load() }
@@ -169,6 +188,7 @@ struct BillView: View {
                         itemRow(item: entry.item, displayName: entry.label, snapshot: snapshot)
                     }
                 }
+                receiptFeesView(receipt: receipt, items: items)
                 let myOwed = myOwedForReceipt(receipt, snapshot: snapshot)
                 if myOwed > 0 {
                     HStack {
@@ -182,7 +202,47 @@ struct BillView: View {
                     }
                     .padding(.top, 4)
                 }
+                Button(role: .destructive) {
+                    receiptPendingDeletion = receipt
+                } label: {
+                    Label("Delete Receipt", systemImage: "trash")
+                }
             }
+        }
+        .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+            Button(role: .destructive) {
+                receiptPendingDeletion = receipt
+            } label: {
+                Label("Delete", systemImage: "trash")
+            }
+        }
+    }
+
+    private func receiptFeesView(receipt: Receipt, items: [BillItem]) -> some View {
+        let subtotal = items.reduce(0.0) { $0 + $1.price }
+
+        return VStack(spacing: 6) {
+            feeRow("Subtotal", amount: subtotal)
+            feeRow("Tax", amount: receipt.tax)
+            feeRow("Tip", amount: receipt.tip)
+            if receipt.surcharge > 0.005 {
+                feeRow("Surcharge", amount: receipt.surcharge)
+            }
+            Divider()
+            feeRow("Receipt total", amount: receipt.totalAmount, isTotal: true)
+        }
+        .font(.caption)
+        .padding(.vertical, 4)
+    }
+
+    private func feeRow(_ label: String, amount: Double, isTotal: Bool = false) -> some View {
+        HStack {
+            Text(label)
+                .foregroundStyle(isTotal ? .primary : .secondary)
+            Spacer()
+            Text(amount, format: .currency(code: "USD"))
+                .fontWeight(isTotal ? .semibold : .regular)
+                .foregroundStyle(isTotal ? .primary : .secondary)
         }
     }
 
@@ -294,14 +354,7 @@ struct BillView: View {
 
                     Section("At \(receipt.placeName) · paid by \(payerName)") {
                         ForEach(receiptTotals.filter { $0.total > 0.005 }, id: \.userId) { t in
-                            HStack {
-                                Text(t.displayName)
-                                    .foregroundStyle(t.userId == myUserId ? .primary : .secondary)
-                                Spacer()
-                                Text(t.total, format: .currency(code: "USD"))
-                                    .bold()
-                                    .foregroundStyle(t.userId == myUserId ? Color.coral : .primary)
-                            }
+                            totalRow(t)
                         }
                         if receiptTotals.allSatisfy({ $0.total <= 0.005 }) {
                             Text("No items claimed yet")
@@ -314,13 +367,7 @@ struct BillView: View {
                 Section {
                     let allTotals = snapshot.crossReceiptTotals
                     ForEach(allTotals.filter { $0.total > 0.005 }, id: \.userId) { t in
-                        HStack {
-                            Text(t.displayName)
-                            Spacer()
-                            Text(t.total, format: .currency(code: "USD"))
-                                .bold()
-                                .foregroundStyle(t.userId == myUserId ? Color.coral : .primary)
-                        }
+                        totalRow(t)
                     }
                 } header: {
                     Text("Total across \(receipts.count) place\(receipts.count == 1 ? "" : "s")")
@@ -333,6 +380,24 @@ struct BillView: View {
                     Button("Done") { showSummary = false }
                 }
             }
+        }
+    }
+
+    private func totalRow(_ total: BillService.PersonTotal) -> some View {
+        HStack(alignment: .firstTextBaseline) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(total.displayName)
+                    .foregroundStyle(total.userId == myUserId ? .primary : .secondary)
+                Text(
+                    "Items \(total.subtotal.formatted(.currency(code: "USD"))) + tax \(total.taxShare.formatted(.currency(code: "USD"))) + tip \(total.tipShare.formatted(.currency(code: "USD")))"
+                )
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            }
+            Spacer()
+            Text(total.total, format: .currency(code: "USD"))
+                .bold()
+                .foregroundStyle(total.userId == myUserId ? Color.coral : .primary)
         }
     }
 
@@ -362,6 +427,8 @@ struct BillView: View {
                 } else {
                     combined[t.userId]?.total += t.total
                     combined[t.userId]?.subtotal += t.subtotal
+                    combined[t.userId]?.taxShare += t.taxShare
+                    combined[t.userId]?.tipShare += t.tipShare
                 }
             }
         }
@@ -449,6 +516,24 @@ struct BillView: View {
                 try await BillService.shared.claimItem(billItemId: item.id)
             }
             await reloadClaims()
+        } catch {
+            self.error = error.localizedDescription
+        }
+    }
+
+    private func deleteReceipt(_ receipt: Receipt) async {
+        do {
+            try await BillService.shared.deleteReceipt(receipt)
+            receipts.removeAll { $0.id == receipt.id }
+            receiptItems.removeValue(forKey: receipt.id)
+            let remainingItemIds = Set(receiptItems.values.flatMap { $0.map(\.id) })
+            claims.removeAll { !remainingItemIds.contains($0.billItemId) }
+            if expandedReceiptId == receipt.id {
+                expandedReceiptId = receipts.first?.id
+            }
+            receiptPendingDeletion = nil
+        } catch is CancellationError {
+            return
         } catch {
             self.error = error.localizedDescription
         }

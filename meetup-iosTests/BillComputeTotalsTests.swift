@@ -22,6 +22,25 @@ struct BillComputeTotalsTests {
         BillItem(id: UUID(), billId: billId, name: "Item", price: price, position: 0)
     }
 
+    private func makeReceipt(tax: Double, tip: Double, surcharge: Double = 0) -> Receipt {
+        Receipt(
+            id: UUID(),
+            meetupId: UUID(),
+            placeName: "Test Cafe",
+            payerUserId: UUID(),
+            totalAmount: 20 + tax + tip + surcharge,
+            tax: tax,
+            tip: tip,
+            surcharge: surcharge,
+            photoUrl: nil,
+            createdAt: Date()
+        )
+    }
+
+    private func makeReceiptItem(receiptId: UUID, price: Double) -> BillItem {
+        BillItem(id: UUID(), receiptId: receiptId, name: "Item", price: price, position: 0)
+    }
+
     private func makeClaim(itemId: UUID, userId: UUID) -> BillItemClaim {
         BillItemClaim(id: UUID(), billItemId: itemId, userId: userId, createdAt: Date())
     }
@@ -172,5 +191,62 @@ struct BillComputeTotalsTests {
         #expect(totals.count == 1)
         #expect(totals[0].displayName == "Alice")
         #expect(totals[0].total == 0)
+    }
+
+    @Test("receipt totals expose tax and tip shares")
+    func receiptTotalsExposeTaxAndTipShares() throws {
+        let aliceId = UUID()
+        let bobId = UUID()
+        let receipt = makeReceipt(tax: 2, tip: 4)
+        let aliceItem = makeReceiptItem(receiptId: receipt.id, price: 5)
+        let bobItem = makeReceiptItem(receiptId: receipt.id, price: 15)
+        let claims = [
+            makeClaim(itemId: aliceItem.id, userId: aliceId),
+            makeClaim(itemId: bobItem.id, userId: bobId),
+        ]
+        let participants = [
+            makeParticipant(userId: aliceId, name: "Alice"),
+            makeParticipant(userId: bobId, name: "Bob"),
+        ]
+
+        let totalsByReceipt = BillService.computeReceiptTotals(
+            receipts: [receipt],
+            items: [receipt.id: [aliceItem, bobItem]],
+            claims: claims,
+            participants: participants
+        )
+
+        let totals = try #require(totalsByReceipt[receipt.id])
+        let alice = try #require(totals.first(where: { $0.displayName == "Alice" }))
+        let bob = try #require(totals.first(where: { $0.displayName == "Bob" }))
+
+        #expect(abs(alice.taxShare - 0.50) < 0.001)
+        #expect(abs(alice.tipShare - 1.00) < 0.001)
+        #expect(abs(alice.total - 6.50) < 0.001)
+        #expect(abs(bob.taxShare - 1.50) < 0.001)
+        #expect(abs(bob.tipShare - 3.00) < 0.001)
+        #expect(abs(bob.total - 19.50) < 0.001)
+    }
+
+    @Test("unclaimed receipt items keep their tax and tip unassigned")
+    func unclaimedReceiptItemsKeepFeesUnassigned() throws {
+        let aliceId = UUID()
+        let receipt = makeReceipt(tax: 2, tip: 4)
+        let claimedItem = makeReceiptItem(receiptId: receipt.id, price: 5)
+        let unclaimedItem = makeReceiptItem(receiptId: receipt.id, price: 15)
+        let participant = makeParticipant(userId: aliceId, name: "Alice")
+
+        let totalsByReceipt = BillService.computeReceiptTotals(
+            receipts: [receipt],
+            items: [receipt.id: [claimedItem, unclaimedItem]],
+            claims: [makeClaim(itemId: claimedItem.id, userId: aliceId)],
+            participants: [participant]
+        )
+
+        let alice = try #require(totalsByReceipt[receipt.id]?.first)
+
+        #expect(abs(alice.taxShare - 0.50) < 0.001)
+        #expect(abs(alice.tipShare - 1.00) < 0.001)
+        #expect(abs(alice.total - 6.50) < 0.001)
     }
 }
