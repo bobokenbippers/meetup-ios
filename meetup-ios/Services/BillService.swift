@@ -4,6 +4,8 @@ import Supabase
 final class BillService {
     static let shared = BillService()
     private var supabase: SupabaseClient { SupabaseManager.shared.client }
+    private let receiptPhotoBucket = "receipts"
+    private let signedURLExpiry = 3600
 
     // MARK: - Bill CRUD (legacy single-bill)
 
@@ -80,13 +82,14 @@ final class BillService {
     // MARK: - Receipts
 
     func fetchReceipts(meetupId: UUID) async throws -> [Receipt] {
-        try await supabase
+        let receipts: [Receipt] = try await supabase
             .from("receipts")
             .select()
             .eq("meetup_id", value: meetupId)
             .order("created_at")
             .execute()
             .value
+        return await refreshReceiptPhotoURLs(receipts)
     }
 
     func createReceipt(meetupId: UUID, placeName: String, payerUserId: UUID) async throws -> Receipt {
@@ -150,10 +153,9 @@ final class BillService {
     func uploadReceiptPhoto(receiptId: UUID, imageData: Data) async throws -> String {
         let path = "\(receiptId.uuidString)/photo.jpg"
         try await supabase.storage
-            .from("receipts")
+            .from(receiptPhotoBucket)
             .upload(path: path, file: imageData, options: FileOptions(contentType: "image/jpeg", upsert: true))
-        let publicURL = try supabase.storage.from("receipts").getPublicURL(path: path)
-        return publicURL.absoluteString
+        return path
     }
 
     func updateReceiptPhotoUrl(_ receiptId: UUID, photoUrl: String) async throws {
@@ -169,10 +171,11 @@ final class BillService {
     }
 
     func deleteReceipt(_ receipt: Receipt) async throws {
-        if receipt.photoUrl != nil {
+        if let photoUrl = receipt.photoUrl,
+           let path = Self.receiptPhotoStoragePath(from: photoUrl) {
             try? await supabase.storage
-                .from("receipts")
-                .remove(paths: ["\(receipt.id.uuidString)/photo.jpg"])
+                .from(receiptPhotoBucket)
+                .remove(paths: [path])
         }
 
         try await supabase
@@ -180,6 +183,51 @@ final class BillService {
             .delete()
             .eq("id", value: receipt.id)
             .execute()
+    }
+
+    private func refreshReceiptPhotoURLs(_ receipts: [Receipt]) async -> [Receipt] {
+        var refreshed: [Receipt] = []
+        refreshed.reserveCapacity(receipts.count)
+
+        for receipt in receipts {
+            guard let storedPhotoURL = receipt.photoUrl,
+                  let signedURL = await signedReceiptPhotoURLString(forStoredPhotoURL: storedPhotoURL) else {
+                refreshed.append(receipt)
+                continue
+            }
+            refreshed.append(receipt.replacingPhotoUrl(signedURL))
+        }
+
+        return refreshed
+    }
+
+    private func signedReceiptPhotoURLString(forStoredPhotoURL storedPhotoURL: String) async -> String? {
+        guard let path = Self.receiptPhotoStoragePath(from: storedPhotoURL) else { return nil }
+        guard let signedURL = try? await supabase.storage
+            .from(receiptPhotoBucket)
+            .createSignedURL(path: path, expiresIn: signedURLExpiry) else {
+            return nil
+        }
+        return signedURL.absoluteString
+    }
+
+    static func receiptPhotoStoragePath(from storedPhotoURL: String) -> String? {
+        let trimmed = storedPhotoURL.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+
+        if !trimmed.localizedCaseInsensitiveContains("://") {
+            return trimmed
+        }
+
+        guard let url = URL(string: trimmed) else { return nil }
+        let pathComponents = url.pathComponents
+        guard let bucketIndex = pathComponents.firstIndex(of: "receipts") else { return nil }
+        let storageComponents = pathComponents.dropFirst(bucketIndex + 1)
+        guard !storageComponents.isEmpty else { return nil }
+
+        return storageComponents
+            .joined(separator: "/")
+            .removingPercentEncoding
     }
 
     func fetchReceiptItems(receiptId: UUID) async throws -> [BillItem] {

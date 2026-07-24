@@ -21,4 +21,19 @@ struct Receipt: Codable, Identifiable, Equatable {
         case photoUrl    = "photo_url"
         case createdAt   = "created_at"
     }
+
+    func replacingPhotoUrl(_ photoUrl: String) -> Receipt {
+        Receipt(
+            id: id,
+            meetupId: meetupId,
+            placeName: placeName,
+            payerUserId: payerUserId,
+            totalAmount: totalAmount,
+            tax: tax,
+            tip: tip,
+            surcharge: surcharge,
+            photoUrl: photoUrl,
+            createdAt: createdAt
+        )
+    }
 }
