@@ -2,6 +2,7 @@ import SwiftUI
 
 struct JoinMeetupSheet: View {
     let shareToken: String
+    let onJoined: (UUID) -> Void
     @Environment(\.dismiss) private var dismiss
 
     @State private var meetup: Meetup?
@@ -194,10 +195,11 @@ struct JoinMeetupSheet: View {
     private func join(_ meetup: Meetup) async {
         isJoining = true
         do {
-            try await MeetupService.shared.joinByShareToken(shareToken)
+            let meetupId = try await MeetupService.shared.joinByShareToken(shareToken)
             withAnimation { joined = true }
             try? await Task.sleep(for: .seconds(1.5))
             dismiss()
+            onJoined(meetupId)
         } catch is CancellationError {
             isJoining = false
             return

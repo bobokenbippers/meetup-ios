@@ -94,7 +94,6 @@ struct meetup_iosApp: App {
     @State private var settings = AppSettings()
     private let navState = NavigationState.shared
     @State private var pendingShareToken: String?
-    @State private var showJoinSheet = false
     @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding = false
     @AppStorage("themePreference") private var themePreference: ThemePreference = .system
 
@@ -126,12 +125,32 @@ struct meetup_iosApp: App {
             .onOpenURL { url in
                 handleDeepLink(url)
             }
-            .sheet(isPresented: $showJoinSheet, onDismiss: { pendingShareToken = nil }) {
+            .sheet(isPresented: joinSheetBinding, onDismiss: { pendingShareToken = nil }) {
                 if let token = pendingShareToken {
-                    JoinMeetupSheet(shareToken: token)
+                    JoinMeetupSheet(shareToken: token) { meetupId in
+                        NavigationState.shared.handle(
+                            event: "meetup_invite",
+                            meetupId: meetupId.uuidString
+                        )
+                    }
                 }
             }
         }
+    }
+
+    private var canPresentJoinSheet: Bool {
+        auth.hasResolvedInitialSession &&
+        auth.session != nil &&
+        auth.profile?.id == auth.session?.user.id &&
+        auth.profile?.phoneE164 != nil &&
+        hasCompletedOnboarding
+    }
+
+    private var joinSheetBinding: Binding<Bool> {
+        Binding(
+            get: { pendingShareToken != nil && canPresentJoinSheet },
+            set: { if !$0 { pendingShareToken = nil } }
+        )
     }
 
     private func handleDeepLink(_ url: URL) {
@@ -142,14 +161,12 @@ struct meetup_iosApp: App {
             // squadbrunch.app/join/<token>
             if path.count >= 2, path[0] == "join" {
                 pendingShareToken = path[1]
-                showJoinSheet = true
                 return
             }
             // <ref>.supabase.co/functions/v1/join-meetup/<token>
             if let tokenIndex = path.firstIndex(of: "join-meetup").map({ $0 + 1 }),
                tokenIndex < path.count {
                 pendingShareToken = path[tokenIndex]
-                showJoinSheet = true
                 return
             }
         }
@@ -162,7 +179,6 @@ struct meetup_iosApp: App {
             // squadbrunch://join/<token>
             if let token = pathComponents.first {
                 pendingShareToken = token
-                showJoinSheet = true
             }
         case "meetup":
             let meetupId = pathComponents.first
