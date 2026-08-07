@@ -795,12 +795,13 @@ final class MeetupService {
             .execute()
     }
 
-    /// Join a meetup via share link. The RPC validates the share token server-side
-    /// and performs the insert with the right RLS context.
-    func joinByShareToken(_ token: String) async throws {
+    /// Join a meetup via share link. The RPC validates the share token server-side,
+    /// performs the insert/update with the right RLS context, and returns the meetup id.
+    func joinByShareToken(_ token: String) async throws -> UUID {
         guard supabase.auth.currentUser?.id != nil else { throw MeetupError.notSignedIn }
-        _ = try await supabase
+        return try await supabase
             .rpc("join_meetup_by_token", params: ["p_share_token": token])
             .execute()
+            .value
     }
 }

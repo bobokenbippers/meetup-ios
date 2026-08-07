@@ -304,6 +304,7 @@ struct MeetupsListView: View {
             .task {
                 loadHiddenIds()
                 await load()
+                handlePendingMeetupId(navState.pendingMeetupId)
                 await subscribeToInviteChanges()
             }
             .refreshable { await refreshHome() }
@@ -471,15 +472,16 @@ struct MeetupsListView: View {
 
     private func handlePendingMeetupId(_ meetupId: UUID?) {
         guard let meetupId else { return }
-        navState.pendingMeetupId = nil
         var found: MyParticipation?
         for p in participations where p.meetup.id == meetupId { found = p; break }
         if let p = found {
+            navState.pendingMeetupId = nil
             presentedSheet = .meetup(p.meetup)
         } else {
             Task {
                 await load()
                 for p in participations where p.meetup.id == meetupId {
+                    navState.pendingMeetupId = nil
                     presentedSheet = .meetup(p.meetup)
                     break
                 }
