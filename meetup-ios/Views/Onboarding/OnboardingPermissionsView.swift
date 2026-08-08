@@ -91,8 +91,7 @@ struct OnboardingPermissionsView: View {
         isRequesting = true
         Task {
             LocationManager.shared.requestPermission()
-            _ = try? await UNUserNotificationCenter.current()
-                .requestAuthorization(options: [.alert, .badge, .sound])
+            _ = await NotificationService.shared.requestAuthorizationAndRegister()
             await MainActor.run {
                 isRequesting = false
                 onNext()
