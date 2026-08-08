@@ -7,6 +7,7 @@
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>location</string>
+		<string>remote-notification</string>
 	</array>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>Squad Brunch uses your location to suggest nearby events and share your ETA during active meetups.</string>
@@ -14,6 +15,14 @@
 	<string>Squad Brunch uses background location only during active meetups so friends can see your live ETA.</string>
 	<key>NSMotionUsageDescription</key>
 	<string>Used to adapt location updates to save battery during active meetups.</string>
+	<key>NSContactsUsageDescription</key>
+	<string>Squad Brunch uses contacts only when you choose to find friends or fill in your profile details.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>Squad Brunch uses the camera when you choose to scan receipts or add in-app photo proof.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Squad Brunch uses selected photos when you choose images for chats, meetups, receipts, or your profile.</string>
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
 	<key>TicketmasterAPIKey</key>
 	<string>$(TICKETMASTER_API_KEY)</string>
 	<key>AppEnvironment</key>

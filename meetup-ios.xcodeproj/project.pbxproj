@@ -467,8 +467,11 @@
 				INFOPLIST_KEY_NSContactsUsageDescription = "Used to find which of your contacts are on this app so you can add them as friends or invite them to meetups.";
 				INFOPLIST_KEY_NSLocationAlwaysAndWhenInUseUsageDescription = "Your location is shared in the background during a meetup so participants can track your arrival even when the app is closed.";
 				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Your location is shared with meetup participants so everyone can see who's on their way and when they'll arrive.";
+				INFOPLIST_KEY_NSMotionUsageDescription = "Used to adapt location updates to save battery during active meetups.";
+				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "Squad Brunch uses selected photos when you choose images for chats, meetups, receipts, or your profile.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UIBackgroundModes = "location remote-notification";
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
@@ -509,8 +512,11 @@
 				INFOPLIST_KEY_NSContactsUsageDescription = "Used to find which of your contacts are on this app so you can add them as friends or invite them to meetups.";
 				INFOPLIST_KEY_NSLocationAlwaysAndWhenInUseUsageDescription = "Your location is shared in the background during a meetup so participants can track your arrival even when the app is closed.";
 				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Your location is shared with meetup participants so everyone can see who's on their way and when they'll arrive.";
+				INFOPLIST_KEY_NSMotionUsageDescription = "Used to adapt location updates to save battery during active meetups.";
+				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "Squad Brunch uses selected photos when you choose images for chats, meetups, receipts, or your profile.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UIBackgroundModes = "location remote-notification";
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";

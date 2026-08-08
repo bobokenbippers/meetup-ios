@@ -410,11 +410,10 @@ struct SettingsView: View {
         if enabled {
             notificationMessage = nil
             Task {
-                let granted = await requestNotificationAuthorization()
+                let granted = await NotificationService.shared.requestAuthorizationAndRegister()
                 await MainActor.run {
                     if granted {
                         notificationMessage = "Push notifications are on."
-                        UIApplication.shared.registerForRemoteNotifications()
                     } else {
                         pushEnabled = false
                         notificationMessage = "Notifications are blocked. Enable them in iOS Settings."
@@ -429,14 +428,6 @@ struct SettingsView: View {
             }
             notificationMessage = "Push notifications are off."
             persist()
-        }
-    }
-
-    private func requestNotificationAuthorization() async -> Bool {
-        do {
-            return try await UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .badge, .sound])
-        } catch {
-            return false
         }
     }
 

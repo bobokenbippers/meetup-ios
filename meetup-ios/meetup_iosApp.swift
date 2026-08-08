@@ -34,13 +34,9 @@ class AppDelegate: NSObject, UIApplicationDelegate {
             UITabBar.appearance().scrollEdgeAppearance = tabAppearance
         }
         UNUserNotificationCenter.current().delegate = self
-        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .badge, .sound]) { granted, _ in
-            guard granted else { return }
-            Task { @MainActor in
-                UIApplication.shared.registerForRemoteNotifications()
-            }
+        Task {
+            await NotificationService.shared.registerForRemoteNotificationsIfAuthorized()
         }
-        LocationManager.shared.requestPermission()
         return true
     }
 
