@@ -281,7 +281,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "# Stamp CFBundleVersion (build number).\n# In CI uses GITHUB_RUN_NUMBER; locally falls back to git commit count.\nif [ \"${CONFIGURATION}\" = \"Release\" ]; then\n  if [ -n \"${GITHUB_RUN_NUMBER}\" ]; then\n    build_number=\"${GITHUB_RUN_NUMBER}\"\n    echo \"Using GITHUB_RUN_NUMBER: ${build_number}\"\n  elif command -v git >/dev/null 2>&1 && git -C \"${SRCROOT}\" rev-parse >/dev/null 2>&1; then\n    build_number=$(git -C \"${SRCROOT}\" rev-list --count HEAD)\n    echo \"Using git commit count: ${build_number}\"\n  else\n    echo \"warning: no build number source; CFBundleVersion left unchanged\"\n    exit 0\n  fi\n  plist=\"${TARGET_BUILD_DIR}/${INFOPLIST_PATH}\"\n  if [ -f \"${plist}\" ]; then\n    /usr/libexec/PlistBuddy -c \"Set :CFBundleVersion ${build_number}\" \"${plist}\"\n    echo \"Set CFBundleVersion to ${build_number}\"\n  else\n    echo \"warning: Info.plist not found at ${plist}; skipping build-number stamping\"\n  fi\nfi\n";
+			shellScript = "# Stamp CFBundleVersion (build number).\n# In CI fastlane sets SQUAD_BUILD_NUMBER above App Store Connect's old builds;\n# locally falls back to git commit count.\nif [ \"${CONFIGURATION}\" = \"Release\" ]; then\n  if [ -n \"${SQUAD_BUILD_NUMBER}\" ]; then\n    build_number=\"${SQUAD_BUILD_NUMBER}\"\n    echo \"Using SQUAD_BUILD_NUMBER: ${build_number}\"\n  elif [ -n \"${GITHUB_RUN_NUMBER}\" ]; then\n    build_number=$((10000 + ${GITHUB_RUN_NUMBER}))\n    echo \"Using offset GITHUB_RUN_NUMBER: ${build_number}\"\n  elif command -v git >/dev/null 2>&1 && git -C \"${SRCROOT}\" rev-parse >/dev/null 2>&1; then\n    build_number=$(git -C \"${SRCROOT}\" rev-list --count HEAD)\n    echo \"Using git commit count: ${build_number}\"\n  else\n    echo \"warning: no build number source; CFBundleVersion left unchanged\"\n    exit 0\n  fi\n  plist=\"${TARGET_BUILD_DIR}/${INFOPLIST_PATH}\"\n  if [ -f \"${plist}\" ]; then\n    /usr/libexec/PlistBuddy -c \"Set :CFBundleVersion ${build_number}\" \"${plist}\"\n    echo \"Set CFBundleVersion to ${build_number}\"\n  else\n    echo \"warning: Info.plist not found at ${plist}; skipping build-number stamping\"\n  fi\nfi\n";
 		};
 /* End PBXShellScriptBuildPhase section */
 
@@ -647,7 +647,7 @@
 /* Begin XCRemoteSwiftPackageReference section */
 		BA53CC082FB8F39F00A19C8E /* XCRemoteSwiftPackageReference "supabase-swift" */ = {
 			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "git@github.com:supabase/supabase-swift.git";
+			repositoryURL = "https://github.com/supabase/supabase-swift.git";
 			requirement = {
 				kind = upToNextMajorVersion;
 				minimumVersion = 2.54.1;
