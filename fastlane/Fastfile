@@ -26,6 +26,15 @@ platform :ios do
 
   desc "Build and upload to TestFlight"
   lane :beta do
+    if ENV["CI"] && ENV["GITHUB_RUN_NUMBER"]
+      build_number = (10_000 + ENV["GITHUB_RUN_NUMBER"].to_i).to_s
+      ENV["SQUAD_BUILD_NUMBER"] = build_number
+      increment_build_number(
+        build_number: build_number,
+        xcodeproj: "meetup-ios.xcodeproj"
+      )
+    end
+
     match(type: "appstore", readonly: is_ci)
     update_code_signing_settings(
       use_automatic_signing: false,
@@ -47,7 +56,8 @@ platform :ios do
       }
     )
     upload_to_testflight(
-      skip_waiting_for_build_processing: true
+      skip_waiting_for_build_processing: false,
+      wait_processing_timeout_duration: 1800
     )
   end
 end

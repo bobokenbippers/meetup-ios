@@ -35,8 +35,10 @@ jobs:
 
       - name: Configure Git for Match and SPM
         run: |
+          test -n "${{ secrets.MATCH_GIT_TOKEN }}" || (echo "MATCH_GIT_TOKEN is required for profile regeneration" && exit 1)
           git config --global url."https://x-access-token:${{ secrets.MATCH_GIT_TOKEN }}@github.com/".insteadOf "https://github.com/"
-          git config --global url."https://github.com/".insteadOf "git@github.com:"
+          git config --global url."https://x-access-token:${{ secrets.MATCH_GIT_TOKEN }}@github.com/".insteadOf "git@github.com:"
+          git config --global url."https://x-access-token:${{ secrets.MATCH_GIT_TOKEN }}@github.com/".insteadOf "ssh://git@github.com/"
 
       - name: Write Secrets.xcconfig from secrets
         run: |
@@ -55,7 +57,21 @@ jobs:
           APP_STORE_CONNECT_API_KEY_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}
           APP_STORE_CONNECT_API_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_API_ISSUER_ID }}
           APP_STORE_CONNECT_API_KEY_CONTENT: ${{ secrets.APP_STORE_CONNECT_API_KEY_CONTENT }}
-        run: bundle exec fastlane regen_profiles
+          MATCH_GIT_TOKEN: ${{ secrets.MATCH_GIT_TOKEN }}
+        run: |
+          case "$MATCH_GIT_URL" in
+            git@github.com:*)
+              MATCH_GIT_URL="https://x-access-token:${MATCH_GIT_TOKEN}@github.com/${MATCH_GIT_URL#git@github.com:}"
+              ;;
+            ssh://git@github.com/*)
+              MATCH_GIT_URL="https://x-access-token:${MATCH_GIT_TOKEN}@github.com/${MATCH_GIT_URL#ssh://git@github.com/}"
+              ;;
+            https://github.com/*)
+              MATCH_GIT_URL="https://x-access-token:${MATCH_GIT_TOKEN}@github.com/${MATCH_GIT_URL#https://github.com/}"
+              ;;
+          esac
+          export MATCH_GIT_URL
+          bundle exec fastlane regen_profiles
 
       - name: Build & upload to TestFlight
         if: ${{ inputs.also_ship }}
@@ -66,4 +82,18 @@ jobs:
           APP_STORE_CONNECT_API_KEY_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}
           APP_STORE_CONNECT_API_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_API_ISSUER_ID }}
           APP_STORE_CONNECT_API_KEY_CONTENT: ${{ secrets.APP_STORE_CONNECT_API_KEY_CONTENT }}
-        run: bundle exec fastlane beta
+          MATCH_GIT_TOKEN: ${{ secrets.MATCH_GIT_TOKEN }}
+        run: |
+          case "$MATCH_GIT_URL" in
+            git@github.com:*)
+              MATCH_GIT_URL="https://x-access-token:${MATCH_GIT_TOKEN}@github.com/${MATCH_GIT_URL#git@github.com:}"
+              ;;
+            ssh://git@github.com/*)
+              MATCH_GIT_URL="https://x-access-token:${MATCH_GIT_TOKEN}@github.com/${MATCH_GIT_URL#ssh://git@github.com/}"
+              ;;
+            https://github.com/*)
+              MATCH_GIT_URL="https://x-access-token:${MATCH_GIT_TOKEN}@github.com/${MATCH_GIT_URL#https://github.com/}"
+              ;;
+          esac
+          export MATCH_GIT_URL
+          bundle exec fastlane beta
