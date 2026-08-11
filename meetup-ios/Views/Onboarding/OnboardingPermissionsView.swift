@@ -32,7 +32,7 @@ struct OnboardingPermissionsView: View {
                     permissionRow(
                         icon: "location.fill",
                         title: "Location",
-                        subtitle: "We need your location to show friends how close you are"
+                        subtitle: "Use your location to show friends your live ETA during active meetups"
                     )
                     permissionRow(
                         icon: "bell.fill",
@@ -47,7 +47,7 @@ struct OnboardingPermissionsView: View {
                 Button {
                     requestPermissions()
                 } label: {
-                    Text(isRequesting ? "Requesting…" : "Allow →")
+                    Text(isRequesting ? "Requesting..." : "Continue")
                         .scaledFont(size: 18, weight: .semibold)
                         .foregroundStyle(Color.appAccentForeground)
                         .frame(maxWidth: .infinity)

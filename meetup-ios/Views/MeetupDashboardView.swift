@@ -28,6 +28,7 @@ struct MeetupDashboardView: View {
     @State private var showRecap = false
     @State private var showAddParticipants = false
     @State private var showStopSharingConfirm = false
+    @State private var isStartingSharing = false
     @State private var isStoppingSharing = false
 
     // Photo state
@@ -75,6 +76,12 @@ struct MeetupDashboardView: View {
             votes: latePunishmentVotes,
             currentUserId: myUserId
         )
+    }
+    private var canShareLocation: Bool {
+        myStatus == "yes" && meetup.status == "active" && UserSettingsService.locationSharingEnabled
+    }
+    private var isSharingThisMeetup: Bool {
+        LocationManager.shared.isTracking && LocationManager.shared.trackingMeetup?.id == meetup.id
     }
     private var greeting: String {
         let h = Calendar.current.component(.hour, from: Date())
@@ -542,8 +549,54 @@ struct MeetupDashboardView: View {
             .padding(.top, 12)
             .padding(.bottom, 4)
 
-            // Stop Sharing button — only shown while actively broadcasting location
-            if LocationManager.shared.isTracking && LocationManager.shared.trackingMeetup?.id == meetup.id {
+            if canShareLocation {
+                VStack(alignment: .leading, spacing: 8) {
+                    Button {
+                        if isSharingThisMeetup {
+                            showStopSharingConfirm = true
+                        } else {
+                            startSharing()
+                        }
+                    } label: {
+                        HStack(spacing: 6) {
+                            if isStartingSharing || isStoppingSharing {
+                                ProgressView()
+                                    .scaleEffect(0.75)
+                            } else {
+                                Image(systemName: isSharingThisMeetup ? "location.slash.fill" : "location.fill")
+                            }
+                            Text(locationSharingButtonTitle)
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.8)
+                        }
+                        .scaledFont(size: 13, weight: .semibold)
+                        .foregroundStyle(isSharingThisMeetup ? Color.statusRunningLate : Color.coral)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 11)
+                        .background(locationSharingControlColor.opacity(0.12))
+                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 12)
+                                .strokeBorder(locationSharingControlColor.opacity(0.35), lineWidth: 1)
+                        )
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(isStartingSharing || isStoppingSharing)
+                    .accessibilityLabel(locationSharingAccessibilityLabel)
+                    .accessibilityIdentifier(isSharingThisMeetup ? "btn_stop_sharing" : "btn_start_sharing")
+
+                    Text(
+                        "Live ETA updates continue in the background for this active meetup until " +
+                            "you stop sharing or the meetup expires. This may use battery."
+                    )
+                        .scaledFont(size: 11)
+                        .foregroundStyle(DS.Color.textSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .padding(.horizontal, 16)
+                .padding(.bottom, 8)
+                .transition(.scale(scale: 0.95, anchor: .top).combined(with: .opacity))
+            } else if isSharingThisMeetup {
                 Button {
                     showStopSharingConfirm = true
                 } label: {
@@ -591,6 +644,28 @@ struct MeetupDashboardView: View {
     }
 
     // MARK: - Logic
+
+    private var locationSharingButtonTitle: String {
+        if isStartingSharing { return "Starting..." }
+        if isStoppingSharing { return "Stopping..." }
+        return isSharingThisMeetup ? "Stop Sharing Location" : "Start Sharing Location"
+    }
+
+    private var locationSharingAccessibilityLabel: String {
+        isSharingThisMeetup ? "Stop sharing your location" : "Start sharing your location"
+    }
+
+    private var locationSharingControlColor: Color {
+        isSharingThisMeetup ? Color.statusRunningLate : Color.coral
+    }
+
+    private func startSharing() {
+        guard !isStartingSharing else { return }
+        isStartingSharing = true
+        LocationManager.shared.requestPermission()
+        LocationManager.shared.startTracking(meetup: meetup)
+        isStartingSharing = false
+    }
 
     private func stopSharing() async {
         guard !isStoppingSharing else { return }
@@ -690,11 +765,8 @@ struct MeetupDashboardView: View {
                 if fresh != participants { participants = fresh }
                 hasLoaded = true
             }
-            if myParticipant?.status == "yes" && meetup.status == "active" && UserSettingsService.locationSharingEnabled {
-                LocationManager.shared.requestPermission()
-                LocationManager.shared.startTracking(meetup: meetup)
-            } else if !UserSettingsService.locationSharingEnabled,
-                      LocationManager.shared.trackingMeetup?.id == meetup.id {
+            if !UserSettingsService.locationSharingEnabled,
+               LocationManager.shared.trackingMeetup?.id == meetup.id {
                 // User turned off location sharing while this meetup is in view.
                 LocationManager.shared.stopTracking()
             }

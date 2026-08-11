@@ -41,6 +41,8 @@ Please test:
 ### Fixed
 - Added missing Contacts, Camera, and Photos privacy usage strings required for TestFlight/App Review builds.
 - Permission prompts now stay inside onboarding/settings instead of firing location and notification prompts immediately on launch; existing push-authorized users still re-register their APNs token on launch.
+- App Review: changed onboarding pre-permission copy so the location prompt uses a neutral Continue action.
+- App Review: made live background location sharing an explicit Start/Stop action on active meetup dashboards.
 - Location sharing can now be explicitly stopped during a meetup instead of only ending when the view disappears.
 - Bill item claims no longer require leaving and reopening Split Bill to see another tester's changes.
 - Truth or Dare: players are no longer trapped in a dead game. Any player in a session can now end it (not just the original starter), so a soft-locked game started by someone else can be cleared by anyone in it.
