@@ -4,8 +4,8 @@ import Testing
 
 @Suite("EventSuggestionsService")
 struct EventSuggestionsServiceTests {
-    @Test("Ticketmaster URL requests only current or future events")
-    func ticketmasterURLIncludesStartDateTime() throws {
+    @Test("Ticketmaster URL requests nearby current or future events")
+    func ticketmasterURLIncludesGeoPointAndStartDateTime() throws {
         let now = try #require(ISO8601DateFormatter().date(from: "2026-06-10T20:00:00Z"))
 
         let url = TicketmasterEventSource.discoveryURL(
@@ -22,11 +22,17 @@ struct EventSuggestionsServiceTests {
         })
 
         #expect(query["apikey"] == "test-key")
-        #expect(query["latlong"] == "40.744,-74.032")
+        #expect(query["geoPoint"] == TicketmasterEventSource.geoHash(latitude: 40.744, longitude: -74.032))
+        #expect(query["latlong"] == nil)
         #expect(query["radius"] == "25")
         #expect(query["unit"] == "miles")
         #expect(query["sort"] == "date,asc")
         #expect(query["startDateTime"] == "2026-06-10T20:00:00Z")
+    }
+
+    @Test("Ticketmaster geoPoint uses standard geohash encoding")
+    func ticketmasterGeoPointUsesGeohash() {
+        #expect(TicketmasterEventSource.geoHash(latitude: 42.6, longitude: -5.6, precision: 5) == "ezs42")
     }
 
     @Test("Ticketmaster URL includes category preference")
