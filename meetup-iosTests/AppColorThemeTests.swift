@@ -7,7 +7,9 @@ struct AppColorThemeTests {
     @Test("themes expose stable labels")
     func labels() {
         #expect(AppColorTheme.standard.label == "Standard")
-        #expect(AppColorTheme.allCases == [.standard])
+        #expect(AppColorTheme.aperitif.label == "Aperitif")
+        #expect(AppColorTheme.coastal.label == "Coastal")
+        #expect(AppColorTheme.allCases == [.standard, .aperitif, .coastal])
     }
 
     @Test("removed or unknown persisted value falls back to standard")
