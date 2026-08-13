@@ -96,6 +96,9 @@ struct SettingsView: View {
                     .pickerStyle(.segmented)
                     .listRowBackground(Color.appSurface)
 
+                    ColorPalettePicker(selection: $settings.colorTheme)
+                        .listRowInsets(EdgeInsets(top: 10, leading: 16, bottom: 10, trailing: 16))
+                        .listRowBackground(Color.appSurface)
                 } header: {
                     sectionHeader("APPEARANCE")
                 }
@@ -458,6 +461,62 @@ struct SettingsView: View {
         } catch {
             profilePhotoMessage = "Couldn't load that photo."
         }
+    }
+}
+
+// MARK: - Color Palette Picker
+
+private struct ColorPalettePicker: View {
+    @Binding var selection: AppColorTheme
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Color Scheme")
+                .scaledFont(size: 13, weight: .semibold)
+                .foregroundStyle(DS.Color.textPrimary)
+
+            HStack(spacing: 8) {
+                ForEach(AppColorTheme.allCases) { theme in
+                    Button {
+                        selection = theme
+                    } label: {
+                        VStack(spacing: 7) {
+                            HStack(spacing: 3) {
+                                swatch(theme.accentColor)
+                                swatch(theme.secondaryAccentColor)
+                                swatch(theme.categoryGradientFoodEnd)
+                            }
+                            .frame(height: 22)
+
+                            Text(theme.label)
+                                .scaledFont(size: 11, weight: .bold)
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.8)
+                                .foregroundStyle(selection == theme ? Color.coral : DS.Color.textSecondary)
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 9)
+                        .background(
+                            RoundedRectangle(cornerRadius: 8)
+                                .fill(selection == theme ? Color.coral.opacity(0.10) : Color.appBackground)
+                        )
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 8)
+                                .strokeBorder(selection == theme ? Color.coral : Color(.separator).opacity(0.45), lineWidth: 1)
+                        )
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("\(theme.label) color scheme")
+                    .accessibilityValue(selection == theme ? "Selected" : "")
+                }
+            }
+        }
+    }
+
+    private func swatch(_ color: Color) -> some View {
+        Circle()
+            .fill(color)
+            .frame(width: 18, height: 18)
     }
 }
 

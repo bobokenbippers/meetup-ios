@@ -22,6 +22,8 @@ enum ThemePreference: String, CaseIterable {
 
 enum AppColorTheme: String, CaseIterable, Identifiable {
     case standard
+    case aperitif
+    case coastal
 
     var id: String { rawValue }
 
@@ -33,6 +35,8 @@ enum AppColorTheme: String, CaseIterable, Identifiable {
     var label: String {
         switch self {
         case .standard: return "Standard"
+        case .aperitif: return "Aperitif"
+        case .coastal:  return "Coastal"
         }
     }
 
@@ -40,26 +44,38 @@ enum AppColorTheme: String, CaseIterable, Identifiable {
         switch self {
         case .standard:
             return Color(light: Color(hex: "6C57C5"), dark: Color(hex: "8A78E0"))
+        case .aperitif:
+            return Color(light: Color(hex: "A83F5F"), dark: Color(hex: "FF8AA6"))
+        case .coastal:
+            return Color(light: Color(hex: "0F7C80"), dark: Color(hex: "4FD1C5"))
         }
     }
 
     var accentForegroundColor: Color {
         switch self {
-        case .standard:
+        case .standard, .aperitif:
             return Color(light: .white, dark: .black)
+        case .coastal:
+            return Color.white
         }
     }
 
     var secondaryAccentColor: Color {
         switch self {
         case .standard:
-            return Color(light: Color(hex: "6C57C5"), dark: Color(hex: "8A78E0"))
+            return Color(light: Color(hex: "D95F76"), dark: Color(hex: "FF9A7A"))
+        case .aperitif:
+            return Color(light: Color(hex: "C78A2F"), dark: Color(hex: "F2C46D"))
+        case .coastal:
+            return Color(light: Color(hex: "D0643A"), dark: Color(hex: "FFB86B"))
         }
     }
 
     var secondaryAccentForegroundColor: Color {
         switch self {
-        case .standard:
+        case .standard, .aperitif:
+            return Color(light: .white, dark: .black)
+        case .coastal:
             return Color(light: .white, dark: .black)
         }
     }
@@ -75,18 +91,40 @@ enum AppColorTheme: String, CaseIterable, Identifiable {
                 Color(red: 0.910, green: 0.212, blue: 0.278),
                 Color(red: 0.000, green: 0.780, blue: 0.941),
             ]
+        case .aperitif:
+            return [
+                Color(hex: "A83F5F"),
+                Color(hex: "C78A2F"),
+                Color(hex: "6C57C5"),
+                Color(hex: "2F7D67"),
+                Color(hex: "D95F76"),
+                Color(hex: "4467A8"),
+            ]
+        case .coastal:
+            return [
+                Color(hex: "0F7C80"),
+                Color(hex: "D0643A"),
+                Color(hex: "4B6FA8"),
+                Color(hex: "7B8F3A"),
+                Color(hex: "9C5DA8"),
+                Color(hex: "2F9C73"),
+            ]
         }
     }
 
     var categoryGradientFoodStart: Color {
         switch self {
         case .standard: return Color(red: 0.388, green: 0.302, blue: 0.718)
+        case .aperitif: return Color(hex: "A83F5F")
+        case .coastal:  return Color(hex: "0F7C80")
         }
     }
 
     var categoryGradientFoodEnd: Color {
         switch self {
         case .standard: return Color(red: 0.235, green: 0.180, blue: 0.478)
+        case .aperitif: return Color(hex: "5E2C56")
+        case .coastal:  return Color(hex: "164E63")
         }
     }
 }
