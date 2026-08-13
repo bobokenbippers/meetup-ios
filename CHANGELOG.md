@@ -58,6 +58,7 @@ Please test:
 - Event suggestions can request location correctly after authorization by adding required iOS location usage strings and a one-shot location fetch.
 - Event suggestions no longer disappear when location permission is pending or unavailable; the Meetups tab now shows a clear location prompt or empty state.
 - Event suggestion API configuration is now included in the app target build settings so release builds can read it reliably.
+- Event suggestions now use Ticketmaster's supported `geoPoint` geohash location filter instead of the deprecated `latlong` filter, and venue coordinate decoding accepts both string and numeric API payloads.
 - Settings → Sync Contacts now actually requests contact permission, reports sync status, and gates contact suggestions throughout the app.
 - Friend requests now insert under the canonical friendship RLS policy regardless of UUID ordering.
 - Destination search now guards Google Places configuration so typing a meetup location cannot crash when Places is unavailable.

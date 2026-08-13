@@ -241,7 +241,7 @@ struct TicketmasterEventSource: EventSource {
         var components = URLComponents(string: "https://app.ticketmaster.com/discovery/v2/events.json")!
         var queryItems = [
             URLQueryItem(name: "apikey", value: apiKey),
-            URLQueryItem(name: "latlong", value: "\(latitude),\(longitude)"),
+            URLQueryItem(name: "geoPoint", value: geoHash(latitude: latitude, longitude: longitude)),
             URLQueryItem(name: "radius", value: String(radiusMiles)),
             URLQueryItem(name: "unit", value: "miles"),
             URLQueryItem(name: "size", value: "20"),
@@ -253,6 +253,49 @@ struct TicketmasterEventSource: EventSource {
         }
         components.queryItems = queryItems
         return components.url!
+    }
+
+    static func geoHash(latitude: Double, longitude: Double, precision: Int = 9) -> String {
+        let base32 = Array("0123456789bcdefghjkmnpqrstuvwxyz")
+        var latitudeRange = (-90.0, 90.0)
+        var longitudeRange = (-180.0, 180.0)
+        var isLongitudeBit = true
+        var bit = 0
+        var characterIndex = 0
+        var output = ""
+
+        while output.count < precision {
+            if isLongitudeBit {
+                let midpoint = (longitudeRange.0 + longitudeRange.1) / 2
+                if longitude >= midpoint {
+                    characterIndex = (characterIndex << 1) + 1
+                    longitudeRange.0 = midpoint
+                } else {
+                    characterIndex <<= 1
+                    longitudeRange.1 = midpoint
+                }
+            } else {
+                let midpoint = (latitudeRange.0 + latitudeRange.1) / 2
+                if latitude >= midpoint {
+                    characterIndex = (characterIndex << 1) + 1
+                    latitudeRange.0 = midpoint
+                } else {
+                    characterIndex <<= 1
+                    latitudeRange.1 = midpoint
+                }
+            }
+
+            isLongitudeBit.toggle()
+            bit += 1
+
+            if bit == 5 {
+                output.append(base32[characterIndex])
+                bit = 0
+                characterIndex = 0
+            }
+        }
+
+        return output
     }
 
     // MARK: Mapping
@@ -356,7 +399,33 @@ private struct TMVenue: Decodable {
 private struct TMAddress: Decodable { let line1: String? }
 private struct TMCity: Decodable { let name: String? }
 private struct TMState: Decodable { let stateCode: String? }
-private struct TMLocation: Decodable { let latitude: String?; let longitude: String? }
+private struct TMLocation: Decodable {
+    let latitude: String?
+    let longitude: String?
+
+    enum CodingKeys: String, CodingKey {
+        case latitude, longitude
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        latitude = Self.decodeCoordinateString(.latitude, from: container)
+        longitude = Self.decodeCoordinateString(.longitude, from: container)
+    }
+
+    private static func decodeCoordinateString(
+        _ key: CodingKeys,
+        from container: KeyedDecodingContainer<CodingKeys>
+    ) -> String? {
+        if let string = try? container.decode(String.self, forKey: key) {
+            return string
+        }
+        if let double = try? container.decode(Double.self, forKey: key) {
+            return String(double)
+        }
+        return nil
+    }
+}
 
 private struct CachedEventSuggestions: Codable {
     let storedAt: Date
