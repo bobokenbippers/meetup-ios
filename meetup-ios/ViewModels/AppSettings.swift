@@ -22,7 +22,6 @@ enum ThemePreference: String, CaseIterable {
 
 enum AppColorTheme: String, CaseIterable, Identifiable {
     case standard
-    case knicks
 
     var id: String { rawValue }
 
@@ -34,7 +33,6 @@ enum AppColorTheme: String, CaseIterable, Identifiable {
     var label: String {
         switch self {
         case .standard: return "Standard"
-        case .knicks: return "Knicks"
         }
     }
 
@@ -42,14 +40,12 @@ enum AppColorTheme: String, CaseIterable, Identifiable {
         switch self {
         case .standard:
             return Color(light: Color(hex: "6C57C5"), dark: Color(hex: "8A78E0"))
-        case .knicks:
-            return Color(light: Color(hex: "006BB6"), dark: Color(hex: "3BA3FF"))
         }
     }
 
     var accentForegroundColor: Color {
         switch self {
-        case .standard, .knicks:
+        case .standard:
             return Color(light: .white, dark: .black)
         }
     }
@@ -58,9 +54,6 @@ enum AppColorTheme: String, CaseIterable, Identifiable {
         switch self {
         case .standard:
             return Color(light: Color(hex: "6C57C5"), dark: Color(hex: "8A78E0"))
-        case .knicks:
-            // Official Knicks Orange #F58426; lightened for dark-mode contrast.
-            return Color(light: Color(hex: "F58426"), dark: Color(hex: "FF9E4D"))
         }
     }
 
@@ -68,12 +61,6 @@ enum AppColorTheme: String, CaseIterable, Identifiable {
         switch self {
         case .standard:
             return Color(light: .white, dark: .black)
-        case .knicks:
-            // Orange #F58426 is light in both schemes; white-on-orange fails
-            // contrast (~2:1). A near-black warm ink reads ~9:1 either way and
-            // keeps the orange accent legible without re-breaking the white-text
-            // bug we just fixed on the food cards.
-            return Color(hex: "1A1206")
         }
     }
 
@@ -88,35 +75,18 @@ enum AppColorTheme: String, CaseIterable, Identifiable {
                 Color(red: 0.910, green: 0.212, blue: 0.278),
                 Color(red: 0.000, green: 0.780, blue: 0.941),
             ]
-        case .knicks:
-            // Official Knicks palette: blue #006BB6, orange #F58426, silver #BEC0C2,
-            // plus supporting tints for avatar/pin variety.
-            return [
-                Color(hex: "006BB6"),
-                Color(hex: "F58426"),
-                Color(hex: "1D428A"),
-                Color(hex: "BEC0C2"),
-                Color(hex: "005EA8"),
-                Color(hex: "C65312"),
-            ]
         }
     }
 
     var categoryGradientFoodStart: Color {
         switch self {
         case .standard: return Color(red: 0.388, green: 0.302, blue: 0.718)
-        case .knicks: return Color(hex: "006BB6")
         }
     }
 
     var categoryGradientFoodEnd: Color {
         switch self {
         case .standard: return Color(red: 0.235, green: 0.180, blue: 0.478)
-        // Blue-forward: a darker shade of the official Knicks Blue #006BB6
-        // (same hue, ~0.67x brightness) so brunch cards read blue — the primary
-        // brand color — with strong white-title contrast (9.6:1). Orange stays
-        // the pop accent, not the wallpaper. Strictly on-palette, no invented navy.
-        case .knicks: return Color(hex: "00477A")
         }
     }
 }

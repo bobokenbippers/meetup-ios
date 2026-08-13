@@ -804,7 +804,7 @@ struct MeetupRowCard: View {
     }
 
     private var activeBorderColor: Color {
-        Color(light: Color(hex: "006BB6").opacity(0.55), dark: Color.coral.opacity(0.45))
+        Color.coral.opacity(0.45)
     }
 
     private var inactiveBorderColor: Color {
