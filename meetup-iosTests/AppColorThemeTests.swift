@@ -7,10 +7,10 @@ struct AppColorThemeTests {
     @Test("themes expose stable labels")
     func labels() {
         #expect(AppColorTheme.standard.label == "Standard")
-        #expect(AppColorTheme.knicks.label == "Knicks")
+        #expect(AppColorTheme.allCases == [.standard])
     }
 
-    @Test("unknown persisted value falls back to standard")
+    @Test("removed or unknown persisted value falls back to standard")
     func currentFallsBackToStandard() {
         let defaults = UserDefaults.standard
         let previous = defaults.string(forKey: "appColorTheme")
@@ -23,7 +23,9 @@ struct AppColorThemeTests {
         }
 
         defaults.set("heat", forKey: "appColorTheme")
+        #expect(AppColorTheme.current == .standard)
 
+        defaults.set("knicks", forKey: "appColorTheme")
         #expect(AppColorTheme.current == .standard)
     }
 }
