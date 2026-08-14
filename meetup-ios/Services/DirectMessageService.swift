@@ -137,7 +137,7 @@ final class DirectMessageService {
         do {
             try await supabase.storage
                 .from(photoBucket)
-                .upload(path: path, file: jpeg, options: FileOptions(contentType: "image/jpeg", upsert: false))
+                .upload(path, data: jpeg, options: FileOptions(contentType: "image/jpeg", upsert: false))
         } catch {
             throw DirectMessageError.imageUploadFailed
         }

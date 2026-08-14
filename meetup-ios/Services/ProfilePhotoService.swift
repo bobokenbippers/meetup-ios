@@ -36,7 +36,7 @@ final class ProfilePhotoService {
         let path = "\(userId.uuidString.lowercased())/\(UUID().uuidString.lowercased()).jpg"
         try await supabase.storage
             .from(bucket)
-            .upload(path: path, file: jpeg, options: FileOptions(contentType: "image/jpeg", upsert: false))
+            .upload(path, data: jpeg, options: FileOptions(contentType: "image/jpeg", upsert: false))
         let publicURL = try supabase.storage
             .from(bucket)
             .getPublicURL(path: path)

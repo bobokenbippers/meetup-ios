@@ -42,8 +42,9 @@ final class PlaceSearchService {
         let mapResults: [PlaceSearchResult] = response.mapItems.prefix(8).enumerated().compactMap {
             offset, item -> PlaceSearchResult? in
             guard let place = SelectedPlace(mapItem: item) else { return nil }
+            let coordinate = item.location.coordinate
             return PlaceSearchResult(
-                id: "\(item.placemark.coordinate.latitude),\(item.placemark.coordinate.longitude)-\(offset)",
+                id: "\(coordinate.latitude),\(coordinate.longitude)-\(offset)",
                 mainText: place.name,
                 secondaryText: place.address ?? "",
                 place: place
@@ -79,8 +80,8 @@ private extension SelectedPlace {
 
         self.init(
             name: name,
-            address: mapItem.placemark.formattedAddress,
-            coordinate: mapItem.placemark.coordinate
+            address: mapItem.addressRepresentations?.fullAddress(includingRegion: false, singleLine: false),
+            coordinate: mapItem.location.coordinate
         )
     }
 
@@ -95,19 +96,6 @@ private extension SelectedPlace {
             address: placemark.formattedAddress(excluding: name),
             coordinate: coordinate
         )
-    }
-}
-
-private extension MKPlacemark {
-    var formattedAddress: String? {
-        let cityStateZip = [locality, administrativeArea, postalCode]
-            .compactMap { $0?.trimmingCharacters(in: .whitespacesAndNewlines) }
-            .filter { !$0.isEmpty }
-            .joined(separator: ", ")
-        let parts = [thoroughfare, cityStateZip]
-            .compactMap { $0?.trimmingCharacters(in: .whitespacesAndNewlines) }
-            .filter { !$0.isEmpty }
-        return parts.isEmpty ? nil : parts.joined(separator: "\n")
     }
 }
 
