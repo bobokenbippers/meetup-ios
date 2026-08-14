@@ -4,7 +4,7 @@ import Testing
 
 @Suite("EventSuggestionsService")
 struct EventSuggestionsServiceTests {
-    @Test("Ticketmaster URL requests nearby current or future events")
+    @Test("Ticketmaster URL requests relevant nearby current or future events")
     func ticketmasterURLIncludesGeoPointAndStartDateTime() throws {
         let now = try #require(ISO8601DateFormatter().date(from: "2026-06-10T20:00:00Z"))
 
@@ -26,7 +26,7 @@ struct EventSuggestionsServiceTests {
         #expect(query["latlong"] == nil)
         #expect(query["radius"] == "25")
         #expect(query["unit"] == "miles")
-        #expect(query["sort"] == "date,asc")
+        #expect(query["sort"] == "relevance,desc")
         #expect(query["startDateTime"] == "2026-06-10T20:00:00Z")
     }
 

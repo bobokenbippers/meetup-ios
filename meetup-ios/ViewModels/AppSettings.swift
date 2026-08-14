@@ -174,7 +174,7 @@ final class AppSettings {
             ? true
             : d.bool(forKey: "eventSuggestionsEnabled")
         let storedRadius = d.integer(forKey: "eventSuggestionRadiusMiles")
-        eventSuggestionRadiusMiles = storedRadius == 0 ? 2 : storedRadius
+        eventSuggestionRadiusMiles = storedRadius == 0 ? 5 : storedRadius
         let rawCategory = d.string(forKey: "eventSuggestionCategory") ?? ""
         eventSuggestionCategory = EventSuggestionCategoryPreference(rawValue: rawCategory) ?? .all
     }

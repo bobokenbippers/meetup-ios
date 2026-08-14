@@ -245,7 +245,7 @@ struct TicketmasterEventSource: EventSource {
             URLQueryItem(name: "radius", value: String(radiusMiles)),
             URLQueryItem(name: "unit", value: "miles"),
             URLQueryItem(name: "size", value: "20"),
-            URLQueryItem(name: "sort", value: "date,asc"),
+            URLQueryItem(name: "sort", value: "relevance,desc"),
             URLQueryItem(name: "startDateTime", value: ISO8601DateFormatter().string(from: now)),
         ]
         if let classificationName {
