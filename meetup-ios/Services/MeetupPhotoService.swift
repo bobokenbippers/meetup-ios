@@ -21,7 +21,7 @@ final class MeetupPhotoService {
         let path = "\(meetupId.uuidString)/\(UUID().uuidString).jpg"
         try await supabase.storage
             .from(bucket)
-            .upload(path: path, file: jpeg, options: FileOptions(contentType: "image/jpeg", upsert: false))
+            .upload(path, data: jpeg, options: FileOptions(contentType: "image/jpeg", upsert: false))
         return path
     }
 
@@ -135,7 +135,7 @@ final class MeetupPhotoService {
         let path = "\(meetupId.uuidString)/\(UUID().uuidString).jpg"
         try await supabase.storage
             .from(bucket)
-            .upload(path: path, file: imageData, options: FileOptions(contentType: "image/jpeg", upsert: false))
+            .upload(path, data: imageData, options: FileOptions(contentType: "image/jpeg", upsert: false))
         return try await supabase.storage
             .from(bucket)
             .createSignedURL(path: path, expiresIn: signedURLExpiry)

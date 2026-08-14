@@ -48,7 +48,7 @@ final class LatePunishmentService {
         let path = "\(meetupId.uuidString)/late-punishment-\(UUID().uuidString).jpg"
         try await supabase.storage
             .from(bucket)
-            .upload(path: path, file: jpeg, options: FileOptions(contentType: "image/jpeg", upsert: false))
+            .upload(path, data: jpeg, options: FileOptions(contentType: "image/jpeg", upsert: false))
 
         struct ProofInsert: Encodable {
             let meetupId: UUID

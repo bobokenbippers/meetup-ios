@@ -154,7 +154,7 @@ final class BillService {
         let path = "\(receiptId.uuidString)/photo.jpg"
         try await supabase.storage
             .from(receiptPhotoBucket)
-            .upload(path: path, file: imageData, options: FileOptions(contentType: "image/jpeg", upsert: true))
+            .upload(path, data: imageData, options: FileOptions(contentType: "image/jpeg", upsert: true))
         return path
     }
 
