@@ -4,7 +4,7 @@ import CoreLocation
 /// normalized into the shape the app needs to render a suggestion card and pre-fill
 /// the create-meetup flow. This is intentionally source-agnostic — the backing
 /// `EventSource` maps its own JSON into this type.
-struct NearbyEvent: Identifiable {
+struct NearbyEvent: Identifiable, Sendable {
     let id: String
     let name: String
     let startDate: Date?

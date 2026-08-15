@@ -1,5 +1,6 @@
 import Foundation
 import CoreLocation
+import Supabase
 
 // MARK: - Source abstraction
 
@@ -42,7 +43,13 @@ final class EventSuggestionsService {
     private let source: EventSource
     private let timeoutSeconds: Double
 
-    init(source: EventSource = TicketmasterEventSource(), timeoutSeconds: Double = 8) {
+    init(
+        source: EventSource = CompositeEventSource(sources: [
+            TicketmasterEventSource(),
+            SupabaseCachedEventSource(),
+        ]),
+        timeoutSeconds: Double = 8
+    ) {
         self.source = source
         self.timeoutSeconds = timeoutSeconds
     }
@@ -179,6 +186,92 @@ final class EventSuggestionsService {
         let lng = (longitude * 100).rounded() / 100
         let category = classificationName?.replacingOccurrences(of: " ", with: "-") ?? "all"
         return "eventSuggestions.\(lat).\(lng).\(radiusMiles).\(category)"
+    }
+}
+
+// MARK: - Composite source
+
+/// Merges official live search with the server-side cached feed. Individual
+/// provider failures are non-fatal as long as another provider returns events.
+struct CompositeEventSource: EventSource {
+    let sourceName: String
+    private let sources: [any EventSource]
+
+    init(sources: [any EventSource]) {
+        self.sources = sources
+        sourceName = sources.map { $0.sourceName }.joined(separator: " + ")
+    }
+
+    func fetchNearbyEvents(
+        latitude: Double,
+        longitude: Double,
+        radiusMiles: Int,
+        classificationName: String?
+    ) async throws -> [NearbyEvent] {
+        try await withThrowingTaskGroup(of: [NearbyEvent].self) { group in
+            for source in sources {
+                group.addTask {
+                    do {
+                        return try await source.fetchNearbyEvents(
+                            latitude: latitude,
+                            longitude: longitude,
+                            radiusMiles: radiusMiles,
+                            classificationName: classificationName
+                        )
+                    } catch is CancellationError {
+                        throw CancellationError()
+                    } catch {
+                        return []
+                    }
+                }
+            }
+
+            var merged: [NearbyEvent] = []
+
+            for try await events in group {
+                merged.append(contentsOf: events)
+            }
+
+            return merged
+        }
+    }
+}
+
+// MARK: - Supabase cached events
+
+/// Reads normalized events populated by the scheduled backend ingest job. This
+/// source is intentionally read-only in the app; ingestion uses service-role
+/// credentials outside the client.
+struct SupabaseCachedEventSource: EventSource {
+    let sourceName = "Cached events"
+    private var supabase: SupabaseClient { SupabaseManager.shared.client }
+
+    func fetchNearbyEvents(
+        latitude: Double,
+        longitude: Double,
+        radiusMiles: Int,
+        classificationName: String?
+    ) async throws -> [NearbyEvent] {
+        struct Params: Encodable {
+            let p_lat: Double
+            let p_lng: Double
+            let p_radius_miles: Int
+            let p_category: String?
+            let p_limit: Int
+        }
+
+        let rows: [CachedEventRow] = try await supabase
+            .rpc("search_cached_events", params: Params(
+                p_lat: latitude,
+                p_lng: longitude,
+                p_radius_miles: radiusMiles,
+                p_category: classificationName,
+                p_limit: 20
+            ))
+            .execute()
+            .value
+
+        return rows.map(\.nearbyEvent)
     }
 }
 
@@ -424,6 +517,42 @@ private struct TMLocation: Decodable {
             return String(double)
         }
         return nil
+    }
+}
+
+private struct CachedEventRow: Decodable {
+    let sourceName: String
+    let sourceEventId: String
+    let title: String
+    let venueName: String?
+    let address: String?
+    let lat: Double
+    let lng: Double
+    let startsAt: Date?
+    let sourceUrl: String
+
+    enum CodingKeys: String, CodingKey {
+        case sourceName = "source_name"
+        case sourceEventId = "source_event_id"
+        case title
+        case venueName = "venue_name"
+        case address
+        case lat
+        case lng
+        case startsAt = "starts_at"
+        case sourceUrl = "source_url"
+    }
+
+    var nearbyEvent: NearbyEvent {
+        NearbyEvent(
+            id: "\(sourceName):\(sourceEventId)",
+            name: title,
+            startDate: startsAt,
+            venueName: venueName,
+            address: address,
+            coordinate: CLLocationCoordinate2D(latitude: lat, longitude: lng),
+            url: sourceUrl
+        )
     }
 }
 
