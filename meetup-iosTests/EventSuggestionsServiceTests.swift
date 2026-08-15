@@ -67,6 +67,42 @@ struct EventSuggestionsServiceTests {
         }
     }
 
+    @Test("Composite source merges healthy providers and ignores provider failures")
+    func compositeSourceMergesHealthyProviders() async throws {
+        let ticketmasterEvent = NearbyEvent(
+            id: "tm-1",
+            name: "Rooftop Set",
+            startDate: nil,
+            venueName: "Elsewhere",
+            address: nil,
+            coordinate: nil,
+            url: nil
+        )
+        let cachedEvent = NearbyEvent(
+            id: "cached-1",
+            name: "Gallery Night",
+            startDate: nil,
+            venueName: "Chelsea",
+            address: nil,
+            coordinate: nil,
+            url: nil
+        )
+        let source = CompositeEventSource(sources: [
+            StaticEventSource(name: "Ticketmaster", events: [ticketmasterEvent]),
+            FailingEventSource(),
+            StaticEventSource(name: "Cached", events: [cachedEvent]),
+        ])
+
+        let events = try await source.fetchNearbyEvents(
+            latitude: 40.744,
+            longitude: -74.032,
+            radiusMiles: 5,
+            classificationName: nil
+        )
+
+        #expect(Set(events.map(\.id)) == Set(["tm-1", "cached-1"]))
+    }
+
     @Test("Duplicate suggestions collapse to one card, keeping the soonest date")
     func dedupeCollapsesRepeatsAndRuns() throws {
         let mar1 = ISO8601DateFormatter().date(from: "2026-03-01T20:00:00Z")
@@ -101,5 +137,37 @@ private struct HangingEventSource: EventSource {
     ) async throws -> [NearbyEvent] {
         try await Task.sleep(for: .seconds(10))
         return []
+    }
+}
+
+private struct StaticEventSource: EventSource {
+    let sourceName: String
+    let events: [NearbyEvent]
+
+    init(name: String, events: [NearbyEvent]) {
+        sourceName = name
+        self.events = events
+    }
+
+    func fetchNearbyEvents(
+        latitude: Double,
+        longitude: Double,
+        radiusMiles: Int,
+        classificationName: String?
+    ) async throws -> [NearbyEvent] {
+        events
+    }
+}
+
+private struct FailingEventSource: EventSource {
+    let sourceName = "Failing"
+
+    func fetchNearbyEvents(
+        latitude: Double,
+        longitude: Double,
+        radiusMiles: Int,
+        classificationName: String?
+    ) async throws -> [NearbyEvent] {
+        throw EventSourceError.badResponse
     }
 }

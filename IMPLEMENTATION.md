@@ -2407,6 +2407,76 @@ create policy "users can update their own settings"
 
 The iOS client upserts on `user_id` (`UserSettingsService.save`). `location_sharing_enabled` is mirrored into `UserDefaults` so `MeetupDashboardView` / `LocationManager` can gate live tracking synchronously. The `event_cancelled_enabled` flag is the gate the `feature/cancel-event-push-notifications` branch should read before sending a cancel push (the push backend should `select` this column for the recipient and skip if false).
 
+### M9.1.1 Cached Event Suggestions
+
+Server-side event ingestion normalizes provider data into `public.cached_events`.
+The iOS app reads this table through `search_cached_events` and merges those
+results with live Ticketmaster Discovery API results. Cached events are read-only
+from the client; scheduled ingestion writes with the Supabase service-role key.
+
+```sql
+create table public.cached_events (
+  id              uuid primary key default gen_random_uuid(),
+  source_name     text not null,
+  source_event_id text not null,
+  title           text not null,
+  venue_name      text,
+  address         text,
+  lat             double precision not null,
+  lng             double precision not null,
+  starts_at       timestamptz,
+  source_url      text not null,
+  image_url       text,
+  category        text,
+  last_seen_at    timestamptz not null default now(),
+  created_at      timestamptz not null default now(),
+  updated_at      timestamptz not null default now(),
+  unique (source_name, source_event_id)
+);
+
+alter table public.cached_events enable row level security;
+
+create policy "authenticated users read cached events"
+  on public.cached_events for select
+  to authenticated
+  using (true);
+
+create policy "service role manages cached events"
+  on public.cached_events for all
+  to service_role
+  using (true)
+  with check (true);
+```
+
+RPC:
+
+```sql
+public.search_cached_events(
+  p_lat double precision,
+  p_lng double precision,
+  p_radius_miles integer default 5,
+  p_category text default null,
+  p_limit integer default 20
+)
+```
+
+Ingestion:
+
+- Workflow: `.github/workflows/ingest-cached-events.yml`
+- Script: `scripts/ingest_cached_events.py`
+- Schedule: hourly at minute 17
+- Required GitHub secrets: `TICKETMASTER_API_KEY`, `SUPABASE_SERVICE_ROLE_KEY`
+- Current provider: Ticketmaster Discovery API around NYC search points
+- Future provider slot: AllEvents/Parse.bot can append normalized rows to the
+  same `cached_events` upsert path.
+
+Client behavior:
+
+- `EventSuggestionsService` uses `CompositeEventSource`.
+- Ticketmaster remains provider #1.
+- `SupabaseCachedEventSource` reads cached events as provider #2.
+- Provider failures are non-fatal when another provider returns events.
+
 ### M9.2 Account deactivation (soft delete)
 
 `profiles` gains a `deactivated_at` column plus a `security definer` RPC so a user can deactivate their own account without exposing service-role keys. Run:
