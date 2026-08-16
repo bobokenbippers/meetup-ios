@@ -33,6 +33,78 @@ enum EventSourceError: LocalizedError, Equatable {
     }
 }
 
+private final class TimeoutRace<T: Sendable>: @unchecked Sendable {
+    private let lock = NSLock()
+    private var continuation: CheckedContinuation<T, Error>?
+    private var operationTask: Task<Void, Never>?
+    private var timeoutTask: Task<Void, Never>?
+    private var didResume = false
+
+    func start(
+        continuation: CheckedContinuation<T, Error>,
+        seconds: Double,
+        operation: @escaping @Sendable () async throws -> T
+    ) {
+        lock.lock()
+        self.continuation = continuation
+        lock.unlock()
+
+        let operationTask = Task { [weak self] in
+            do {
+                let value = try await operation()
+                self?.resume(.success(value))
+            } catch {
+                self?.resume(.failure(error))
+            }
+        }
+        let timeoutTask = Task { [weak self] in
+            do {
+                let milliseconds = max(1, Int(seconds * 1_000))
+                try await Task.sleep(for: .milliseconds(milliseconds))
+                self?.resume(.failure(EventSourceError.timedOut))
+            } catch is CancellationError {
+                return
+            } catch {
+                self?.resume(.failure(error))
+            }
+        }
+
+        lock.lock()
+        self.operationTask = operationTask
+        self.timeoutTask = timeoutTask
+        lock.unlock()
+    }
+
+    func cancel() {
+        resume(.failure(CancellationError()))
+    }
+
+    private func resume(_ result: Result<T, Error>) {
+        lock.lock()
+        guard !didResume, let continuation else {
+            lock.unlock()
+            return
+        }
+        didResume = true
+        self.continuation = nil
+        let operationTask = operationTask
+        let timeoutTask = timeoutTask
+        self.operationTask = nil
+        self.timeoutTask = nil
+        lock.unlock()
+
+        operationTask?.cancel()
+        timeoutTask?.cancel()
+
+        switch result {
+        case .success(let value):
+            continuation.resume(returning: value)
+        case .failure(let error):
+            continuation.resume(throwing: error)
+        }
+    }
+}
+
 // MARK: - Service (singleton facade)
 
 /// App-facing entry point for event suggestions. Holds the active `EventSource`
@@ -62,32 +134,53 @@ final class EventSuggestionsService {
         radiusMiles: Int = 25,
         classificationName: String? = nil
     ) async throws -> [NearbyEvent] {
-        try await withThrowingTaskGroup(of: [NearbyEvent].self) { group in
-            group.addTask { [self] in
-                try await source.fetchNearbyEvents(
-                    latitude: latitude,
-                    longitude: longitude,
-                    radiusMiles: radiusMiles,
-                    classificationName: classificationName
-                )
-            }
-            group.addTask { [self] in
-                let milliseconds = max(1, Int(timeoutSeconds * 1_000))
-                try await Task.sleep(for: .milliseconds(milliseconds))
-                throw EventSourceError.timedOut
-            }
-
-            guard let result = try await group.next() else { throw EventSourceError.badResponse }
-            group.cancelAll()
-            let deduped = Self.dedupe(result)
-            cache(
-                deduped,
+        let result = try await Self.withTimeout(seconds: timeoutSeconds) { [source] in
+            try await source.fetchNearbyEvents(
                 latitude: latitude,
                 longitude: longitude,
                 radiusMiles: radiusMiles,
                 classificationName: classificationName
             )
-            return deduped
+        }
+        let deduped = Self.dedupe(result)
+        cache(
+            deduped,
+            latitude: latitude,
+            longitude: longitude,
+            radiusMiles: radiusMiles,
+            classificationName: classificationName
+        )
+        return deduped
+    }
+
+    static func withTimeout<T: Sendable>(
+        seconds: Double,
+        operation: @escaping @Sendable () async throws -> T
+    ) async throws -> T {
+        let race = TimeoutRace<T>()
+        return try await withTaskCancellationHandler {
+            try await withCheckedThrowingContinuation { continuation in
+                race.start(
+                    continuation: continuation,
+                    seconds: seconds,
+                    operation: operation
+                )
+            }
+        } onCancel: {
+            race.cancel()
+        }
+    }
+
+    static func bestEffortWithTimeout<T: Sendable>(
+        seconds: Double,
+        operation: @escaping @Sendable () async throws -> T
+    ) async -> T? {
+        do {
+            return try await withTimeout(seconds: seconds, operation: operation)
+        } catch is CancellationError {
+            return nil
+        } catch {
+            return nil
         }
     }
 
@@ -196,9 +289,11 @@ final class EventSuggestionsService {
 struct CompositeEventSource: EventSource {
     let sourceName: String
     private let sources: [any EventSource]
+    private let providerTimeoutSeconds: Double
 
-    init(sources: [any EventSource]) {
+    init(sources: [any EventSource], providerTimeoutSeconds: Double = 4) {
         self.sources = sources
+        self.providerTimeoutSeconds = providerTimeoutSeconds
         sourceName = sources.map { $0.sourceName }.joined(separator: " + ")
     }
 
@@ -210,19 +305,22 @@ struct CompositeEventSource: EventSource {
     ) async throws -> [NearbyEvent] {
         try await withThrowingTaskGroup(of: [NearbyEvent].self) { group in
             for source in sources {
+                let providerTimeoutSeconds = providerTimeoutSeconds
                 group.addTask {
-                    do {
-                        return try await source.fetchNearbyEvents(
-                            latitude: latitude,
-                            longitude: longitude,
-                            radiusMiles: radiusMiles,
-                            classificationName: classificationName
-                        )
-                    } catch is CancellationError {
-                        throw CancellationError()
-                    } catch {
+                    guard let events = await EventSuggestionsService.bestEffortWithTimeout(
+                        seconds: providerTimeoutSeconds,
+                        operation: {
+                            try await source.fetchNearbyEvents(
+                                latitude: latitude,
+                                longitude: longitude,
+                                radiusMiles: radiusMiles,
+                                classificationName: classificationName
+                            )
+                        }
+                    ) else {
                         return []
                     }
+                    return events
                 }
             }
 

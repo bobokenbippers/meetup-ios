@@ -55,7 +55,7 @@ struct EventSuggestionsServiceTests {
 
     @Test("Event suggestions time out instead of loading forever")
     func eventFetchTimesOut() async throws {
-        let service = EventSuggestionsService(source: HangingEventSource(), timeoutSeconds: 0.01)
+        let service = EventSuggestionsService(source: NonCooperativeHangingEventSource(), timeoutSeconds: 0.01)
 
         do {
             _ = try await service.nearbyEvents(latitude: 40.744, longitude: -74.032)
@@ -65,6 +65,35 @@ struct EventSuggestionsServiceTests {
         } catch {
             Issue.record("Expected EventSourceError.timedOut, got \(error)")
         }
+    }
+
+    @Test("Composite source returns healthy provider when another provider hangs")
+    func compositeSourceIgnoresHangingProvider() async throws {
+        let cachedEvent = NearbyEvent(
+            id: "cached-1",
+            name: "Gallery Night",
+            startDate: nil,
+            venueName: "Chelsea",
+            address: nil,
+            coordinate: nil,
+            url: nil
+        )
+        let source = CompositeEventSource(
+            sources: [
+                NonCooperativeHangingEventSource(),
+                StaticEventSource(name: "Cached", events: [cachedEvent]),
+            ],
+            providerTimeoutSeconds: 0.01
+        )
+
+        let events = try await source.fetchNearbyEvents(
+            latitude: 40.744,
+            longitude: -74.032,
+            radiusMiles: 5,
+            classificationName: nil
+        )
+
+        #expect(events.map(\.id) == ["cached-1"])
     }
 
     @Test("Composite source merges healthy providers and ignores provider failures")
@@ -126,7 +155,7 @@ struct EventSuggestionsServiceTests {
     }
 }
 
-private struct HangingEventSource: EventSource {
+private struct NonCooperativeHangingEventSource: EventSource {
     let sourceName = "Hanging"
 
     func fetchNearbyEvents(
@@ -135,8 +164,7 @@ private struct HangingEventSource: EventSource {
         radiusMiles: Int,
         classificationName: String?
     ) async throws -> [NearbyEvent] {
-        try await Task.sleep(for: .seconds(10))
-        return []
+        try await withCheckedThrowingContinuation { (_: CheckedContinuation<[NearbyEvent], Error>) in }
     }
 }
 
