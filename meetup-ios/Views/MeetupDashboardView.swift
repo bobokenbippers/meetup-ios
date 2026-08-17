@@ -22,6 +22,7 @@ struct MeetupDashboardView: View {
     @State private var error: String?
     @State private var showCancelConfirm = false
     @State private var showBill = false
+    @State private var showComments = false
     @State private var showConfetti = false
     @State private var shareInvite: ShareInvite?
     @State private var isGeneratingShareLink = false
@@ -194,6 +195,10 @@ struct MeetupDashboardView: View {
                 BillView(meetup: meetup, participants: participants)
                     .environment(auth)
                     .environment(settings)
+            }
+            .sheet(isPresented: $showComments) {
+                MeetupCommentsView(meetup: meetup)
+                    .environment(auth)
             }
             .sheet(isPresented: $showRecap, onDismiss: { dismiss() }) {
                 RecapView(meetup: meetup).environment(auth)
@@ -527,6 +532,19 @@ struct MeetupDashboardView: View {
                             .allowsTightening(true)
                     } icon: {
                         Image(systemName: "map.fill")
+                    }
+                    .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.glass)
+
+                Button { showComments = true } label: {
+                    Label {
+                        Text("Comments")
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.5)
+                            .allowsTightening(true)
+                    } icon: {
+                        Image(systemName: "text.bubble.fill")
                     }
                     .frame(maxWidth: .infinity)
                 }

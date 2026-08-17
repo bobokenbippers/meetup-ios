@@ -2604,6 +2604,36 @@ iOS:
 - `MeetupDashboardView` keeps a realtime subscription on `meetup_photos` so new photos
   appear live; the strip shows the first 6 with a `+N` overflow tile into the pager.
 
+### M9.5.1 Meetup comments
+
+Meetup participants can post a lightweight text thread from the dashboard's Comments
+button. Canonical migration: `supabase/migrations/20260817010000_meetup_comments.sql`.
+
+Schema:
+
+- `meetup_comments (id, meetup_id, author_user_id, body, created_at)`: one row per
+  text comment, capped at 1000 characters and rejected when blank after trimming.
+- `list_meetup_comments(p_meetup_id)`: SECURITY DEFINER RPC that returns comments
+  joined with the author's `display_name` and `avatar_url`, ordered oldest to newest.
+
+RLS:
+
+- SELECT: meetup host or any participant of that meetup.
+- INSERT: same visibility rule, and `author_user_id` must be `auth.uid()`.
+- DELETE: comment author only.
+
+Realtime:
+
+- `meetup_comments` is added to `supabase_realtime`; `MeetupCommentsView` subscribes
+  to table changes and also does a 20-second fallback refresh like direct messages.
+
+iOS:
+
+- `MeetupCommentService` owns the Supabase RPC/list, insert, and author-only delete.
+- `MeetupCommentsView` presents a dedicated comment sheet with avatar rows, timestamped
+  bubbles, realtime updates, pull-safe reload behavior, and a compact composer.
+- `MeetupDashboardView` adds a Comments action next to Directions and Split Bill.
+
 ### M9.6 Truth or Dare game
 
 Squad members in a meetup play Truth or Dare together with a synced virtual coin flip,
