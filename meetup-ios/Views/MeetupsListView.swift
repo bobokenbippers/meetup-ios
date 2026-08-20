@@ -223,6 +223,14 @@ struct MeetupsListView: View {
         )
     }
 
+    private var featuredActive: MyParticipation? {
+        active.first
+    }
+
+    private var remainingActive: [MyParticipation] {
+        Array(active.dropFirst())
+    }
+
     private var past: [MyParticipation] {
         MeetupListFilters.past(
             participations,
@@ -339,6 +347,17 @@ struct MeetupsListView: View {
                 .listRowSeparator(.hidden)
                 .listRowInsets(EdgeInsets(top: 0, leading: 0, bottom: 8, trailing: 0))
 
+            if let featuredActive {
+                Button { presentedSheet = .meetup(featuredActive.meetup) } label: {
+                    ActiveNowHeroCard(participation: featuredActive)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Open active meetup at \(featuredActive.meetup.destinationName)")
+                .listRowBackground(Color.clear)
+                .listRowSeparator(.hidden)
+                .listRowInsets(EdgeInsets(top: 2, leading: 16, bottom: 10, trailing: 16))
+            }
+
             if !invited.isEmpty {
                 Section {
                     ForEach(invited, id: \.meetup.id) { p in
@@ -368,9 +387,9 @@ struct MeetupsListView: View {
                 .listSectionSeparator(.hidden)
             }
 
-            if !active.isEmpty {
+            if !remainingActive.isEmpty {
                 Section {
-                    ForEach(active, id: \.meetup.id) { p in
+                    ForEach(remainingActive, id: \.meetup.id) { p in
                         Button { presentedSheet = .meetup(p.meetup) } label: {
                             MeetupRowCard(participation: p)
                         }
@@ -380,7 +399,7 @@ struct MeetupsListView: View {
                         .listRowSeparator(.hidden)
                         .listRowInsets(EdgeInsets(top: 5, leading: 16, bottom: 5, trailing: 16))
                     }
-                    .onDelete { indices in Task { await deleteParticipations(active, at: indices) } }
+                    .onDelete { indices in Task { await deleteParticipations(remainingActive, at: indices) } }
                 } header: {
                     sectionHeader("Active")
                 }
@@ -700,6 +719,83 @@ private struct RecapFolderCard: View {
             RoundedRectangle(cornerRadius: 18)
                 .strokeBorder(Color(white: 0.15), lineWidth: 1)
         )
+    }
+}
+
+private struct ActiveNowHeroCard: View {
+    let participation: MyParticipation
+
+    private var meetup: Meetup { participation.meetup }
+
+    private var timeText: String {
+        let date = meetup.targetArrivalAt ?? meetup.startsAt
+        return date.formatted(.dateTime.weekday(.wide).hour().minute())
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(alignment: .top, spacing: 12) {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("ACTIVE NOW")
+                        .scaledFont(size: 10, weight: .black)
+                        .foregroundStyle(Color.white.opacity(0.72))
+                    Text(meetup.destinationName)
+                        .scaledFont(size: 24, weight: .black)
+                        .foregroundStyle(.white)
+                        .lineLimit(2)
+                    if let address = meetup.destinationAddress, !address.isEmpty {
+                        Text(address)
+                            .scaledFont(size: 12, weight: .medium)
+                            .foregroundStyle(Color.white.opacity(0.82))
+                            .lineLimit(2)
+                    }
+                }
+
+                Spacer(minLength: 0)
+
+                Text(meetupCategoryEmoji(meetup.category))
+                    .scaledFont(size: 34)
+                    .padding(12)
+                    .background(Color.white.opacity(0.14))
+                    .clipShape(RoundedRectangle(cornerRadius: 18))
+            }
+
+            HStack(spacing: 8) {
+                Label(timeText, systemImage: "clock.fill")
+                Label("Tap into the live squad map", systemImage: "person.3.fill")
+            }
+            .scaledFont(size: 11, weight: .bold)
+            .foregroundStyle(Color.white.opacity(0.9))
+
+            HStack(spacing: 10) {
+                MeetupStatusPill(participation: participation)
+                    .padding(.trailing, 2)
+
+                Spacer(minLength: 0)
+
+                Image(systemName: "arrow.up.right.circle.fill")
+                    .scaledFont(size: 24, weight: .semibold)
+                    .foregroundStyle(.white.opacity(0.95))
+            }
+        }
+        .padding(18)
+        .background(
+            LinearGradient(
+                colors: [
+                    Color.coral,
+                    Color(red: 0.980, green: 0.486, blue: 0.380),
+                    Color(red: 0.941, green: 0.333, blue: 0.412)
+                ],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+        )
+        .clipShape(RoundedRectangle(cornerRadius: 24))
+        .overlay(
+            RoundedRectangle(cornerRadius: 24)
+                .strokeBorder(Color.white.opacity(0.16), lineWidth: 1)
+        )
+        .shadow(color: Color.coral.opacity(0.28), radius: 18, y: 10)
     }
 }
 

@@ -31,6 +31,7 @@ struct MeetupDashboardView: View {
     @State private var showStopSharingConfirm = false
     @State private var isStartingSharing = false
     @State private var isStoppingSharing = false
+    @State private var isDrawerExpanded = false
 
     // Photo state
     @State private var recentPhotos: [MeetupPhoto] = []
@@ -94,50 +95,80 @@ struct MeetupDashboardView: View {
         }
     }
 
+    private var activeParticipants: [MeetupParticipant] {
+        participants.filter { $0.status != "no" && $0.status != "declined" }
+    }
+
+    private var compactParticipantSummary: String {
+        let arrivedCount = activeParticipants.filter { $0.status == "arrived" }.count
+        let liveCount = activeParticipants.filter(\.hasLiveETA).count
+        if arrivedCount > 0 {
+            return "\(arrivedCount) arrived" + (liveCount > 0 ? " • \(liveCount) sharing live ETA" : "")
+        }
+        if liveCount > 0 {
+            return "\(liveCount) sharing live ETA"
+        }
+        return "\(activeParticipants.count) in the squad"
+    }
+
     var body: some View {
         NavigationStack {
-            VStack(spacing: 0) {
-                // Header
-                dashboardHeader
-                    .padding(.horizontal, 20)
-                    .padding(.top, 8)
-                    .padding(.bottom, 10)
+            ZStack(alignment: .bottom) {
+                VStack(spacing: 0) {
+                    dashboardHeader
+                        .padding(.horizontal, 20)
+                        .padding(.top, 8)
+                        .padding(.bottom, 10)
 
-                // Destination card
-                destinationCard
-                    .padding(.horizontal, 14)
-                    .padding(.bottom, 10)
+                    destinationCard
+                        .padding(.horizontal, 14)
+                        .padding(.bottom, 10)
 
-                // Map — full-bleed, fills remaining space
-                Map {
-                    Annotation("", coordinate: destinationCoord) {
-                        DestinationMarker()
-                    }
-                    if meetup.status == "active" && !meetup.isRecap {
-                        ForEach(participants) { p in
-                            if let lat = p.lat, let lng = p.lng {
-                                Annotation("", coordinate: CLLocationCoordinate2D(latitude: lat, longitude: lng)) {
-                                    DashboardParticipantPin(
-                                        participant: p,
-                                        isMe: p.userId == myUserId,
-                                        targetArrivalAt: meetup.targetArrivalAt
-                                    )
+                    ZStack(alignment: .bottom) {
+                        Map {
+                            Annotation("", coordinate: destinationCoord) {
+                                DestinationMarker()
+                            }
+                            if meetup.status == "active" && !meetup.isRecap {
+                                ForEach(participants) { p in
+                                    if let lat = p.lat, let lng = p.lng {
+                                        Annotation("", coordinate: CLLocationCoordinate2D(latitude: lat, longitude: lng)) {
+                                            DashboardParticipantPin(
+                                                participant: p,
+                                                isMe: p.userId == myUserId,
+                                                targetArrivalAt: meetup.targetArrivalAt
+                                            )
+                                        }
+                                    }
                                 }
                             }
                         }
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .clipShape(RoundedRectangle(cornerRadius: 28))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 28)
+                                .strokeBorder(Color.coral.opacity(0.18), lineWidth: 1)
+                        )
+                        .padding(.horizontal, 12)
+                        .padding(.bottom, 12)
+
+                        LinearGradient(
+                            colors: [.clear, Color.black.opacity(0.22)],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
+                        .clipShape(RoundedRectangle(cornerRadius: 28))
+                        .padding(.horizontal, 12)
+                        .padding(.bottom, 12)
+                        .allowsHitTesting(false)
                     }
                 }
-                .frame(maxHeight: .infinity)
 
-                // Photo thumbnail strip (shown when photos exist)
-                if !recentPhotos.isEmpty {
-                    photoStrip
-                        .padding(.bottom, 0)
-                }
-
-                // Bottom panel
                 bottomPanel
+                    .padding(.horizontal, 12)
+                    .padding(.bottom, 8)
             }
+            .background(Color.appBackground)
             .navigationBarTitleDisplayMode(.inline)
             .navigationTitle("")
             .toolbarBackground(.hidden, for: .navigationBar)
@@ -421,20 +452,74 @@ struct MeetupDashboardView: View {
 
     private var bottomPanel: some View {
         VStack(spacing: 0) {
-            // Drag handle
-            RoundedRectangle(cornerRadius: 2)
-                .fill(Color(white: 0.30))
-                .frame(width: 32, height: 3)
-                .padding(.top, 10)
-                .padding(.bottom, 6)
+            Button {
+                withAnimation(.spring(response: 0.42, dampingFraction: 0.84)) {
+                    isDrawerExpanded.toggle()
+                }
+            } label: {
+                VStack(spacing: 10) {
+                    RoundedRectangle(cornerRadius: 2)
+                        .fill(Color(white: 0.30))
+                        .frame(width: 34, height: 4)
+                        .padding(.top, 10)
 
-            // "Everyone" label + host "Add People" button
+                    HStack(alignment: .center, spacing: 12) {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Everyone")
+                                .scaledFont(size: 14, weight: .bold)
+                                .foregroundStyle(DS.Color.textPrimary)
+                            Text(compactParticipantSummary)
+                                .scaledFont(size: 11, weight: .medium)
+                                .foregroundStyle(DS.Color.textSecondary)
+                                .lineLimit(1)
+                        }
+
+                        Spacer(minLength: 0)
+
+                        SquadAvatarStrip(
+                            participants: participants,
+                            currentUserId: myUserId,
+                            targetArrivalAt: meetup.targetArrivalAt
+                        )
+
+                        Image(systemName: isDrawerExpanded ? "chevron.down" : "chevron.up")
+                            .scaledFont(size: 12, weight: .bold)
+                            .foregroundStyle(DS.Color.textSecondary)
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.bottom, 12)
+                }
+            }
+            .buttonStyle(.plain)
+
+            if isDrawerExpanded {
+                expandedDrawerContent
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+            }
+        }
+        .background(Color.appSurface)
+        .clipShape(RoundedRectangle(cornerRadius: 24))
+        .overlay(
+            RoundedRectangle(cornerRadius: 24)
+                .strokeBorder(Color.coral.opacity(0.20), lineWidth: 1)
+        )
+        .shadow(color: Color.coral.opacity(0.12), radius: 18, y: 8)
+        .animation(.spring(response: 0.45, dampingFraction: 0.75), value: myStatus)
+        .animation(.spring(response: 0.45, dampingFraction: 0.82), value: isDrawerExpanded)
+    }
+
+    @ViewBuilder
+    private var expandedDrawerContent: some View {
+        VStack(spacing: 0) {
+            if !recentPhotos.isEmpty {
+                photoStrip
+                    .clipShape(RoundedRectangle(cornerRadius: 16))
+                    .padding(.horizontal, 12)
+                    .padding(.bottom, 10)
+            }
+
             HStack {
-                Text("Everyone")
-                    .scaledFont(size: 13, weight: .bold)
-                    .foregroundStyle(DS.Color.textPrimary)
                 if myUserId == meetup.hostId {
-                    Spacer()
                     Button {
                         showAddParticipants = true
                     } label: {
@@ -443,12 +528,12 @@ struct MeetupDashboardView: View {
                             .foregroundStyle(Color.coral)
                     }
                 }
+
+                Spacer()
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.horizontal, 16)
             .padding(.bottom, 6)
 
-            // Punctuality color legend
             PunctualityLegend(showsRunningLate: meetup.targetArrivalAt != nil)
                 .padding(.horizontal, 16)
                 .padding(.bottom, 8)
@@ -471,11 +556,10 @@ struct MeetupDashboardView: View {
                         Task { await toggleLateProofReaction(proof: proof, emoji: emoji) }
                     }
                 )
-                    .padding(.horizontal, 16)
-                    .padding(.bottom, 8)
+                .padding(.horizontal, 16)
+                .padding(.bottom, 8)
             }
 
-            // Participant rows
             if hasLoaded {
                 VStack(spacing: 0) {
                     ForEach(Array(participants.enumerated()), id: \.element.id) { idx, p in
@@ -500,7 +584,6 @@ struct MeetupDashboardView: View {
                 ProgressView().padding()
             }
 
-            // RSVP buttons for invited participants
             if myStatus == "invited" {
                 GlassEffectContainer(spacing: 8) {
                     HStack(spacing: 8) {
@@ -517,10 +600,8 @@ struct MeetupDashboardView: View {
                 }
                 .padding(.horizontal, 16)
                 .padding(.bottom, 8)
-                .transition(.scale(scale: 0.9, anchor: .top).combined(with: .opacity))
             }
 
-            // Action buttons
             HStack(spacing: 8) {
                 Button {
                     openDirections()
@@ -607,13 +688,12 @@ struct MeetupDashboardView: View {
                         "Live ETA updates continue in the background for this active meetup until " +
                             "you stop sharing or the meetup expires. This may use battery."
                     )
-                        .scaledFont(size: 11)
-                        .foregroundStyle(DS.Color.textSecondary)
-                        .fixedSize(horizontal: false, vertical: true)
+                    .scaledFont(size: 11)
+                    .foregroundStyle(DS.Color.textSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
                 }
                 .padding(.horizontal, 16)
                 .padding(.bottom, 8)
-                .transition(.scale(scale: 0.95, anchor: .top).combined(with: .opacity))
             } else if isSharingThisMeetup {
                 Button {
                     showStopSharingConfirm = true
@@ -644,21 +724,12 @@ struct MeetupDashboardView: View {
                 .disabled(isStoppingSharing)
                 .padding(.horizontal, 16)
                 .padding(.bottom, 8)
-                .transition(.scale(scale: 0.95, anchor: .top).combined(with: .opacity))
                 .accessibilityLabel("Stop sharing your location")
                 .accessibilityIdentifier("btn_stop_sharing")
             } else {
                 Color.clear.frame(height: 8)
             }
         }
-        .background(Color.appSurface)
-        .clipShape(UnevenRoundedRectangle(cornerRadii: .init(topLeading: 22, topTrailing: 22)))
-        .overlay(
-            UnevenRoundedRectangle(cornerRadii: .init(topLeading: 22, topTrailing: 22))
-                .strokeBorder(Color.coral.opacity(0.20), lineWidth: 1)
-        )
-        .shadow(color: Color.coral.opacity(0.08), radius: 16, y: -4)
-        .animation(.spring(response: 0.45, dampingFraction: 0.75), value: myStatus)
     }
 
     // MARK: - Logic
@@ -1346,6 +1417,103 @@ private struct DestinationMarker: View {
 
 // MARK: - Participant Pin (on map)
 
+private func participantPresenceStyle(
+    for participant: MeetupParticipant,
+    isMe: Bool,
+    targetArrivalAt: Date?
+) -> AvatarPresenceStyle {
+    let punctuality = PunctualityStatus.resolve(
+        status: participant.status,
+        hasLiveETA: participant.hasLiveETA,
+        targetArrivalAt: targetArrivalAt
+    )
+
+    switch punctuality {
+    case .arrived:
+        return AvatarPresenceStyle(
+            ringColor: .statusLive,
+            ringWidth: isMe ? 3 : 2.5,
+            glowColor: .statusLive,
+            glowRadius: 8,
+            badge: .arrived,
+            overlayLabel: nil
+        )
+    case .enRoute:
+        return AvatarPresenceStyle(
+            ringColor: isMe ? .coral : .statusEnRoute,
+            ringWidth: isMe ? 3 : 2.5,
+            glowColor: .statusEnRoute,
+            glowRadius: 10,
+            badge: .live
+        )
+    case .runningLate:
+        return AvatarPresenceStyle(
+            ringColor: .statusRunningLate,
+            ringWidth: isMe ? 3 : 2.5,
+            glowColor: .statusRunningLate,
+            glowRadius: 9,
+            badge: .late
+        )
+    case .invited:
+        return AvatarPresenceStyle(
+            ringColor: Color.statusInvited.opacity(0.45),
+            ringWidth: 1.5,
+            badge: .invited
+        )
+    case .going:
+        return AvatarPresenceStyle(
+            ringColor: .statusGoing,
+            ringWidth: isMe ? 3 : 2
+        )
+    case .declined, .maybe:
+        return AvatarPresenceStyle()
+    }
+}
+
+private struct SquadAvatarStrip: View {
+    let participants: [MeetupParticipant]
+    let currentUserId: UUID?
+    let targetArrivalAt: Date?
+
+    private var visibleParticipants: [MeetupParticipant] {
+        Array(participants.prefix(4))
+    }
+
+    var body: some View {
+        HStack(spacing: -8) {
+            ForEach(visibleParticipants) { participant in
+                ProfileAvatarView(
+                    displayName: participant.displayName,
+                    avatarUrl: participant.avatarUrl,
+                    userId: participant.userId,
+                    size: 28,
+                    fontSize: 11,
+                    presenceStyle: participantPresenceStyle(
+                        for: participant,
+                        isMe: participant.userId == currentUserId,
+                        targetArrivalAt: targetArrivalAt
+                    )
+                )
+                .background(
+                    Circle()
+                        .fill(Color.appSurface)
+                )
+            }
+
+            if participants.count > visibleParticipants.count {
+                Text("+\(participants.count - visibleParticipants.count)")
+                    .scaledFont(size: 10, weight: .bold)
+                    .foregroundStyle(DS.Color.textSecondary)
+                    .frame(width: 28, height: 28)
+                    .background(Color.appBackground)
+                    .clipShape(Circle())
+                    .overlay(Circle().strokeBorder(Color.coral.opacity(0.18), lineWidth: 1))
+                    .padding(.leading, 10)
+            }
+        }
+    }
+}
+
 struct DashboardParticipantPin: View {
     let participant: MeetupParticipant
     let isMe: Bool
@@ -1370,46 +1538,38 @@ struct DashboardParticipantPin: View {
     }
 
     var body: some View {
-        if isMe {
-            // Blue pulsing "You" dot
-            ZStack {
-                Circle()
-                    .fill(Color(red: 0.118, green: 0.565, blue: 1.0).opacity(0.25))
-                    .frame(width: 20, height: 20)
-                Circle()
-                    .fill(Color(red: 0.118, green: 0.565, blue: 1.0))
-                    .frame(width: 12, height: 12)
-                    .overlay(Circle().strokeBorder(.white, lineWidth: 2))
-                    .shadow(color: Color(red: 0.118, green: 0.565, blue: 1.0).opacity(0.6), radius: 4)
-            }
-        } else {
-            HStack(spacing: 4) {
-                ProfileAvatarView(
-                    displayName: participant.displayName,
-                    avatarUrl: participant.avatarUrl,
-                    userId: participant.userId,
-                    size: 34,
-                    fontSize: 13
+        HStack(spacing: 6) {
+            ProfileAvatarView(
+                displayName: participant.displayName,
+                avatarUrl: participant.avatarUrl,
+                userId: participant.userId,
+                size: isMe ? 38 : 34,
+                fontSize: 13,
+                presenceStyle: participantPresenceStyle(
+                    for: participant,
+                    isMe: isMe,
+                    targetArrivalAt: targetArrivalAt
                 )
-                .overlay(Circle().strokeBorder(.white, lineWidth: 2.5))
-                    .shadow(radius: 3)
+            )
+            .overlay(Circle().strokeBorder(.white, lineWidth: isMe ? 3 : 2.5))
+            .shadow(radius: 4)
 
-                // Callout bubble
+            if !isMe || participant.hasLiveETA || participant.status == "arrived" {
                 VStack(alignment: .leading, spacing: 1) {
-                    Text(participant.displayName ?? "?")
+                    Text(isMe ? "You" : (participant.displayName ?? "?"))
                         .scaledFont(size: 10, weight: .bold)
                         .foregroundStyle(DS.Color.textPrimary)
                     Text(etaText)
                         .scaledFont(size: 9, weight: .semibold)
                         .foregroundStyle(etaColor)
                 }
-                .padding(.horizontal, 7)
-                .padding(.vertical, 5)
-                .background(Color.appSurface)
-                .clipShape(RoundedRectangle(cornerRadius: 10))
+                .padding(.horizontal, 8)
+                .padding(.vertical, 6)
+                .background(Color.appSurface.opacity(0.96))
+                .clipShape(RoundedRectangle(cornerRadius: 12))
                 .overlay(
-                    RoundedRectangle(cornerRadius: 10)
-                        .strokeBorder(Color(white: 0.20), lineWidth: 1)
+                    RoundedRectangle(cornerRadius: 12)
+                        .strokeBorder((isMe ? Color.coral : etaColor).opacity(0.22), lineWidth: 1)
                 )
             }
         }
@@ -1480,17 +1640,13 @@ private struct DashboardParticipantRow: View {
                 avatarUrl: participant.avatarUrl,
                 userId: participant.userId,
                 size: 30,
-                fontSize: 12
+                fontSize: 12,
+                presenceStyle: participantPresenceStyle(
+                    for: participant,
+                    isMe: isMe,
+                    targetArrivalAt: targetArrivalAt
+                )
             )
-            .overlay {
-                if participant.status == "arrived" {
-                    Circle()
-                        .fill(Color.black.opacity(0.35))
-                    Image(systemName: "checkmark")
-                        .scaledFont(size: 12, weight: .bold)
-                        .foregroundStyle(.white) // on black overlay
-                }
-            }
 
             VStack(alignment: .leading, spacing: 1) {
                 HStack(spacing: 4) {

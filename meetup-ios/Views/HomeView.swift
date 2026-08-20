@@ -27,6 +27,8 @@ struct HomeView: View {
                     nav.selectedTab = .meetups
                     nav.pendingMeetupId = meetup.id
                 }
+                .padding(.horizontal, 12)
+                .padding(.top, 4)
                 .transition(.move(edge: .top).combined(with: .opacity))
             }
         }
