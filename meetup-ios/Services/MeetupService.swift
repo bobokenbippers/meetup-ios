@@ -795,6 +795,24 @@ final class MeetupService {
             .execute()
     }
 
+    func nudgeParticipant(meetupId: UUID, userId: UUID) async throws {
+        guard supabase.auth.currentUser?.id != nil else { throw MeetupError.notSignedIn }
+
+        struct Params: Encodable {
+            let meetupId: UUID
+            let userId: UUID
+
+            enum CodingKeys: String, CodingKey {
+                case meetupId = "p_meetup_id"
+                case userId = "p_user_id"
+            }
+        }
+
+        try await supabase
+            .rpc("nudge_meetup_participant", params: Params(meetupId: meetupId, userId: userId))
+            .execute()
+    }
+
     /// Join a meetup via share link. The RPC validates the share token server-side,
     /// performs the insert/update with the right RLS context, and returns the meetup id.
     func joinByShareToken(_ token: String) async throws -> UUID {
