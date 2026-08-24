@@ -32,6 +32,7 @@ struct MeetupDashboardView: View {
     @State private var isStartingSharing = false
     @State private var isStoppingSharing = false
     @State private var isDrawerExpanded = false
+    @State private var nudgingParticipantIds: Set<UUID> = []
 
     // Photo state
     @State private var recentPhotos: [MeetupPhoto] = []
@@ -109,6 +110,10 @@ struct MeetupDashboardView: View {
             return "\(liveCount) sharing live ETA"
         }
         return "\(activeParticipants.count) in the squad"
+    }
+
+    private var isHost: Bool {
+        myUserId == meetup.hostId
     }
 
     var body: some View {
@@ -202,7 +207,7 @@ struct MeetupDashboardView: View {
                         .disabled(isGeneratingShareLink)
                     }
                 }
-                if myUserId == meetup.hostId {
+                if isHost {
                     ToolbarItem(placement: .destructiveAction) {
                         Button("Cancel", role: .destructive) { showCancelConfirm = true }
                     }
@@ -519,7 +524,7 @@ struct MeetupDashboardView: View {
             }
 
             HStack {
-                if myUserId == meetup.hostId {
+                if isHost {
                     Button {
                         showAddParticipants = true
                     } label: {
@@ -566,7 +571,12 @@ struct MeetupDashboardView: View {
                         DashboardParticipantRow(
                             participant: p,
                             isMe: p.userId == myUserId,
-                            targetArrivalAt: meetup.targetArrivalAt
+                            targetArrivalAt: meetup.targetArrivalAt,
+                            canNudge: isHost && p.status == "invited",
+                            isNudging: nudgingParticipantIds.contains(p.userId),
+                            onNudge: {
+                                Task { await nudgeParticipant(p) }
+                            }
                         )
                         .transition(.move(edge: .leading).combined(with: .opacity))
                         .animation(
@@ -924,6 +934,24 @@ struct MeetupDashboardView: View {
             self.error = error.localizedDescription
         }
         isActing = false
+    }
+
+    private func nudgeParticipant(_ participant: MeetupParticipant) async {
+        guard isHost, participant.status == "invited" else { return }
+        guard !nudgingParticipantIds.contains(participant.userId) else { return }
+
+        nudgingParticipantIds.insert(participant.userId)
+        defer { nudgingParticipantIds.remove(participant.userId) }
+
+        do {
+            try await MeetupService.shared.nudgeParticipant(meetupId: meetup.id, userId: participant.userId)
+            await load()
+        } catch is CancellationError {
+            return
+        } catch {
+            error = "Couldn't send a nudge right now. Please try again."
+            await load()
+        }
     }
 
     private func loadLatePunishmentVotes() async {
@@ -1582,6 +1610,9 @@ private struct DashboardParticipantRow: View {
     let participant: MeetupParticipant
     let isMe: Bool
     let targetArrivalAt: Date?
+    let canNudge: Bool
+    let isNudging: Bool
+    let onNudge: () -> Void
 
     private var punctualityStatus: PunctualityStatus {
         PunctualityStatus.resolve(
@@ -1670,13 +1701,42 @@ private struct DashboardParticipantRow: View {
                 }
             }
 
-            Spacer()
+            Spacer(minLength: 12)
 
-            PunctualityTile(
-                rawStatus: participant.status,
-                hasLiveETA: participant.hasLiveETA,
-                targetArrivalAt: targetArrivalAt
-            )
+            VStack(alignment: .trailing, spacing: 6) {
+                PunctualityTile(
+                    rawStatus: participant.status,
+                    hasLiveETA: participant.hasLiveETA,
+                    targetArrivalAt: targetArrivalAt
+                )
+
+                if canNudge {
+                    Button(action: onNudge) {
+                        HStack(spacing: 5) {
+                            if isNudging {
+                                ProgressView()
+                                    .scaleEffect(0.7)
+                            } else {
+                                Image(systemName: "bell.badge")
+                            }
+                            Text(isNudging ? "Nudging..." : "Nudge")
+                        }
+                        .scaledFont(size: 10, weight: .semibold)
+                        .foregroundStyle(Color.coral)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 6)
+                        .background(Color.coral.opacity(0.10))
+                        .clipShape(Capsule())
+                        .overlay {
+                            Capsule()
+                                .strokeBorder(Color.coral.opacity(0.22), lineWidth: 1)
+                        }
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(isNudging)
+                    .accessibilityLabel("Nudge \(participant.displayName ?? "participant")")
+                }
+            }
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 8)
