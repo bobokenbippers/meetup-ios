@@ -42,7 +42,7 @@ jobs:
         run: cp Secrets.example.xcconfig Secrets.xcconfig
 
       - name: Initialize CodeQL
-        uses: github/codeql-action/init@v4.37.7
+        uses: github/codeql-action/init@v4.37.8
         with:
           languages: swift
           build-mode: manual
@@ -60,7 +60,7 @@ jobs:
             | xcpretty
 
       - name: Perform CodeQL Analysis
-        uses: github/codeql-action/analyze@v4.37.7
+        uses: github/codeql-action/analyze@v4.37.8
 
   analyze-functions:
     name: Analyze Edge Functions
@@ -72,9 +72,9 @@ jobs:
         uses: actions/checkout@v7
 
       - name: Initialize CodeQL
-        uses: github/codeql-action/init@v4.37.7
+        uses: github/codeql-action/init@v4.37.8
         with:
           languages: javascript-typescript
 
       - name: Perform CodeQL Analysis
-        uses: github/codeql-action/analyze@v4.37.7
+        uses: github/codeql-action/analyze@v4.37.8
