@@ -949,7 +949,7 @@ struct MeetupDashboardView: View {
         } catch is CancellationError {
             return
         } catch {
-            error = "Couldn't send a nudge right now. Please try again."
+            self.error = "Couldn't send a nudge right now. Please try again."
             await load()
         }
     }
