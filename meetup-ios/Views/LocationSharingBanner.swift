@@ -17,10 +17,10 @@ struct LocationSharingBanner: View {
 
                 VStack(alignment: .leading, spacing: 2) {
                     Text("LIVE SHARING")
-                        .scaledFont(size: 9, weight: .black)
+                        .scaledFont(size: 10, weight: .black)
                         .foregroundStyle(Color.appAccentForeground.opacity(0.72))
                     Text(meetup.destinationName)
-                        .scaledFont(size: 13, weight: .bold)
+                        .scaledFont(size: 14, weight: .bold)
                         .lineLimit(1)
                 }
 
@@ -51,5 +51,9 @@ struct LocationSharingBanner: View {
             .shadow(color: Color.coral.opacity(0.22), radius: 14, y: 6)
         }
         .buttonStyle(.plain)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Live location sharing")
+        .accessibilityValue(meetup.destinationName)
+        .accessibilityHint("Opens the active meetup so you can review or stop sharing.")
     }
 }

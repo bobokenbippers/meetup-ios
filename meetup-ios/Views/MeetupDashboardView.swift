@@ -1,7 +1,6 @@
 import SwiftUI
 import MapKit
 import PhotosUI
-import Combine
 import Supabase
 
 struct MeetupDashboardView: View {
@@ -120,53 +119,32 @@ struct MeetupDashboardView: View {
         NavigationStack {
             ZStack(alignment: .bottom) {
                 VStack(spacing: 0) {
-                    dashboardHeader
+                    MeetupDashboardHeaderSection(
+                        greeting: greeting,
+                        displayName: auth.profile?.displayName ?? "there",
+                        destinationName: meetup.destinationName,
+                        meetingCount: meetingCount
+                    )
                         .padding(.horizontal, 20)
                         .padding(.top, 8)
                         .padding(.bottom, 10)
 
-                    destinationCard
+                    MeetupDashboardDestinationCard(
+                        meetup: meetup,
+                        isHost: myUserId == meetup.hostId && !meetup.isRecap,
+                        onEdit: { showEditMeetup = true }
+                    )
                         .padding(.horizontal, 14)
                         .padding(.bottom, 10)
 
-                    ZStack(alignment: .bottom) {
-                        Map {
-                            Annotation("", coordinate: destinationCoord) {
-                                DestinationMarker()
-                            }
-                            if meetup.status == "active" && !meetup.isRecap {
-                                ForEach(participants) { p in
-                                    if let lat = p.lat, let lng = p.lng {
-                                        Annotation("", coordinate: CLLocationCoordinate2D(latitude: lat, longitude: lng)) {
-                                            DashboardParticipantPin(
-                                                participant: p,
-                                                isMe: p.userId == myUserId,
-                                                targetArrivalAt: meetup.targetArrivalAt
-                                            )
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                        .clipShape(RoundedRectangle(cornerRadius: 28))
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 28)
-                                .strokeBorder(Color.coral.opacity(0.18), lineWidth: 1)
-                        )
-                        .padding(.horizontal, 12)
-                        .padding(.bottom, 12)
-
-                        LinearGradient(
-                            colors: [.clear, Color.black.opacity(0.22)],
-                            startPoint: .top,
-                            endPoint: .bottom
-                        )
-                        .clipShape(RoundedRectangle(cornerRadius: 28))
-                        .padding(.horizontal, 12)
-                        .padding(.bottom, 12)
-                        .allowsHitTesting(false)
-                    }
+                    MeetupDashboardMapSection(
+                        destinationCoord: destinationCoord,
+                        participants: participants,
+                        myUserId: myUserId,
+                        meetupStatus: meetup.status,
+                        isRecap: meetup.isRecap,
+                        targetArrivalAt: meetup.targetArrivalAt
+                    )
                 }
 
                 bottomPanel
@@ -310,9 +288,6 @@ struct MeetupDashboardView: View {
                 now = Date()
                 if meetup.isRecap && !showRecap { showRecap = true }
             }
-            .onDisappear {
-                LocationManager.shared.stopTracking()
-            }
             .alert("Error", isPresented: Binding(get: { error != nil }, set: { if !$0 { error = nil } })) {
                 Button("OK") { error = nil }
             } message: {
@@ -327,188 +302,24 @@ struct MeetupDashboardView: View {
 
     // MARK: - Sub-views
 
-    private var dashboardHeader: some View {
-        VStack(alignment: .leading, spacing: 2) {
-            Text("\(greeting), \(auth.profile?.displayName ?? "there") 👋")
-                .scaledFont(size: 12)
-                .foregroundStyle(DS.Color.textSecondary)
-            Text(meetup.destinationName)
-                .scaledFont(size: 24, weight: .black)
-                .foregroundStyle(DS.Color.textPrimary)
-                .lineLimit(1)
-            Text("You're meeting \(meetingCount) \(meetingCount == 1 ? "person" : "people")")
-                .scaledFont(size: 12)
-                .foregroundStyle(DS.Color.textSecondary)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-    }
-
-    private var destinationCard: some View {
-        HStack(spacing: 12) {
-            RoundedRectangle(cornerRadius: 10)
-                .fill(Color.coral)
-                .frame(width: 32, height: 32)
-                .overlay {
-                    Image(systemName: "mappin.circle.fill")
-                        .scaledFont(size: 18)
-                        .foregroundStyle(Color.appAccentForeground)
-                }
-
-            VStack(alignment: .leading, spacing: 1) {
-                Text(meetup.destinationName)
-                    .scaledFont(size: 13, weight: .bold)
-                    .lineLimit(1)
-                if let addr = meetup.destinationAddress {
-                    Text(addr)
-                        .scaledFont(size: 10)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                }
-            }
-
-            Spacer()
-
-            if let target = meetup.targetArrivalAt {
-                VStack(alignment: .trailing, spacing: 1) {
-                    Text(target, format: .dateTime.hour().minute())
-                        .scaledFont(size: 13, weight: .bold)
-                    let mins = Int(target.timeIntervalSinceNow / 60)
-                    if mins > 0 {
-                        Text("in \(mins) min")
-                            .scaledFont(size: 10, weight: .semibold)
-                            .foregroundStyle(Color.coral)
-                    }
-                }
-            }
-
-            if myUserId == meetup.hostId && !meetup.isRecap {
-                Button {
-                    showEditMeetup = true
-                } label: {
-                    Image(systemName: "pencil.circle.fill")
-                        .scaledFont(size: 22)
-                        .foregroundStyle(Color.coral)
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("Edit meetup")
-                .accessibilityIdentifier("btn_edit_meetup")
-            }
-        }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 12)
-        .background(Color.appSurface)
-        .clipShape(RoundedRectangle(cornerRadius: 14))
-        .overlay(
-            RoundedRectangle(cornerRadius: 14)
-                .strokeBorder(Color.coral.opacity(0.25), lineWidth: 1)
-        )
-        .shadow(color: Color.coral.opacity(0.08), radius: 8, y: 2)
-    }
-
-    // MARK: - Photo strip
-
-    private var photoStrip: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 8) {
-                ForEach(recentPhotos.prefix(6)) { photo in
-                    AsyncImage(url: URL(string: photo.photoUrl)) { phase in
-                        switch phase {
-                        case .success(let image):
-                            image
-                                .resizable()
-                                .scaledToFill()
-                        case .failure:
-                            Color.appSurface
-                                .overlay(
-                                    Image(systemName: "photo")
-                                        .foregroundStyle(.secondary)
-                                )
-                        default:
-                            Color.appSurface
-                                .overlay(ProgressView().scaleEffect(0.7))
-                        }
-                    }
-                    .frame(width: 72, height: 72)
-                    .clipped()
-                    .clipShape(RoundedRectangle(cornerRadius: 10))
-                    .contentShape(Rectangle())
-                    .onTapGesture { fullscreenPhoto = photo }
-                }
-
-                if recentPhotos.count > 6 {
-                    Button {
-                        fullscreenPhoto = recentPhotos[6]
-                    } label: {
-                        Text("+\(recentPhotos.count - 6)")
-                            .scaledFont(size: 16, weight: .semibold)
-                            .foregroundStyle(.white)
-                            .frame(width: 72, height: 72)
-                            .background(Color(white: 0.20))
-                            .clipShape(RoundedRectangle(cornerRadius: 10))
-                    }
-                    .buttonStyle(.plain)
-                }
-            }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 10)
-        }
-        .background(Color.appSurface)
-    }
-
     private var bottomPanel: some View {
-        VStack(spacing: 0) {
-            Button {
+        MeetupDashboardDrawer(
+            isExpanded: isDrawerExpanded,
+            summary: compactParticipantSummary,
+            participants: participants,
+            myUserId: myUserId,
+            targetArrivalAt: meetup.targetArrivalAt,
+            onToggle: {
                 withAnimation(.spring(response: 0.42, dampingFraction: 0.84)) {
                     isDrawerExpanded.toggle()
                 }
-            } label: {
-                VStack(spacing: 10) {
-                    RoundedRectangle(cornerRadius: 2)
-                        .fill(Color(white: 0.30))
-                        .frame(width: 34, height: 4)
-                        .padding(.top, 10)
-
-                    HStack(alignment: .center, spacing: 12) {
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text("Everyone")
-                                .scaledFont(size: 14, weight: .bold)
-                                .foregroundStyle(DS.Color.textPrimary)
-                            Text(compactParticipantSummary)
-                                .scaledFont(size: 11, weight: .medium)
-                                .foregroundStyle(DS.Color.textSecondary)
-                                .lineLimit(1)
-                        }
-
-                        Spacer(minLength: 0)
-
-                        SquadAvatarStrip(
-                            participants: participants,
-                            currentUserId: myUserId,
-                            targetArrivalAt: meetup.targetArrivalAt
-                        )
-
-                        Image(systemName: isDrawerExpanded ? "chevron.down" : "chevron.up")
-                            .scaledFont(size: 12, weight: .bold)
-                            .foregroundStyle(DS.Color.textSecondary)
-                    }
-                    .padding(.horizontal, 16)
-                    .padding(.bottom, 12)
-                }
             }
-            .buttonStyle(.plain)
-
+        ) {
             if isDrawerExpanded {
                 expandedDrawerContent
                     .transition(.move(edge: .bottom).combined(with: .opacity))
             }
         }
-        .background(Color.appSurface)
-        .clipShape(RoundedRectangle(cornerRadius: 24))
-        .overlay(
-            RoundedRectangle(cornerRadius: 24)
-                .strokeBorder(Color.coral.opacity(0.20), lineWidth: 1)
-        )
-        .shadow(color: Color.coral.opacity(0.12), radius: 18, y: 8)
         .animation(.spring(response: 0.45, dampingFraction: 0.75), value: myStatus)
         .animation(.spring(response: 0.45, dampingFraction: 0.82), value: isDrawerExpanded)
     }
@@ -517,7 +328,13 @@ struct MeetupDashboardView: View {
     private var expandedDrawerContent: some View {
         VStack(spacing: 0) {
             if !recentPhotos.isEmpty {
-                photoStrip
+                MeetupDashboardPhotoStrip(
+                    photos: recentPhotos,
+                    onSelect: { fullscreenPhoto = $0 },
+                    onShowOverflow: { overflowPhoto in
+                        fullscreenPhoto = overflowPhoto
+                    }
+                )
                     .clipShape(RoundedRectangle(cornerRadius: 16))
                     .padding(.horizontal, 12)
                     .padding(.bottom, 10)
@@ -612,151 +429,33 @@ struct MeetupDashboardView: View {
                 .padding(.bottom, 8)
             }
 
-            HStack(spacing: 8) {
-                Button {
-                    openDirections()
-                } label: {
-                    Label {
-                        Text("Directions")
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.5)
-                            .allowsTightening(true)
-                    } icon: {
-                        Image(systemName: "map.fill")
-                    }
-                    .frame(maxWidth: .infinity)
-                }
-                .buttonStyle(.glass)
-
-                Button { showComments = true } label: {
-                    Label {
-                        Text("Comments")
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.5)
-                            .allowsTightening(true)
-                    } icon: {
-                        Image(systemName: "text.bubble.fill")
-                    }
-                    .frame(maxWidth: .infinity)
-                }
-                .buttonStyle(.glass)
-
-                Button { showBill = true } label: {
-                    Label {
-                        Text("Split Bill")
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.5)
-                            .allowsTightening(true)
-                    } icon: {
-                        Image(systemName: "receipt")
-                    }
-                    .frame(maxWidth: .infinity)
-                }
-                .buttonStyle(.glass)
-            }
+            MeetupDashboardQuickActions(
+                onDirections: openDirections,
+                onComments: { showComments = true },
+                onBill: { showBill = true }
+            )
             .padding(.horizontal, 16)
             .padding(.top, 12)
             .padding(.bottom, 4)
 
-            if canShareLocation {
-                VStack(alignment: .leading, spacing: 8) {
-                    Button {
-                        if isSharingThisMeetup {
-                            showStopSharingConfirm = true
-                        } else {
-                            startSharing()
-                        }
-                    } label: {
-                        HStack(spacing: 6) {
-                            if isStartingSharing || isStoppingSharing {
-                                ProgressView()
-                                    .scaleEffect(0.75)
-                            } else {
-                                Image(systemName: isSharingThisMeetup ? "location.slash.fill" : "location.fill")
-                            }
-                            Text(locationSharingButtonTitle)
-                                .lineLimit(1)
-                                .minimumScaleFactor(0.8)
-                        }
-                        .scaledFont(size: 13, weight: .semibold)
-                        .foregroundStyle(isSharingThisMeetup ? Color.statusRunningLate : Color.coral)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 11)
-                        .background(locationSharingControlColor.opacity(0.12))
-                        .clipShape(RoundedRectangle(cornerRadius: 12))
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 12)
-                                .strokeBorder(locationSharingControlColor.opacity(0.35), lineWidth: 1)
-                        )
+            MeetupDashboardLocationSharingSection(
+                canShareLocation: canShareLocation,
+                isSharingThisMeetup: isSharingThisMeetup,
+                isStartingSharing: isStartingSharing,
+                isStoppingSharing: isStoppingSharing,
+                onStartOrStop: {
+                    if isSharingThisMeetup {
+                        showStopSharingConfirm = true
+                    } else {
+                        startSharing()
                     }
-                    .buttonStyle(.plain)
-                    .disabled(isStartingSharing || isStoppingSharing)
-                    .accessibilityLabel(locationSharingAccessibilityLabel)
-                    .accessibilityIdentifier(isSharingThisMeetup ? "btn_stop_sharing" : "btn_start_sharing")
-
-                    Text(
-                        "Live ETA updates continue in the background for this active meetup until " +
-                            "you stop sharing or the meetup expires. This may use battery."
-                    )
-                    .scaledFont(size: 11)
-                    .foregroundStyle(DS.Color.textSecondary)
-                    .fixedSize(horizontal: false, vertical: true)
-                }
-                .padding(.horizontal, 16)
-                .padding(.bottom, 8)
-            } else if isSharingThisMeetup {
-                Button {
-                    showStopSharingConfirm = true
-                } label: {
-                    HStack(spacing: 6) {
-                        if isStoppingSharing {
-                            ProgressView()
-                                .scaleEffect(0.75)
-                        } else {
-                            Image(systemName: "location.slash.fill")
-                        }
-                        Text(isStoppingSharing ? "Stopping…" : "Stop Sharing Location")
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.8)
-                    }
-                    .scaledFont(size: 13, weight: .semibold)
-                    .foregroundStyle(Color.statusRunningLate)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 11)
-                    .background(Color.statusRunningLate.opacity(0.12))
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 12)
-                            .strokeBorder(Color.statusRunningLate.opacity(0.35), lineWidth: 1)
-                    )
-                }
-                .buttonStyle(.plain)
-                .disabled(isStoppingSharing)
-                .padding(.horizontal, 16)
-                .padding(.bottom, 8)
-                .accessibilityLabel("Stop sharing your location")
-                .accessibilityIdentifier("btn_stop_sharing")
-            } else {
-                Color.clear.frame(height: 8)
-            }
+                },
+                onStopOnly: { showStopSharingConfirm = true }
+            )
         }
     }
 
     // MARK: - Logic
-
-    private var locationSharingButtonTitle: String {
-        if isStartingSharing { return "Starting..." }
-        if isStoppingSharing { return "Stopping..." }
-        return isSharingThisMeetup ? "Stop Sharing Location" : "Start Sharing Location"
-    }
-
-    private var locationSharingAccessibilityLabel: String {
-        isSharingThisMeetup ? "Stop sharing your location" : "Start sharing your location"
-    }
-
-    private var locationSharingControlColor: Color {
-        isSharingThisMeetup ? Color.statusRunningLate : Color.coral
-    }
 
     private func startSharing() {
         guard !isStartingSharing else { return }
@@ -1428,7 +1127,7 @@ private struct ShareSheet: UIViewControllerRepresentable {
 
 // MARK: - Destination Marker
 
-private struct DestinationMarker: View {
+struct DestinationMarker: View {
     var body: some View {
         ZStack {
             Circle()
@@ -1440,315 +1139,6 @@ private struct DestinationMarker: View {
                 .overlay(Circle().strokeBorder(.white, lineWidth: 2))
                 .shadow(color: Color.coral.opacity(0.6), radius: 6)
         }
-    }
-}
-
-// MARK: - Participant Pin (on map)
-
-private func participantPresenceStyle(
-    for participant: MeetupParticipant,
-    isMe: Bool,
-    targetArrivalAt: Date?
-) -> AvatarPresenceStyle {
-    let punctuality = PunctualityStatus.resolve(
-        status: participant.status,
-        hasLiveETA: participant.hasLiveETA,
-        targetArrivalAt: targetArrivalAt
-    )
-
-    switch punctuality {
-    case .arrived:
-        return AvatarPresenceStyle(
-            ringColor: .statusLive,
-            ringWidth: isMe ? 3 : 2.5,
-            glowColor: .statusLive,
-            glowRadius: 8,
-            badge: .arrived,
-            overlayLabel: nil
-        )
-    case .enRoute:
-        return AvatarPresenceStyle(
-            ringColor: isMe ? .coral : .statusEnRoute,
-            ringWidth: isMe ? 3 : 2.5,
-            glowColor: .statusEnRoute,
-            glowRadius: 10,
-            badge: .live
-        )
-    case .runningLate:
-        return AvatarPresenceStyle(
-            ringColor: .statusRunningLate,
-            ringWidth: isMe ? 3 : 2.5,
-            glowColor: .statusRunningLate,
-            glowRadius: 9,
-            badge: .late
-        )
-    case .invited:
-        return AvatarPresenceStyle(
-            ringColor: Color.statusInvited.opacity(0.45),
-            ringWidth: 1.5,
-            badge: .invited
-        )
-    case .going:
-        return AvatarPresenceStyle(
-            ringColor: .statusGoing,
-            ringWidth: isMe ? 3 : 2
-        )
-    case .declined, .maybe:
-        return AvatarPresenceStyle()
-    }
-}
-
-private struct SquadAvatarStrip: View {
-    let participants: [MeetupParticipant]
-    let currentUserId: UUID?
-    let targetArrivalAt: Date?
-
-    private var visibleParticipants: [MeetupParticipant] {
-        Array(participants.prefix(4))
-    }
-
-    var body: some View {
-        HStack(spacing: -8) {
-            ForEach(visibleParticipants) { participant in
-                ProfileAvatarView(
-                    displayName: participant.displayName,
-                    avatarUrl: participant.avatarUrl,
-                    userId: participant.userId,
-                    size: 28,
-                    fontSize: 11,
-                    presenceStyle: participantPresenceStyle(
-                        for: participant,
-                        isMe: participant.userId == currentUserId,
-                        targetArrivalAt: targetArrivalAt
-                    )
-                )
-                .background(
-                    Circle()
-                        .fill(Color.appSurface)
-                )
-            }
-
-            if participants.count > visibleParticipants.count {
-                Text("+\(participants.count - visibleParticipants.count)")
-                    .scaledFont(size: 10, weight: .bold)
-                    .foregroundStyle(DS.Color.textSecondary)
-                    .frame(width: 28, height: 28)
-                    .background(Color.appBackground)
-                    .clipShape(Circle())
-                    .overlay(Circle().strokeBorder(Color.coral.opacity(0.18), lineWidth: 1))
-                    .padding(.leading, 10)
-            }
-        }
-    }
-}
-
-struct DashboardParticipantPin: View {
-    let participant: MeetupParticipant
-    let isMe: Bool
-    let targetArrivalAt: Date?
-
-    private var punctualityStatus: PunctualityStatus {
-        PunctualityStatus.resolve(
-            status: participant.status,
-            hasLiveETA: participant.hasLiveETA,
-            targetArrivalAt: targetArrivalAt
-        )
-    }
-
-    private var etaText: String {
-        if let late = participant.lateLabel(target: targetArrivalAt) { return late }
-        return participant.etaLabel() ?? punctualityStatus.label
-    }
-
-    private var etaColor: Color {
-        if participant.lateLabel(target: targetArrivalAt) != nil { return .statusLate }
-        return punctualityStatus.color
-    }
-
-    var body: some View {
-        HStack(spacing: 6) {
-            ProfileAvatarView(
-                displayName: participant.displayName,
-                avatarUrl: participant.avatarUrl,
-                userId: participant.userId,
-                size: isMe ? 38 : 34,
-                fontSize: 13,
-                presenceStyle: participantPresenceStyle(
-                    for: participant,
-                    isMe: isMe,
-                    targetArrivalAt: targetArrivalAt
-                )
-            )
-            .overlay(Circle().strokeBorder(.white, lineWidth: isMe ? 3 : 2.5))
-            .shadow(radius: 4)
-
-            if !isMe || participant.hasLiveETA || participant.status == "arrived" {
-                VStack(alignment: .leading, spacing: 1) {
-                    Text(isMe ? "You" : (participant.displayName ?? "?"))
-                        .scaledFont(size: 10, weight: .bold)
-                        .foregroundStyle(DS.Color.textPrimary)
-                    Text(etaText)
-                        .scaledFont(size: 9, weight: .semibold)
-                        .foregroundStyle(etaColor)
-                }
-                .padding(.horizontal, 8)
-                .padding(.vertical, 6)
-                .background(Color.appSurface.opacity(0.96))
-                .clipShape(RoundedRectangle(cornerRadius: 12))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 12)
-                        .strokeBorder((isMe ? Color.coral : etaColor).opacity(0.22), lineWidth: 1)
-                )
-            }
-        }
-    }
-}
-
-// MARK: - Participant Row (in bottom panel)
-
-private struct DashboardParticipantRow: View {
-    let participant: MeetupParticipant
-    let isMe: Bool
-    let targetArrivalAt: Date?
-    let canNudge: Bool
-    let isNudging: Bool
-    let onNudge: () -> Void
-
-    private var punctualityStatus: PunctualityStatus {
-        PunctualityStatus.resolve(
-            status: participant.status,
-            hasLiveETA: participant.hasLiveETA,
-            targetArrivalAt: targetArrivalAt
-        )
-    }
-
-    private var etaText: String {
-        if let late = participant.lateLabel(target: targetArrivalAt) { return late }
-        return participant.etaLabel() ?? punctualityStatus.label
-    }
-
-    private var etaColor: Color {
-        if participant.lateLabel(target: targetArrivalAt) != nil { return .statusLate }
-        return punctualityStatus.color
-    }
-
-    private var punctualityTint: Color? {
-        guard let target = targetArrivalAt,
-              participant.status != "arrived"
-        else { return nil }
-        switch participant.punctualityState(target: target) {
-        case .early:        return Color.statusLive.opacity(0.12)
-        case .onTime:       return nil
-        case .cuttingClose: return Color(red: 1.0, green: 0.85, blue: 0.2).opacity(0.18)
-        case .late:         return Color.orange.opacity(0.18)
-        case .veryLate:     return Color.statusLate.opacity(0.15)
-        case .none:         return nil
-        }
-    }
-
-    private var punctualityAccent: Color? {
-        guard let target = targetArrivalAt,
-              participant.status != "arrived"
-        else { return nil }
-        switch participant.punctualityState(target: target) {
-        case .early:        return Color.statusLive
-        case .onTime:       return nil
-        case .cuttingClose: return Color(red: 1.0, green: 0.75, blue: 0.0)
-        case .late:         return Color.orange
-        case .veryLate:     return Color.statusLate
-        case .none:         return nil
-        }
-    }
-
-    private var isRunningLate: Bool {
-        punctualityStatus == .runningLate
-    }
-
-    var body: some View {
-        HStack(spacing: 12) {
-            ProfileAvatarView(
-                displayName: participant.displayName,
-                avatarUrl: participant.avatarUrl,
-                userId: participant.userId,
-                size: 30,
-                fontSize: 12,
-                presenceStyle: participantPresenceStyle(
-                    for: participant,
-                    isMe: isMe,
-                    targetArrivalAt: targetArrivalAt
-                )
-            )
-
-            VStack(alignment: .leading, spacing: 1) {
-                HStack(spacing: 4) {
-                    Text(participant.displayName ?? "Unknown")
-                        .scaledFont(size: 12, weight: .semibold)
-                        .foregroundStyle(DS.Color.textPrimary)
-                    if isMe {
-                        Text("(you)")
-                            .scaledFont(size: 11)
-                            .foregroundStyle(DS.Color.textSecondary)
-                    }
-                }
-                Text(etaText)
-                    .scaledFont(size: 10, weight: .semibold)
-                    .foregroundStyle(etaColor)
-                if isRunningLate {
-                    Label("Late tax", systemImage: "bolt.fill")
-                        .scaledFont(size: 9, weight: .bold)
-                        .foregroundStyle(Color.statusRunningLate)
-                        .labelStyle(.titleAndIcon)
-                }
-            }
-
-            Spacer(minLength: 12)
-
-            VStack(alignment: .trailing, spacing: 6) {
-                PunctualityTile(
-                    rawStatus: participant.status,
-                    hasLiveETA: participant.hasLiveETA,
-                    targetArrivalAt: targetArrivalAt
-                )
-
-                if canNudge {
-                    Button(action: onNudge) {
-                        HStack(spacing: 5) {
-                            if isNudging {
-                                ProgressView()
-                                    .scaleEffect(0.7)
-                            } else {
-                                Image(systemName: "bell.badge")
-                            }
-                            Text(isNudging ? "Nudging..." : "Nudge")
-                        }
-                        .scaledFont(size: 10, weight: .semibold)
-                        .foregroundStyle(Color.coral)
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 6)
-                        .background(Color.coral.opacity(0.10))
-                        .clipShape(Capsule())
-                        .overlay {
-                            Capsule()
-                                .strokeBorder(Color.coral.opacity(0.22), lineWidth: 1)
-                        }
-                    }
-                    .buttonStyle(.plain)
-                    .disabled(isNudging)
-                    .accessibilityLabel("Nudge \(participant.displayName ?? "participant")")
-                }
-            }
-        }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 8)
-        .background(punctualityTint)
-        .overlay(alignment: .leading) {
-            if let accent = punctualityAccent {
-                Rectangle()
-                    .fill(accent)
-                    .frame(width: 3)
-            }
-        }
-        .animation(.easeInOut(duration: 0.3), value: participant.etaSeconds)
     }
 }
 
